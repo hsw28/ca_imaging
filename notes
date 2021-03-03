@@ -1,0 +1,29 @@
+CONVERT ALL TO TIFFS
+CONCATINATE ALL TIFFS
+OPEN FOLDER WITH CIATAH
+MODEL PRE PROCESS MOVIE
+  - remove strips
+  - downsample in space
+  - turboREG
+  - border
+  - fixed dropped frames
+  - downsample in time
+  - convert to dF/std
+modelExtractSignalsFromMovie
+  - zhou? -- have to insert processed movie and make sure frame rate is correct
+modelVarsFromFiles (can also use this to open formerly analyzed files)
+(optional) view output using viewCellExtractionOnMovie
+computeManualSortSignals
+  -- then can rerun modelExtraxt using sorted signals +about 20% (so 163, run using PCA for 200 and resort)
+
+
+%to get times
+>> spikeinfo = load('/Users/Hannah/Downloads/rat_1_28_21/2021_02_25/1_28_21_p000_m000_NULL000_cnmfeAnalysis.mat')
+spikeinfo.cnmfeAnalysisOutput.extractedPeaks
+spikeinfo.cnmfeAnalysisOutput.extractedSignals
+spikeinfo.cnmfeAnalysisOutput.extractedSignalsEst
+
+%to get good cells after sorting
+>> good = load('/Users/Hannah/Downloads/rat_1_28_21/2021_02_25/1_28_21_p000_m000_NULL000_cnmfeAnalysisSorted_hannah.mat')
+good = good.validCNMFE;
+temp = find(good==1);
