@@ -11,6 +11,8 @@ goodtime = pos(goodvel, 1);
 figure
 
 numunits = size(peaks_time,1);
+ha = tight_subplot(ceil(sqrt(numunits)),ceil(sqrt(numunits)),[.01 .03],[.1 .01],[.01 .01])
+
 for k=1:numunits
   highspeedspikes = [];
   for i=1:length(peaks_time(k,:)) %finding if in good vel
@@ -21,10 +23,12 @@ for k=1:numunits
     end;
   end
 
-  subplot(ceil(sqrt(numunits)),ceil(sqrt(numunits)), k)
+  %subplot(ceil(sqrt(numunits)),ceil(sqrt(numunits)), k)
 
-
+  axes(ha(k));
   normalizePosData(highspeedspikes,pos,dim);
+  set(colorbar,'visible','off')
+
 
   %normalizePosData(peaks_time(k,:),pos,dim);
 end

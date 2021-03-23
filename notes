@@ -35,4 +35,11 @@ spiketimes = converttrain(spikepeaks, length_in_seconds);
 %plot raster
 ca_raster(spiketimes)
 
-%
+%load position
+pos = load('pos.csv')
+
+%fix position
+pos = ca_fixpos(pos, length_in_seconds);
+
+%look for place Cells
+pos_maps(spiketimes, pos, dim)
