@@ -1,4 +1,4 @@
-function v = velocity(pos);
+function v = ca_velocity(pos);
 %computes velocity from position data as velocity(pos, varargin). if you put a 1 in varargin, velocity will be directional from junction of forced arms (380, 360)
 %computes velocity. input a [#ofpoints, 3] vector, where first column is time, second is x, third is y
 %linear track is 248.92cm and about 620 pixels = 2.5pixels per cm

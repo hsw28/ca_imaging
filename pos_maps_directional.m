@@ -41,13 +41,31 @@ for k=1:numunits
   %plot fwd
 
   axes(ha(k));
-  pos(:,3) = 30;
-  normalizePosData(fwd,pos,dim, 2.5);
-  set(colorbar,'visible','off')
+  pos(:,3) = 1;
+  [rate totspikes totstime colorbarf] = normalizePosData(fwd,pos,dim, 2.5);
+  camutualinfo(rate)
 
-  axes(ha(k*2));
-  pos(:,3) = 30;
-  normalizePosData(bwd,pos,dim, 2.5);
+  q = ceil((numunits))*2;
+  axes(ha(q./2+k));
+  pos(:,3) = 1;
+  [rate totspikes totstime colorbarb] = normalizePosData(bwd,pos,dim, 2.5);
+  camutualinfo(rate)
+
+  if max(colorbarf) > max(colorbarb)
+    axes(ha(q./2+k));
+    set(gca, 'clim', colorbarf);
+    colorbar
+    axes(ha(k));
+    set(gca, 'clim', colorbarf);
+    colorbar
+  else
+    axes(ha(k));
+    set(gca, 'clim', colorbarb);
+    colorbar
+    axes(ha(q./2+k));
+    set(gca, 'clim', colorbarb);
+    colorbar
+  end
 
 
   %normalizePosData(peaks_time(k,:),pos,dim);
