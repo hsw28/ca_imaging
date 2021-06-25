@@ -1,6 +1,8 @@
-function f = ca_fixpos(pos, length_in_seconds)
+function f = ca_fixpos(pos)
 %converts position file to time, x, y and interpolates missing values
 %REMEMBER TO GET PIXEL TO INCH CONVERSION
+
+length_in_seconds = length(pos)./30;
 
 pos = pos';
 time = (0:(length_in_seconds./length(pos)):length_in_seconds);

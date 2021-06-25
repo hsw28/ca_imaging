@@ -1,10 +1,9 @@
 function f = ca_raster(peak_matrix)
 %plots input times
 
-
 frames = size(peak_matrix,2);
 
-raster(peak_matrix', 1, max(peak_matrix(:)));
+raster((peak_matrix'), 1, max(peak_matrix(:)));
 title('Ca2+ Imaging Raster Plot')
 xlabel('Seconds')
 ylabel('Cells')

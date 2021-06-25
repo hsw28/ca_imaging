@@ -1,5 +1,6 @@
 function f = getspikepeaks(unsortedstructure, sortedstructure)
 %gives you only sorted spike peaks
+%aftrwards you need to still convert spikepeaks to times: spiketimes = converttrain(spikepeaks, length_in_seconds);
 
 spikepeaks = unsortedstructure.cnmfeAnalysisOutput.extractedPeaks;
 

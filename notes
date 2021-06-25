@@ -18,28 +18,30 @@
 
 
 %to get times
->> spikeinfo = load('/Users/Hannah/Downloads/rat_1_28_21/2021_02_25/1_28_21_p000_m000_NULL000_cnmfeAnalysis.mat')
-spikepeaks = spikeinfo.cnmfeAnalysisOutput.extractedPeaks
-spikeinfo.cnmfeAnalysisOutput.extractedSignals
-spikeinfo.cnmfeAnalysisOutput.extractedSignalsEst
-
+!!!!!!!NOTE-- the below section is all done in getspikepeaks.m except for the loading
+%>> spikeinfo = load('/Users/Hannah/Downloads/rat_1_28_21/2021_02_25/1_28_21_p000_m000_NULL000_cnmfeAnalysis.mat')
+%spikepeaks = spikeinfo.cnmfeAnalysisOutput.extractedPeaks
+%spikeinfo.cnmfeAnalysisOutput.extractedSignals
+%spikeinfo.cnmfeAnalysisOutput.extractedSignalsEst
 %to get good cells after sorting
->> good = load('/Users/Hannah/Downloads/rat_1_28_21/2021_02_25/1_28_21_p000_m000_NULL000_cnmfeAnalysisSorted_hannah.mat')
-good = good.validCNMFE;
-temp = find(good==1);
-spikepeaks = spikepeaks(temp, :);
-
-%convert spikepeaks to times
-spiketimes = converttrain(spikepeaks, length_in_seconds);
-
-%plot raster
-ca_raster(spiketimes)
+%>> good = load('/Users/Hannah/Downloads/rat_1_28_21/2021_02_25/1_28_21_p000_m000_NULL000_cnmfeAnalysisSorted_hannah.mat')
+%good = good.validCNMFE;
+%temp = find(good==1);
+%spikepeaks = spikepeaks(temp, :);
 
 %load position
 pos = load('pos.csv')
 
 %fix position
-pos = ca_fixpos(pos, length_in_seconds);
+pos = ca_fixpos(pos);
+
+%convert spikepeaks to times
+spiketimes = converttrain(spikepeaks);
+
+
+%plot raster
+maketrain(sparsematrix);
+
 
 %look for place Cells
 pos_maps(spiketimes, pos, dim)
