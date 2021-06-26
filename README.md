@@ -4,6 +4,8 @@ ca_mutualinfo - in prep
 ca_bitsperspike - in prep
 
 ca_fixpos - converts position file to time, x, y and interpolates missing values
+ca_mutualinfo - gets mutual info for Ca cells (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6331214/)
+ca_mutualinfo_shuff - shuffles spike trains for mutual info
 ca_raster - makes raster of times
 ca_velocity - gets velocity using track pixel to cm converstion.
 converttotime - converts output of getspikepeaks to matrix of times.

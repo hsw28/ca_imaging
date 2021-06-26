@@ -4,10 +4,11 @@ function f = pos_maps_directional(peaks_time, pos, dim)
 
 
 velthreshold = 12;
-vel = cavelocity(pos);
+vel = ca_velocity(pos);
 vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30); %originally had this at 30, trying with 15 now
 goodvel = find(vel(1,:)>=velthreshold);
 goodtime = pos(goodvel, 1);
+goodpos = pos(goodvel,:);
 
 figure
 
@@ -41,15 +42,15 @@ for k=1:numunits
   %plot fwd
 
   axes(ha(k));
-  pos(:,3) = 1;
-  [rate totspikes totstime colorbarf] = normalizePosData(fwd,pos,dim, 2.5);
-  camutualinfo(rate)
+  goodpos(:,3) = 1;
+  [rate totspikes totstime colorbarf] = normalizePosData(fwd,goodpos,dim, 2.5);
 
+  hold on
   q = ceil((numunits))*2;
   axes(ha(q./2+k));
-  pos(:,3) = 1;
-  [rate totspikes totstime colorbarb] = normalizePosData(bwd,pos,dim, 2.5);
-  camutualinfo(rate)
+  goodpos(:,3) = 1;
+  [rate totspikes totstime colorbarb] = normalizePosData(bwd,goodpos,dim, 2.5);
+
 
   if max(colorbarf) > max(colorbarb)
     axes(ha(q./2+k));
@@ -68,5 +69,5 @@ for k=1:numunits
   end
 
 
-  %normalizePosData(peaks_time(k,:),pos,dim);
+
 end
