@@ -8,7 +8,7 @@
   - border
   - fixed dropped frames
   - downsample in time
-  - convert to dF/std
+  - convert to dF/d0
 *modelExtractSignalsFromMovie
   - zhou? -- have to insert processed movie and make sure frame rate is correct
 *modelVarsFromFiles (can also use this to open formerly analyzed files)
@@ -27,7 +27,7 @@
 %>> good = load('/Users/Hannah/Downloads/rat_1_28_21/2021_02_25/1_28_21_p000_m000_NULL000_cnmfeAnalysisSorted_hannah.mat')
 %good = good.validCNMFE;
 %temp = find(good==1);
-%spikepeaks = spikepeaks(temp, :);
+%spikepeaks = getspikepeaks(temp, :);
 
 %load position
 pos = load('pos.csv')
@@ -36,12 +36,17 @@ pos = load('pos.csv')
 pos = ca_fixpos(pos);
 
 %convert spikepeaks to times
-spiketimes = converttrain(spikepeaks);
+spiketimes = converttotime(spikepeaks);
 
 
 %plot raster
 maketrain(sparsematrix);
 
 
-%look for place Cells
+%look for place Cells visually
 pos_maps(spiketimes, pos, dim)
+
+%look for place cells with mutual info
+ mutinfo = ca_mutualinfo(peaks_time, pos, dim)
+ mutinfo_shuff = ca_mutualinfo_shuff(peaks_time, pos, dim, num_times_to_run, ca_MI)
+ mutualinfo_diff(mutinfo, mutinfo_shuff)

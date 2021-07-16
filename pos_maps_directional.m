@@ -3,7 +3,7 @@ function f = pos_maps_directional(peaks_time, pos, dim)
 
 
 
-velthreshold = 12;
+velthreshold = 8;
 vel = ca_velocity(pos);
 vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30); %originally had this at 30, trying with 15 now
 goodvel = find(vel(1,:)>=velthreshold);
@@ -30,7 +30,7 @@ for k=1:numunits
   bwd = [];
   for z = 1:length(highspeedspikes)
     [minValue,closestIndex] = min(abs(pos(:,1)-highspeedspikes(z)));
-    if pos(closestIndex-15,2)-pos(closestIndex+15,2)>0
+    if pos(max(closestIndex-15, 1),2)-pos(min(closestIndex+15,length(pos)),2)>0
       fwd(end+1) = highspeedspikes(z);
     else
       bwd(end+1) = highspeedspikes(z);
@@ -44,14 +44,16 @@ for k=1:numunits
   axes(ha(k));
   goodpos(:,3) = 1;
   [rate totspikes totstime colorbarf] = normalizePosData(fwd,goodpos,dim, 2.5);
+  colorbar
 
-  hold on
+
   q = ceil((numunits))*2;
   axes(ha(q./2+k));
   goodpos(:,3) = 1;
   [rate totspikes totstime colorbarb] = normalizePosData(bwd,goodpos,dim, 2.5);
+  colorbar
 
-
+%{
   if max(colorbarf) > max(colorbarb)
     axes(ha(q./2+k));
     set(gca, 'clim', colorbarf);
@@ -67,7 +69,7 @@ for k=1:numunits
     set(gca, 'clim', colorbarb);
     colorbar
   end
-
+%}
 
 
 end

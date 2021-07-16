@@ -1,35 +1,34 @@
-function f = ca_mutualinfo(peaks_time, pos, dim)
-%plots place cell maps for a bunch of 'cells'
+function f = ca_mutualinfo_shuff_all(peaks_time, pos, dim, num_times_to_run)
+%finds 95% top shuffled mutual info for X number of runs
+%shuffles spike trains for mutual info in all times (NOT only in run time)
 
-tic
+
 mutinfo = NaN(2, size(peaks_time,1));
 
-
-
-velthreshold = 12;
+velthreshold = 8;
 vel = ca_velocity(pos);
-vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30.0005); %originally had this at 30, trying with 15 now
+vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30); %originally had this at 30, trying with 15 now
 goodvel = find(vel(1,:)>=velthreshold);
 goodtime = pos(goodvel, 1);
 goodpos = pos(goodvel,:);
 
-mintime = vel(2,1);
-maxtime = vel(2,end);
+figure
 
 numunits = size(peaks_time,1);
 
 for k=1:numunits
+
+  for l = 1:num_times_to_run
+
+  shuff = randsample(pos(:, 1), length(numunits));
+  shuff = sort(shuff);
+
   highspeedspikes = [];
-
-  [c indexmin] = (min(abs(peaks_time(k,:)-mintime))); %
-  [c indexmax] = (min(abs(peaks_time(k,:)-maxtime))); %
-  currspikes = peaks_time(k,indexmin:indexmax);
-
-  for i=1:length(currspikes) %finding if in good vel
-    [minValue,closestIndex] = min(abs(currspikes(i)-goodtime));
+  for i=1:length(shuff) %finding if in good vel
+    [minValue,closestIndex] = min(abs(shuff(i)-goodtime));
 
     if minValue <= 1 %if spike is within 1 second of moving. no idea if good time
-      highspeedspikes(end+1) = currspikes(i);
+      highspeedspikes(end+1) = shuff(i);
     end;
   end
 
@@ -45,13 +44,17 @@ for k=1:numunits
     end
   end
 
-
   %subplot(ceil(sqrt(numunits)),ceil(sqrt(numunits)), k)
 
 
   set(0,'DefaultFigureVisible', 'off');
 
-  if length(fwd)./length(goodtime)*30 >.01
+fwdshuf = NaN(num_times_to_run,1);
+bwdshuf = NaN(num_times_to_run,1);
+
+
+
+  if length(fwd) >5
   goodpos(:,3) = 1;
   [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(fwd,goodpos,dim, 2.5);
 
@@ -61,7 +64,7 @@ for k=1:numunits
   end
 
 
-  if length(bwd)./length(goodtime)*30 >.01
+  if length(bwd) >5
   goodpos(:,3) = 1;
   [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(bwd,goodpos,dim, 2.5);
   mutinfo(2, k) = mutualinfo([spikeprob', occprob']);
@@ -69,10 +72,14 @@ for k=1:numunits
     mutinfo(2, k) = NaN;
   end
 
+end
+
+topMI = floor(num_times_to_run*.95);
+fwdshuf = sort(fwdshuf);
+bwdshuf = sort(bwdshuf);
+mutinfo(1, k) = fwdshuf(topMI);
+mutinfo(2, k) = bwdshuf(topMI);
 
 end
 
 f = mutinfo';
-toc
-beep on
-beep

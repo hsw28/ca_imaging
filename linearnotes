@@ -1,0 +1,37 @@
+MI127_603 = ca_mutualinfo(spiketimes127_603, pos127_603, 4);
+MI127_607 = ca_mutualinfo(spiketimes127_607, pos127_607, 4);
+MI128_518 = ca_mutualinfo(spiketimes128_518, pos128_518, 4);
+MI128_520 = ca_mutualinfo(spiketimes128_520, pos128_520, 4);
+MI330_608 = ca_mutualinfo(spiketimes330_608, pos330_608, 4);
+MI330_609 = ca_mutualinfo(spiketimes330_609, pos330_609, 4);
+MI331_603 = ca_mutualinfo(spiketimes331_603, pos331_603, 4);
+MI331_607 = ca_mutualinfo(spiketimes331_607, pos331_607, 4);
+
+MI127_603_shuff = ca_mutualinfo_shuff(spiketimes127_603, pos127_603, 4, 500, MI127_603);
+MI127_607_shuff = ca_mutualinfo_shuff(spiketimes127_607, pos127_607, 4, 500, MI127_607);
+MI128_518_shuff = ca_mutualinfo_shuff(spiketimes128_518, pos128_518, 4, 500, MI128_518);
+MI128_520_shuff = ca_mutualinfo_shuff(spiketimes128_520, pos128_520, 4, 500, MI128_520);
+MI330_608_shuff = ca_mutualinfo_shuff(spiketimes330_608, pos330_608, 4, 500, MI330_608);
+MI330_609_shuff = ca_mutualinfo_shuff(spiketimes330_609, pos330_609, 4, 500, MI330_609);
+MI331_603_shuff = ca_mutualinfo_shuff(spiketimes331_603, pos331_603, 4, 500, MI331_603);
+MI331_607_shuff = ca_mutualinfo_shuff(spiketimes331_607, pos331_607, 4, 500, MI331_607);
+
+MI127_603_good = mutualinfo_diff(MI127_603,MI127_603_shuff);
+MI127_607_good = mutualinfo_diff(MI127_607,MI127_607_shuff);
+MI128_518_good = mutualinfo_diff(MI128_518,MI128_518_shuff);
+MI128_520_good = mutualinfo_diff(MI128_520,MI128_520_shuff);
+MI330_608_good = mutualinfo_diff(MI330_608,MI330_608_shuff);
+MI330_609_good = mutualinfo_diff(MI330_609,MI330_609_shuff);
+MI331_603_good = mutualinfo_diff(MI331_603,MI331_603_shuff);
+MI331_607_good = mutualinfo_diff(MI331_607,MI331_607_shuff);
+
+
+
+maxrate127_603 = ca_maxrate(spiketimes127_603, pos127_603, 4);
+maxrate127_607 = ca_maxrate(spiketimes127_607, pos127_607, 4);
+maxrate128_518 = ca_maxrate(spiketimes128_518, pos128_518, 4);
+maxrate128_520 = ca_maxrate(spiketimes128_520, pos128_520, 4);
+maxrate330_608 = ca_maxrate(spiketimes330_608, pos330_608, 4);
+maxrate330_609 = ca_maxrate(spiketimes330_609, pos330_609, 4);
+maxrate331_603 = ca_maxrate(spiketimes331_603, pos331_603, 4);
+maxrate331_607 = ca_maxrate(spiketimes331_607, pos331_607, 4);
