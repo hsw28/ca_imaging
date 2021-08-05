@@ -11,6 +11,6 @@ l2/l;
 
 n1 = find(isnan(MIcells(:,1))==1);
 n2 = find(isnan(MIcells(:,2))==1);
-l = length(MIcells)-length(unique([n1;n2]));
+%l = length(MIcells)-length(intersect(n1,n2));
 l2 = length(unique(f(:,1)))-1;
 l2/l

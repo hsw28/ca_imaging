@@ -4,12 +4,12 @@ function f = pos_maps(peaks_time, pos, dim)
 
 pos(:,3) = 1;
 velthreshold = 12;
-vel = cavelocity(pos);
+vel = ca_velocity(pos);
 vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30); %originally had this at 30, trying with 15 now
 goodvel = find(vel(1,:)>=velthreshold);
 goodtime = pos(goodvel, 1);
 
-figure
+
 
 numunits = size(peaks_time,1);
 ha = tight_subplot(ceil(sqrt(numunits)),ceil(sqrt(numunits)),[.01 .03],[.1 .01],[.01 .01]);

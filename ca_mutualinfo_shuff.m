@@ -93,3 +93,19 @@ end
 
 toc
 f = mutinfo';
+f = [fwdshuf; bwdshuf]';
+
+%{
+set(0,'DefaultFigureVisible', 'on');
+figure
+subplot(2,1,1)
+histogram(fwdshuf, 'BinWidth', .01, 'Normalization','probability')
+vline(mutinfo(1))
+vline(ca_MI(1), 'g')
+%xlabel('Mutual Information')
+%ylabel('Occurance (%)')
+subplot(2,1,2)
+histogram(bwdshuf, 'BinWidth', .01, 'Normalization','probability')
+vline(mutinfo(2))
+vline(ca_MI(2), 'g')
+%}

@@ -3,9 +3,9 @@ function f = ca_fixpos(pos, timestamps)
 
 
 %DELETE NEXT LINES
-startpos = pos(1,1)*30;
-timestamps = timestamps(startpos:end);
-pos = pos(:,[2,3]);
+%startpos = pos(1,1)*30;
+%timestamps = timestamps(startpos:end);
+%pos = pos(:,[2,3]);
 
 
 pos = pos';

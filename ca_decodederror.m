@@ -85,6 +85,7 @@ for i=1:length(decoded)
     alldiff(end+1) = diff;
     %numpoints(end+1) = c;
 
+    realX(end+1) = nanmean(pos(postimes,2));
    realT(end+1) = nanmean(pos(postimes(1),1));
     %realT(end+1) = pointstime(i);
     predX(end+1) = X(i);
@@ -99,5 +100,8 @@ end
 nanmean(alldiff)./2.5
 nanmedian(alldiff)./2.5
 
-%f = [predT; predX; predY; realT; realX; realY; realV]';
-f = [alldiff/2.5; realT];
+size(predX);
+size(realX);
+size(realT);
+f = [predX; realX; realT]';
+%f = [alldiff/2.5; realT];

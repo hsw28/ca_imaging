@@ -44,16 +44,50 @@ for k=1:numunits
   axes(ha(k));
   goodpos(:,3) = 1;
   [rate totspikes totstime colorbarf] = normalizePosData(fwd,goodpos,dim, 2.5);
-  colorbar
+  colorbar('southoutside');
+  set(gca,'ytick',[])
+ax = gca;
+  axis([0 264/dim, 1 2])
+tick_scale_factor = dim;
+ax.XTickLabel = ax.XTick * tick_scale_factor;
+
 
 
   q = ceil((numunits))*2;
   axes(ha(q./2+k));
   goodpos(:,3) = 1;
   [rate totspikes totstime colorbarb] = normalizePosData(bwd,goodpos,dim, 2.5);
-  colorbar
+colorbar('southoutside');
+set(gca,'ytick',[])
+ax = gca;
+  axis([0 264/dim, 1 2])
+tick_scale_factor = dim;
+ax.XTickLabel = (ax.XTick) * tick_scale_factor;
+
+
+
+if max(colorbarf) < .1
+        axes(ha(k));
+  set(gca, 'clim', [0,.1]);
+  c = colorbar('southoutside');
+  %c.Label.String = 'spikes per second per bin';
+  %xlabel('cm')
+end
+if max(colorbarb) < .1
+    axes(ha(q./2+k));
+  set(gca, 'clim', [0,.1]);
+colorbar('southoutside');
+end
 
 %{
+  mn = mean([max(colorbarb), max(colorbarf)])
+  axes(ha(q./2+k));
+  set(gca, 'clim', [0 mn]);
+  colorbar
+  axes(ha(k));
+  set(gca, 'clim', [0 mn]);
+  colorbar
+
   if max(colorbarf) > max(colorbarb)
     axes(ha(q./2+k));
     set(gca, 'clim', colorbarf);
@@ -69,7 +103,7 @@ for k=1:numunits
     set(gca, 'clim', colorbarb);
     colorbar
   end
-%}
 
+%}
 
 end
