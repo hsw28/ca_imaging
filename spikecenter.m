@@ -24,7 +24,8 @@ for k=1:size(extractedimages,3)
     currentimage = imgaussfilt(currentimage, 3); %smooth
 
     %find max values
-    [x,y] = max(currentimage);
+    maxval = max(currentimage,[],'all');
+    [x,y] = find(currentimage==maxval);
     maxx(end+1) = x;
     maxy(end+1) = y;
 
