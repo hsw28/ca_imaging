@@ -93,8 +93,8 @@ for z=1:(daynum)
     mi_neigh =  mi_neigh';
     mi_dist = mi_dist';
 
-    neighper(end+1) = length(find(neighmor>mi_neigh))./num_times_to_shuffle;
-    disper(end+1) = length(find(dismore>mi_dist))./num_times_to_shuffle;
+    neighper(end+1) = length(find(neighmor<mi_neigh))./num_times_to_shuffle;
+    disper(end+1) = length(find(dismore<mi_dist))./num_times_to_shuffle;
 end
 
 

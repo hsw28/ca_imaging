@@ -1,5 +1,5 @@
-function percents = shuffled_moran(cellcenter, fieldcenter, num_times_to_shuffle)
-
+function percents = shuffled_moran_binned(cellcenter, fieldcenter, num_times_to_shuffle)
+%does moran but bins track into reward area and not reward area
 %average soma size is 21um https://synapseweb.clm.utexas.edu/dimensions-dendrites
 %so radius is aout 11um or 0.011mm
 %thats 2 pixels out of 200 if view field is 1.1mm
@@ -52,6 +52,15 @@ for z=1:(daynum)
 
 
 
+  %this divides track into 5 segments <-- gets 14/24 with all inputs same
+  tracklength = max(currentbicenter)-min(currentbicenter);
+  [N,EDGES,BIN] = histcounts(currentbicenter, 'BinEdges', [min(currentbicenter), min(currentbicenter)+(tracklength./5), min(currentbicenter)+(2*tracklength./5), min(currentbicenter)+(3*tracklength./5), min(currentbicenter)+(4*tracklength./5), max(currentbicenter)]);
+  %BIN(find(BIN==5)) = 1; %reward
+  BIN(find(BIN==2)) = 3; %not reward
+  BIN(find(BIN==4)) = 3;
+  currentbicenter = BIN;
+
+
   currentcellcenter1 = currentcellcenter(1,~nans);
   currentcellcenter1 = (currentcellcenter1);
   currentcellcenter2 = currentcellcenter(2,~nans);
@@ -69,7 +78,9 @@ for z=1:(daynum)
       colormatrix(c,:)=[1 0 0]; %not reward os red
     end
   end
+  %subplot(ceil(daynum./6), ceil(daynum./4), z);
   scatter(jitter(currentcellcenter(1,:)), currentcellcenter(2,:), sizes, colormatrix, 'filled')
+
 
 
 
@@ -81,19 +92,13 @@ for z=1:(daynum)
   disweights = dist(currentcellcenter);
   cellnum(end+1) = length(disweights);
 
-  %disweights = make_nnw(currentcellcenter(1,:)', currentcellcenter(2,:)', 6, 4);
-  %disweights = make_neighborsw(currentcellcenter(1,:)', currentcellcenter(2,:)', 6);
-  %disweights = pdweight(currentcellcenter(1,:)', currentcellcenter(2,:)',0,50,1);
-
-
-
   notzero = find(disweights(:)>0);
   disweights(notzero) = 1./disweights(notzero);
   disweights = normw(disweights);
 
   %PLOTTING
-  figure
-  subplot(ceil(daynum./6), ceil(daynum./4), z);
+  %figure
+  %subplot(ceil(daynum./6), ceil(daynum./4), z);
   plotval = spatiallag(disweights, currentbicenter);
 
   figure
@@ -119,8 +124,7 @@ for z=1:(daynum)
   end
   sizes = 100;
   scatter(jitter(currentcellcenter(1,:)), currentcellcenter(2,:), sizes, colormatrix, 'filled')
-  %scatter(jitter(currentcellcenter(1,:)), currentcellcenter(2,:), sizes, plotval', 'filled')
-  title('Both Directions')
+  %title('Both Directions')
   axis([0 200,0 200])
 
 

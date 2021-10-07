@@ -12,13 +12,15 @@ for k=1:size(cellcenters,2)
   elseif isnan(f1b)==1
     bicenter(k) = f1f;
   elseif abs(f1f-f1b) <= 15 %same field
-    bicenter(k) = mean(f1f, f1b)
+    bicenter(k) = mean(f1f, f1b);
   elseif abs(f1f-f1b) > 15
     bicenter(k) = NaN;
   end
 end
 f1f = characteristic(:, 1);
-f1b = characteristic(:, 2)
+f1b = characteristic(:, 2);
+
+
 
 %{
 figure
@@ -49,13 +51,39 @@ title('Backward Direction')
 
 subplot(1,3,3)
 %}
+
 figure
+subplot(1,2,1)
 colors = (bicenter - min(bicenter))./max(bicenter); %normalize to 0:1
 colors = colors*100;
 %colors = colors(indexes3,:);
 c = colorbar;
 %set(gca, 'clim', [min(indexes2),100]);
-sizes = 100;
-scatter(cellcenters(3,:), cellcenters(4,:), sizes, colors, 'filled')
-colorbar
+sizes = 125;
+scatter(jitter(cellcenters(1,:)), cellcenters(2,:), sizes, colors, 'filled')
 title('Both Directions')
+axis([0 200,0 200])
+
+
+length(find(~isnan(colors)))
+subplot(1,2,2)
+fullmat = NaN(200,200);
+for k=1:length(cellcenters(1,:))
+  fullmat(cellcenters(1,k), cellcenters(2,k)) = colors(k);
+end
+
+[tempmat temp] = ndnanfilter(fullmat, 'gausswin', [10 10]);
+win = [[temp; flip(temp)], flip([temp; flip(temp)], 2)];
+
+[fullmat a] = ndnanfilter(fullmat, win, [10 10]);
+
+
+
+%fullmat = ndnanfilter(fullmat, 'gausswin', [6 6]);
+
+%imagesc(flip(fullmat', 1))
+
+h = pcolor(fullmat')
+set(h, 'EdgeColor', 'none');
+axis([0 200,0 200])
+colorbar
