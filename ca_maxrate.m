@@ -1,8 +1,8 @@
-function f = ca_maxrate(peaks_time, pos, dim, num_times_to_run, ca_MI)
-  %plots place cell maps for a bunch of 'cells'
+function f = ca_maxrate(spike_times, pos, dim)
+  %finds max rate for a cell
 
   tic
-  maxrate = NaN(2, size(peaks_time,1));
+  maxrate = NaN(2, size(spike_times,1));
 
   velthreshold = 8;
   vel = ca_velocity(pos);
@@ -11,15 +11,15 @@ function f = ca_maxrate(peaks_time, pos, dim, num_times_to_run, ca_MI)
   goodtime = pos(goodvel, 1);
   goodpos = pos(goodvel,:);
 
-  numunits = size(peaks_time,1);
+  numunits = size(spike_times,1);
 
   for k=1:numunits
     highspeedspikes = [];
-    for i=1:length(peaks_time(k,:)) %finding if in good vel
-      [minValue,closestIndex] = min(abs(peaks_time(k,i)-goodtime));
+    for i=1:length(spike_times(k,:)) %finding if in good vel
+      [minValue,closestIndex] = min(abs(spike_times(k,i)-goodtime));
 
       if minValue <= 1 %if spike is within 1 second of moving. no idea if good time
-        highspeedspikes(end+1) = peaks_time(k,i);
+        highspeedspikes(end+1) = spike_times(k,i);
       end;
     end
 
@@ -46,7 +46,7 @@ function f = ca_maxrate(peaks_time, pos, dim, num_times_to_run, ca_MI)
     [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(fwd,goodpos,dim, 2.5);
 
     maxrate(1, k) = max(rate);
-    meanrate(1,k) = mean(rate);
+    meanrate(1,k) = nanmean(rate);
 
     else
       maxrate(1, k) = NaN;
@@ -58,15 +58,15 @@ function f = ca_maxrate(peaks_time, pos, dim, num_times_to_run, ca_MI)
     goodpos(:,3) = 1;
     [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(bwd,goodpos,dim, 2.5);
     maxrate(2, k) = max(rate);
-    meanrate(2,k) = mean(rate);
+    meanrate(2,k) = nanmean(rate);
 
     else
       maxrate(2, k) = NaN;
-      meanrate(1,k) = NaN;
+      meanrate(2,k) = NaN;
 
     end
 
 
   end
 
-  f = maxrate'*dim;
+  f = [maxrate'*dim, meanrate'*dim];

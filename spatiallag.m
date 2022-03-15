@@ -16,13 +16,12 @@ lag = sum(lag')';
 
 y = lag';
 
-%{
+
 figure
 scatter(x, lag);
 
 hold on
 coeffs = polyfit(x, y, 1);
-
 
 
 
@@ -41,11 +40,11 @@ if pvalforward <= .05
 else
   plot(x, y, 'black', 'LineWidth', 5) % best fit line
 end
-str1 = {'p value' pvalforward, 'r2 value' rsquared, 'slope' coeffs(1)};
+str1 = {'p value' pvalforward, 'r2 value' rsquared, 'slope' coeffs(1)}
 text(max(x)*.7,min(lag),str1,'FontSize',8);
 vline(0)
 hline(0)
-%}
+
 
 
 smallx = find(x<0);

@@ -1,9 +1,10 @@
 function f = ca_mutualinfo_shuff(peaks_time, pos, dim, num_times_to_run, ca_MI)
-%finds 95% top shuffled mutual info for X number of runs
+%finds 95% top shuffled and 99% top shuffled mutual info for X number of runs
 %put in ca_mutualinfo so you know what to skip
  tic
 
-mutinfo = NaN(2, size(peaks_time,1));
+mutinfo = NaN(4, size(peaks_time,1));
+stddev3 = NaN(2, size(peaks_time,1));
 
 velthreshold = 12;
 vel = ca_velocity(pos);
@@ -54,46 +55,55 @@ for k=1:numunits
 
   set(0,'DefaultFigureVisible', 'off');
 
-fwdshuf = [];
-bwdshuf = [];
+fwdshuf = NaN(num_times_to_run,1);
+bwdshuf = NaN(num_times_to_run,1);
+goodpos(:,3) = 1;
 
-for l = 1:num_times_to_run
+parfor l = 1:num_times_to_run
 
   if isnan(ca_MI(k,1))==0
-  goodpos(:,3) = 1;
   shufffwd = randsample(goodtime, length(fwd));
   shufffwd = sort(shufffwd);
   [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(shufffwd,goodpos,dim, 2.5);
 
-  fwdshuf(end+1) = mutualinfo([spikeprob', occprob']);
+  fwdshuf(l) = mutualinfo([spikeprob', occprob']);
   else
-    fwdshuf(end+1) = NaN;
+    fwdshuf(l) = NaN;
   end
 
 
   if isnan(ca_MI(k,2))==0
-  goodpos(:,3) = 1;
   shuffbwd = randsample(goodtime, length(bwd));
   shuffbwd = sort(shuffbwd);
   [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(shuffbwd,goodpos,dim, 2.5);
-  bwdshuf(end+1) = mutualinfo([spikeprob', occprob']);
+  bwdshuf(l) = mutualinfo([spikeprob', occprob']);
   else
-    bwdshuf(end+1) = NaN;
+    bwdshuf(l) = NaN;
   end
 end
 
-topMI = floor(num_times_to_run*.95);
+%{
+topMI5 = floor(num_times_to_run*.95);
+topMI1 = floor(num_times_to_run*.99);
 fwdshuf = sort(fwdshuf);
 bwdshuf = sort(bwdshuf);
-mutinfo(1, k) = fwdshuf(topMI);
-mutinfo(2, k) = bwdshuf(topMI);
+mutinfo(1, k) = fwdshuf(topMI5);
+mutinfo(2, k) = bwdshuf(topMI5);
+mutinfo(3, k) = fwdshuf(topMI1);
+mutinfo(4, k) = bwdshuf(topMI1);
+%}
+
+stddev3(1,k) = nanmean(fwdshuf)+(3*nanstd(fwdshuf));
+stddev3(2,k) = nanmean(bwdshuf)+(3*nanstd(bwdshuf));
 
 end
 end
 
 toc
-f = mutinfo';
-f = [fwdshuf; bwdshuf]';
+%f = mutinfo';
+f = stddev3';
+
+
 
 %{
 set(0,'DefaultFigureVisible', 'on');

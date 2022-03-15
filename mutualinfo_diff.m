@@ -1,16 +1,24 @@
 function f = mutualinfo_diff(MIcells, MIshuffle)
 %finds place cells based on MI> shuffled MI
 
-diff = MIcells-MIshuffle;
+diff = MIcells-MIshuffle(:,1:2);
 [x,y] = find(diff>0);
 f = ([x,y]);
 
+%percent all
 l = length(MIcells);
-l2 = length(unique(f(:,1)))-1;
+un = unique(f(:,1));
+l2 = length(un);
 l2/l;
+l;
 
-n1 = find(isnan(MIcells(:,1))==1);
-n2 = find(isnan(MIcells(:,2))==1);
-%l = length(MIcells)-length(intersect(n1,n2));
-l2 = length(unique(f(:,1)))-1;
-l2/l
+%perceent firing rate >0.01
+
+l = length(MIcells)-length(find(isnan(MIcells)==1));
+un = unique(f(:,1));
+l2 = length(un);
+l2/l;
+l;
+
+
+length(unique(f(:,1)))

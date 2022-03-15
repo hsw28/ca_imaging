@@ -1,4 +1,5 @@
 function [weights cellcenterf] = hw_moran(cellcenter, fieldcenter)
+  %DEPRICATED
   %runs a moran test for shared neighbors and distance matrix
 %see https://cran.r-project.org/web/packages/Irescale/vignettes/rectifiedI.html
 
