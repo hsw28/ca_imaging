@@ -3,6 +3,7 @@ function f = plotchar(cellcenters, characteristic)
 
      set(0, 'DefaultFigureRenderer', 'painters');
 bicenter = NaN(size(cellcenters,2),1);
+
 for k=1:size(cellcenters,2)
   f1f = characteristic(k, 1); %field center forward
   f1b = characteristic(k, 2); %field center backward
@@ -20,6 +21,7 @@ for k=1:size(cellcenters,2)
 end
 f1f = characteristic(:, 1);
 f1b = characteristic(:, 2);
+
 
 
 

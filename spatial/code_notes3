@@ -1,0 +1,51 @@
+localI_shuff_F = NaN(18,100);
+localI_shuff_B = NaN(18,100);
+set(0,'DefaultFigureVisible', 'off');
+
+local_inc_shuff=[];
+for k = 1:100
+localI0127_0603_shuff = moranlocal_shuffle(centers0127_0603, fieldcenters0127_0603);
+localI0127_0604X2_shuff = moranlocal_shuffle(centers0127_0604, fieldcenters0127_0604);
+localI0127_0607_shuff = moranlocal_shuffle(centers0127_0607, fieldcenters0127_0607);
+localI0127_0608_shuff = moranlocal_shuffle(centers0127_0608, fieldcenters0127_0608);
+localI0128_0513_shuff = moranlocal_shuffle(centers0128_0513, fieldcenters0128_0513);
+localI0128_0514_shuff = moranlocal_shuffle(centers0128_0514, fieldcenters0128_0514);
+localI0128_0517_shuff = moranlocal_shuffle(centers0128_0517, fieldcenters0128_0517);
+localI0128_0518_shuff = moranlocal_shuffle(centers0128_0518, fieldcenters0128_0518);
+localI0128_0520_shuff = moranlocal_shuffle(centers0128_0520, fieldcenters0128_0520);
+localI0128_0524_shuff = moranlocal_shuffle(centers0128_0524, fieldcenters0128_0524);
+localI0330_0525_shuff = moranlocal_shuffle(centers0330_0525, fieldcenters0330_0525);
+localI0330_0526_shuff = moranlocal_shuffle(centers0330_0526, fieldcenters0330_0526);
+localI0330_0604_shuff = moranlocal_shuffle(centers0330_0604, fieldcenters0330_0604);
+localI0330_0607_shuff = moranlocal_shuffle(centers0330_0607, fieldcenters0330_0607);
+localI0330_0608_shuff = moranlocal_shuffle(centers0330_0608, fieldcenters0330_0608);
+localI0330_0609_shuff = moranlocal_shuffle(centers0330_0609, fieldcenters0330_0609);
+localI0331_0525_shuff = moranlocal_shuffle(centers0331_0525, fieldcenters0331_0525);
+localI0331_0603X1_shuff = moranlocal_shuffle(centers0331_0603, fieldcenters0331_0603);
+localI0331_0607_shuff = moranlocal_shuffle(centers0331_0607, fieldcenters0331_0607);
+localI0331_0608_shuff = moranlocal_shuffle(centers0331_0608, fieldcenters0331_0608);
+
+
+
+localI0331_0603X1_shuff(:, [1,2]) = NaN;
+localI0127_0604X2_shuff(:,[3,4]) = NaN;
+
+
+localALLshuff = vertcat(localI0127_0603_shuff, localI0127_0604X2_shuff, localI0127_0607_shuff, localI0127_0608_shuff, localI0128_0513_shuff, localI0128_0514_shuff, localI0128_0517_shuff, localI0128_0518_shuff, localI0128_0520_shuff, localI0128_0524_shuff, localI0330_0525_shuff, localI0330_0604_shuff, localI0330_0607_shuff, localI0330_0608_shuff, localI0330_0609_shuff, localI0331_0525_shuff, localI0331_0603X1_shuff, localI0331_0607_shuff, localI0331_0608_shuff);
+size(localALLshuff)
+
+
+%temp = [localALLshuff(:,1); localALLshuff(:,3)];
+%local_inc_shuff = [local_inc_shuff; nanmean(localALLshuff')];
+
+% nanmean(temp)
+% length(find(temp>0))
+%figure
+
+
+F = boxplot_grouped(localALLshuff(:,2)*4, localALLshuff (:,1), 15);
+B = boxplot_grouped(localALLshuff(:,4)*4, localALLshuff (:,3), 15);
+
+localI_shuff_F(1:length(F), k) = F;
+localI_shuff_B(1:length(B), k) = B;
+end

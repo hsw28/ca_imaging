@@ -1,0 +1,78 @@
+
+
+%603 and 607 (2/4)
+%%%%%%
+ boxplot_grouped(localI0127_0603(:,2)*4, localI0127_0603(:,1), 15)
+ boxplot_grouped(localI0127_0604X2(:,2)*4, localI0127_0604X2(:,1), 15)
+ boxplot_grouped(localI0127_0607(:,2)*4, localI0127_0607(:,1), 15)
+ boxplot_grouped(localI0127_0608(:,2)*4, localI0127_0608(:,1), 15)        
+%%%%%%
+%ALL TOOGETHER YES
+
+%ALL (6/6)
+ boxplot_grouped(localI0128_0513(:,2)*4, localI0128_0513(:,1), 15)
+ boxplot_grouped(localI0128_0514(:,2)*4, localI0128_0514(:,1), 15)
+ boxplot_grouped(localI0128_0517(:,2)*4, localI0128_0517(:,1), 15)
+ boxplot_grouped(localI0128_0518(:,2)*4, localI0128_0518(:,1), 15)
+ boxplot_grouped(localI0128_0520(:,2)*4, localI0128_0520(:,1), 15)
+ boxplot_grouped(localI0128_0524(:,2)*4, localI0128_0524(:,1), 15)
+%ALL TOOGETHER YES
+
+%ALL BUT 609 (4/5)
+ boxplot_grouped(localI0330_0525(:,2)*4, localI0330_0525(:,1), 15)
+%%%%
+ boxplot_grouped(localI0330_0604(:,2)*4, localI0330_0604(:,1), 15)
+ boxplot_grouped(localI0330_0607(:,2)*4, localI0330_0607(:,1), 15)
+ boxplot_grouped(localI0330_0608(:,2)*4, localI0330_0608(:,1), 15)
+ boxplot_grouped(localI0330_0609(:,2)*4, localI0330_0609(:,1), 15)
+%ALL TOGETHER NO
+
+%ALL BUT 608 (3/4)
+ boxplot_grouped(localI0331_0525(:,2)*4, localI0331_0525(:,1), 15)
+ boxplot_grouped(localI0331_0526(:,2)*4, localI0331_0526(:,1), 15)
+%%%%
+ boxplot_grouped(localI0331_0607(:,2)*4, localI0331_0607(:,1), 15)
+ boxplot_grouped(localI0331_0608(:,2)*4, localI0331_0608(:,1), 15)
+%%%%%
+%ALL TOOGETHER YES
+
+15/19
+
+
+%-------
+
+% 608 (1/3) (but one .05)
+%%%
+ boxplot_grouped(localI0127_0603(:,4)*4, localI0127_0603(:,3), 15)
+%%%
+ boxplot_grouped(localI0127_0607(:,4)*4, localI0127_0607(:,3), 15)
+ boxplot_grouped(localI0127_0608(:,4)*4, localI0127_0608(:,3), 15)
+%%%
+%YES
+
+%ALL but 520 (5/6) (one .06)
+ boxplot_grouped(localI0128_0513(:,4)*4, localI0128_0513(:,3), 15)
+ boxplot_grouped(localI0128_0514(:,4)*4, localI0128_0514(:,3), 15)
+ boxplot_grouped(localI0128_0517(:,4)*4, localI0128_0517(:,3), 15)
+ boxplot_grouped(localI0128_0518(:,4)*4, localI0128_0518(:,3), 15)
+ boxplot_grouped(localI0128_0520(:,4)*4, localI0128_0520(:,3), 15)
+ boxplot_grouped(localI0128_0524(:,4)*4, localI0128_0524(:,3), 15)
+%YES
+
+%ALL BUT 0525 (4/5)
+ boxplot_grouped(localI0330_0525(:,4)*4, localI0330_0525(:,3), 15)
+%%%%
+ boxplot_grouped(localI0330_0604(:,4)*4, localI0330_0604(:,3), 15)
+ boxplot_grouped(localI0330_0607(:,4)*4, localI0330_0607(:,3), 15)
+ boxplot_grouped(localI0330_0608(:,4)*4, localI0330_0608(:,3), 15)
+ boxplot_grouped(localI0330_0609(:,4)*4, localI0330_0609(:,3), 15)
+%YES
+
+%ALL BUT 603 and 525 (2/5) (one .05)
+ boxplot_grouped(localI0331_0525(:,4)*4, localI0331_0525(:,3), 15)
+ boxplot_grouped(localI0331_0526(:,4)*4, localI0331_0526(:,3), 15)
+ boxplot_grouped(localI0331_0603X1(:,4)*4, localI0331_0603X1(:,3), 15)
+ boxplot_grouped(localI0331_0607(:,4)*4, localI0331_0607(:,3), 15)
+ boxplot_grouped(localI0331_0608(:,4)*4, localI0331_0608(:,3), 15)
+%%%
+%YES
