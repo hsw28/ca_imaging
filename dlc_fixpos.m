@@ -3,6 +3,7 @@ function f = dlc_fixpos(pos, timestamps, env_shape)
 %for fixing deeplabcut positions
 %can import CSV from dlc and timestamps using: pos = readtable('file.csv');
 
+
 pos = pos(3:end, 2:end);
 pos = table2array(pos);
 pos = cellfun( @str2double, pos );
@@ -170,5 +171,6 @@ xpos =  smoothdata(xpos, 'gaussian', 15);
 ypos = (pos(:, 2));
 %ypos = filloutliers(ypos, 'pchip', 'movmedian',30);
 ypos =  smoothdata(ypos, 'gaussian', 15);
+timestamps = timestamps/1000;
 pos = [timestamps, xpos, ypos];
-f = pos';
+f = pos;

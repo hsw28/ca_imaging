@@ -10,7 +10,7 @@ velthreshold = 12;
 vel = ca_velocity(pos);
 mintime = vel(2,1);
 maxtime = vel(2,end);
-vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30); %originally had this at 30, trying with 15 now
+%vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30); %originally had this at 30, trying with 15 now
 goodvel = find(vel(1,:)>=velthreshold);
 goodtime = pos(goodvel, 1);
 goodpos = pos(goodvel,:);

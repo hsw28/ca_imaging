@@ -1,13 +1,23 @@
 function f = converttotime(train_peak_matrix, timestamps)
 %converts output of getspikepeaks to matrix of times.
+%can import CSV from timestamps using: timestamps = readtable('file.csv');
+
+if isa(timestamps,'table')
+  timestamps = table2array(timestamps);
+  timestamps = timestamps(:,2);
+end
 
 
+if size(timestamps,2)==3
+  timestamps = timestamps(:,2);
+end
 
-
-
-[x, y] = find(train_peak_matrix>0);
+size(train_peak_matrix,1)
+[x, y] = find(train_peak_matrix> 0);
 
 spike_val = NaN(size(train_peak_matrix));
+
+size(train_peak_matrix,1)
 
 for k=1:size(train_peak_matrix,1)
   currclus = train_peak_matrix(k,:);

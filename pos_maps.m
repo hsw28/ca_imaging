@@ -1,11 +1,10 @@
-function f = pos_maps(peaks_time, pos, dim)
+function f = pos_maps(peaks_time, pos, dim, velthreshold)
 %plots place cell maps for a bunch of 'cells'
 
 
-pos(:,3) = 1;
-velthreshold = 12;
+
+
 vel = ca_velocity(pos);
-vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30); %originally had this at 30, trying with 15 now
 goodvel = find(vel(1,:)>=velthreshold);
 goodtime = pos(goodvel, 1);
 
@@ -27,9 +26,32 @@ for k=1:numunits
   %subplot(ceil(sqrt(numunits)),ceil(sqrt(numunits)), k)
 
   axes(ha(k));
-  normalizePosData(highspeedspikes,pos,dim, 2.5);
-  set(colorbar,'visible','off')
+  [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(highspeedspikes,pos,dim, 6.85);
+
+  sigma = 1; % set sigma to the value you need
+  sz = 2*ceil(2.6 * sigma) + 1; % See note below
+  mask = fspecial('gauss', sz, sigma);
+ rate = nanconv(rate, mask, 'same');
+
+ %%%%%%%
+
+ [nr,nc] = size(rate);
+ colormap('parula');
+ %lower and higher three percent of firing sets bounds
+ numrate = rate(~isnan(rate));
+ numrate = sort(numrate(:),'descend');
+ maxratefive = min(numrate(1:ceil(length(numrate)*0.03)));
+ numrate = sort(numrate(:),'ascend');
+ minratefive = max(numrate(1:ceil(length(numrate)*0.03)));
 
 
-  %normalizePosData(peaks_time(k,:),pos,dim);
+ pcolor([rate nan(nr,1); nan(1,nc+1)]);
+ shading flat;
+ set(gca, 'ydir', 'reverse');
+ if minratefive ~= maxratefive
+   set(gca, 'clim', [minratefive*2, maxratefive]);
+end
+
+colorbar = [minratefive*1.5, maxratefive];
+
 end

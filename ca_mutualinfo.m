@@ -1,5 +1,5 @@
 function f = ca_mutualinfo(peaks_time, pos, dim)
-%plots place cell maps for a bunch of 'cells'
+%finds mutual info for a bunch of cells
 
 tic
 mutinfo = NaN(2, size(peaks_time,1));
@@ -7,9 +7,9 @@ mutinfo = NaN(2, size(peaks_time,1));
 
 
 velthreshold = 12;
-vel = ca_velocity(pos);
-vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30.0005); %originally had this at 30, trying with 15 now
-goodvel = find(vel(1,:)>=velthreshold);
+vel = ca_velocity(pos)
+%vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30.0005); %originally had this at 30, trying with 15 now
+goodvel = find(vel(1,:)>=velthreshold)
 goodtime = pos(goodvel, 1);
 goodpos = pos(goodvel,:);
 
