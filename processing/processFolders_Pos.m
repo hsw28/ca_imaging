@@ -1,5 +1,6 @@
 function giantStructure = processFolders_Pos(currentDir, type1_for_cage_2_for_oval)
 %makes a position structure with all your run days for one animal using dlc_fixpos
+%%FIXES POS
 %input 1 for the cage and 2 for the oval
 %currectDir should be the directory you wish to search from, ie './031423/'
 
@@ -28,7 +29,7 @@ function giantStructure = processFolders_Pos(currentDir, type1_for_cage_2_for_ov
                 pos_folder = strsplit(selected_folder, '/');
                 pos_folder = pos_folder{end};
 
-        
+
                 if strcmp(pos_folder_date, 'extinction')==1
                   pos_folder = fileparts(fileparts(fileparts((selected_folder))));
                   pos_folder_parts = strsplit(pos_folder, '/');
@@ -109,7 +110,7 @@ function output = processSelectedFolder(folder, type1_for_cage_2_for_oval)
     posFileName = posFileNames{~strcmpi(posFileNames, 'timeStamps.csv')};
 
     % Get the full file path for the pos file
-    posFile = fullfile(folder, posFileName);
+    posFile = fullfile(folder, posFileName)
 
     % Read the data from the pos CSV file using readtable
     posData = readtable(posFile);

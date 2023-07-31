@@ -37,8 +37,8 @@ function [giantStructure_TS giantStructure_EMG] = processFolders_EMG(currentDir)
                   outputDate=sprintf('exinction_%s', outputDate);
                 end
 
-                giantStructure_TS.(sprintf('EMG_TS%s', outputDate)) = timestamps';
-                giantStructure_EMG.(sprintf('EMG_%s', outputDate)) = dataSamples';
+                giantStructure_TS.(sprintf('EMG_TS_%s', outputDate)) = timestamps';
+                giantStructure_EMG.(sprintf('EMG_%s', outputDate)) = dataSamples;
             else
                 fprintf('Invalid folder number: %d\n', selected_folder_idx);
             end
