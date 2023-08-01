@@ -1,4 +1,5 @@
 function f = dlc_fixpos(pos, timestamps, env_shape)
+% FOR BATCH PROCESSING USE processFolders_Pos.m
 %put in 1 for rectangle, 2 for oval
 %for fixing deeplabcut positions
 %can import CSV from dlc and timestamps using: pos = readtable('file.csv');

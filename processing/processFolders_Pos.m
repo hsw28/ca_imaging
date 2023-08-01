@@ -1,6 +1,6 @@
 function giantStructure = processFolders_Pos(currentDir, type1_for_cage_2_for_oval)
 %makes a position structure with all your run days for one animal using dlc_fixpos
-%%FIXES POS
+%%FIXES POS USING dlc_fixpos
 %input 1 for the cage and 2 for the oval
 %currectDir should be the directory you wish to search from, ie './031423/'
 
@@ -37,7 +37,11 @@ function giantStructure = processFolders_Pos(currentDir, type1_for_cage_2_for_ov
                   pos_folder_date=sprintf('exinction_%s', pos_folder_date);
                 end
 
-                giantStructure.(sprintf('pos_%s', pos_folder_date)) = output;
+                if type1_for_cage_2_for_oval = 1
+                  giantStructure.(sprintf('pos_%s', pos_folder_date)) = output;
+                else
+                  giantStructure.(sprintf('posOVAL_%s', pos_folder_date)) = output;
+                end
             else
                 fprintf('Invalid folder number: %d\n', selected_folder_idx);
             end
