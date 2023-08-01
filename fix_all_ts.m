@@ -4,6 +4,9 @@ function [fixed_events fixed_EMG_ts fixed_EMG pos_fixed] = fix_all_ts(event_file
 
 %add CA_TS and CA_TS_fixed
 
+%%%%%%%%%%
+%%%%%%%%%%MAKE IT CHECK THAT THE NAMES ARE THE SAME
+%%%%%%%%%%
 
 %first find the time the miniscope starts recording
 [starttime_raw fixed_events] = findMSstart(event_files);
@@ -62,24 +65,43 @@ for i = 1:numel(fields_TS)
   fieldValue_TS = EMG_ts_struct.(fieldName_TS);
   EMG_ts = fieldValue_TS;
 
+  index = strfind(fieldName_TS, '_');
+  TS_date = fieldName_TS(index(2)+1:end);
+
+
   fieldName_EMG = fields_EMG{i};
   fieldValue_EMG = EMG_struct.(fieldName_EMG);
   EMG = fieldValue_EMG;
+
+  index = strfind(fieldName_EMG, '_');
+  EMG_date = fieldName_EMG(index(2)+1:end);
 
   fieldName_starts = fields_starts{i};
   fieldValue_starts = starttime_raw_struct.(fieldName_starts);
   starttime_raw = fieldValue_starts;
 
-  if EMG_ts(1,1)> 152985146928
-    EMG_ts(:,1) = EMG_ts(:,1)./1000000;
-  end
-  dontwant = find(EMG_ts<starttime_raw);
-  EMG_ts = EMG_ts(max(dontwant+1):end);
-  EMG_ts = EMG_ts-starttime_raw;
-  EMG = EMG(max(dontwant+1):end);
+  index = strfind(fieldName_starts, '_');
+  start_date = fieldName_starts(index(2)+1:end);
 
-  EMG_ts_struct.(fieldName_TS) = EMG_ts;
-  EMG_struct.(fieldName_EMG) = EMG;
+  if strcmp(TS_date, EMG_date)==1 && strcmp(TS_date, start_date)==1
+
+    if EMG_ts(1,1)> 152985146928
+      EMG_ts(:,1) = EMG_ts(:,1)./1000000;
+    end
+    dontwant = find(EMG_ts<starttime_raw);
+    EMG_ts = EMG_ts(max(dontwant+1):end);
+    EMG_ts = EMG_ts-starttime_raw;
+    EMG = EMG(max(dontwant+1):end);
+
+    EMG_ts_struct.(fieldName_TS) = EMG_ts;
+    EMG_struct.(fieldName_EMG) = EMG;
+
+  else
+    TS_date
+    EMG_date
+    start_date
+    error('dates do not match' )
+  end
 
 end
 fixed_EMG_ts = EMG_ts_struct;
@@ -87,6 +109,7 @@ fixed_EMG = EMG_struct;
 
 fprintf('EMGs fixed')
 end
+
 
 
 
