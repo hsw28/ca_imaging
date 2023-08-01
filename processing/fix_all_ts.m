@@ -114,12 +114,13 @@ for i = 1:numel(fields_TS)
 
 
     %and sync start times
-    dontwant = find(EMG_ts<starttime_raw);
-    length(dontwant)
-    length(EMG_ts)
-    EMG_ts = EMG_ts(max(dontwant)+1:end);
+    %dontwant = find(EMG_ts<starttime_raw);
+    %EMG_ts = EMG_ts(max(dontwant)+1:end);
+    %EMG_ts = EMG_ts-starttime_raw;
+    %EMG = EMG(max(dontwant+1):end);
+    %EMG_ts = EMG_ts(1:length(EMG));
     EMG_ts = EMG_ts-starttime_raw;
-    EMG = EMG(max(dontwant+1):end);
+    EMG_ts = EMG_ts(1:length(EMG));
     EMG_ts_struct.(fieldName_TS) = EMG_ts';
     EMG_struct.(fieldName_EMG) = EMG;
   end
