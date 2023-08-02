@@ -1,6 +1,6 @@
 function f = ca_mutualinfo_shuff_all(peaks_time, pos, dim, num_times_to_run)
 %finds 95% top shuffled mutual info for X number of runs
-%shuffles spike trains for mutual info in all times (NOT only in run time)
+%!!!!!!shuffles spike trains for mutual info in all times (NOT only in run time)
 
 
 mutinfo = NaN(2, size(peaks_time,1));

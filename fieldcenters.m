@@ -1,10 +1,10 @@
-function fieldcent  = fieldcenters(peaks_time, goodcells, pos, dim)
+function fieldcent  = fieldcenters(peaks_time, goodcells, pos, dim, velthreshold)
   %good cells are the ones you know have fields
   % field ceenters are the highest spiking point, not the geometric center
   %rates returns max rate, av rate, min rate
 
 
-  velthreshold = 12;
+  %velthreshold = 12;
   vel = ca_velocity(pos);
   vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30.0005); %originally had this at 30, trying with 15 now
   goodvel = find(vel(1,:)>=velthreshold);

@@ -1,4 +1,4 @@
-function f = controom(cellcenter, fieldcenter)
+function f = controok(cellcenter, fieldcenter)
   %finnds a contiguity matrix in rook config
 
 
