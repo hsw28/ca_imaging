@@ -1,51 +1,74 @@
-function f = eyeblink_ratios(CS_time_structure, spike_structure)
+function ratios = eyeblink_ratios(US_time_structure, spike_structure)
+% input times_US structure and Ca_peaks structure
+%outputs number of spikes during pretrial, CS, US periods and the ratios of CS:pretrial and US:pretrial
 
-  fields_CS = fieldnames(CS_time_structure);
+  ratios = struct();
+  fields_US = fieldnames(US_time_structure);
   fields_spikes = fieldnames(spike_structure);
 
-if numel(fields_CS) ~= numel(fields_spikes)
-  error('your spike and CS structures do not have the same number of values')
+if numel(fields_US) ~= numel(fields_spikes)
+  error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
 end
 
-for i = 1:numel(fields_CS)
-    fieldName_TS = fields_CS{i}
-    fieldValue_CS = CS_struct.(fieldName_CS);
-    CS = fieldValue_CS;
+for i = 1:numel(fields_US) %going through each day
+    output = [];
 
-    index = strfind(fieldName_CS, '_');
-    CS_date = fieldName_CS(index(2)+1:end);
+    fieldName_US = fields_US{i};
+    fieldValue_US = US_time_structure.(fieldName_US);
+    US = fieldValue_US;
+
+    if length(US)<5
+      fieldName_US
+      warning('there are no USs for this day')
+      continue
+    end
+
+    index = strfind(fieldName_US, '_');
+    US_date = fieldName_US(index(1)+1:end);
 
 
     fieldName_spikes = fields_spikes{i};
-    fieldValue_spikes = spikes_struct.(fieldName_spikes);
+    fieldValue_spikes = spike_structure.(fieldName_spikes);
     spikes = fieldValue_spikes;
 
     index = strfind(fieldName_spikes, '_');
     spikes_date = fieldName_spikes(index(2)+1:end);
 
-    if strcmp(CS_date, spikes_date)==1
-      CS = CS;
-      US = CS-.750; %this is start of CS, -.5 is end of CS
-      pretrial=US-.750;
+    if strcmp(US_date, spikes_date)==1
+      US_end = US+.750;
+      US_start = US;
+      CS_start = US_start-.750; %this is start of CS, -.5 is end of CS
+      pretrial_start=CS_start-.750;
     else
-      CS_date
+      US_date
       spikes_date
-      error('your spike name does not match CS name')
+      error('your spike name does not match US name')
     end
 
-    for k = 1:size(spikes,1) %check this
-      currentspike = spike(1,:); %check this
+  for k = 1:size(spikes,1) %going through each spike
+      currentspike = spikes(k,:);
+      inPretrial = [];
+      inCS = [];
+      inUS = [];
 
-      %%%%%%%%%%%%GO FROM HERE
-      spikesIntertrial = intersect(currentspike, intertrial);
-      spikesCue = intersect(currentspike, cueOnly);
-      spikesReward = intersect(currentspike, reward);
 
-      %finding rates
-      rateIntertrial = length(spikesIntertrial)/timeintertrial;
-      rateCue = length(spikesCue)/timecueOnly;
-      rateReward = length(spikesReward)/timereward;
+      for z = 1:length(CS_start) %go through different intervals
+        inPretrial(end+1) = length(find(currentspike>=pretrial_start(z) & currentspike<CS_start(z)));
+        inCS(end+1) = length(find(currentspike>=CS_start(z) & currentspike<US_start(z)));
+        inUS(end+1) = length(find(currentspike>=US_start(z) & currentspike<US_end(z)));
+      end
 
-      %finding difference from baseline
-      changeCue = rateCue/rateIntertrial;
-      changeReward = rateReward/rateIntertrial;
+      pretrial_sum = sum(inPretrial);
+
+      CS_sum = sum(inCS);
+      US_sum = sum(inUS);
+
+      %CS_change = CS_sum/pretrial_sum;
+      %US_change = US_sum/pretrial_sum;
+
+      newdata = [pretrial_sum, CS_sum, US_sum];
+      output = vertcat(output, newdata);
+    end
+
+    ratios.(sprintf('ratios_%s', spikes_date)) = output;
+  end
