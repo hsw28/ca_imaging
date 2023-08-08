@@ -12,7 +12,6 @@ if size(timestamps,2)==3
   timestamps = timestamps(:,2);
 end
 
-size(train_peak_matrix,1)
 [x, y] = find(train_peak_matrix> 0);
 
 spike_val = NaN(size(train_peak_matrix));
