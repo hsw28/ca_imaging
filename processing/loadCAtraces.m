@@ -14,7 +14,7 @@ if ~isempty(validFoldersList)
     for i = 1:numel(selected_folders)
         selected_folder_idx = selected_folders(i);
         if selected_folder_idx > 0 && selected_folder_idx <= numel(validFoldersList)
-            selected_folder = validFoldersList{selected_folder_idx};
+            selected_folder = validFoldersList{selected_folder_idx}
 
 
 
@@ -30,8 +30,10 @@ if ~isempty(validFoldersList)
             traces = traces(good,:);
 
             %gets peaks
-            [signalPeaks, signalPeaksArray] = computeSignalPeaks(traces,'numStdsForThresh',2,'minTimeBtEvents',0,'detectMethod','diff','medianFilterLength',225);
+            %[signalPeaks, signalPeaksArray] = computeSignalPeaks(traces,'numStdsForThresh',2,'minTimeBtEvents',0,'detectMethod','diff','medianFilterLength',225);
 
+            peaks = trace_file.cnmfeAnalysisOutput.extractedPeaks;
+            signalPeaks = peaks(good,:);
             %converts frames to timestamps
 
             peaks = converttotime(signalPeaks, timestamps);
@@ -173,3 +175,7 @@ end
             timestamps = readtable(filePath);
         end
     end
+
+
+peak_stuct = orderfields(peak_stuct);
+all_traces = orderfields(all_traces);

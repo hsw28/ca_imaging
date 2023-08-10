@@ -16,7 +16,6 @@ end
 
 spike_val = NaN(size(train_peak_matrix));
 
-size(train_peak_matrix,1)
 
 for k=1:size(train_peak_matrix,1)
   currclus = train_peak_matrix(k,:);

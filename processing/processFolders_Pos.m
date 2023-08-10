@@ -37,7 +37,7 @@ function giantStructure = processFolders_Pos(currentDir, type1_for_cage_2_for_ov
                   pos_folder_date=sprintf('exinction_%s', pos_folder_date);
                 end
 
-                if type1_for_cage_2_for_oval = 1
+                if type1_for_cage_2_for_oval == 1
                   giantStructure.(sprintf('pos_%s', pos_folder_date)) = output;
                 else
                   giantStructure.(sprintf('posOVAL_%s', pos_folder_date)) = output;
@@ -100,7 +100,7 @@ end
 function output = processSelectedFolder(folder, type1_for_cage_2_for_oval)
 
     % Get the full file path for timestamps
-    %webCamDir = fullfile(folder, 'My_WebCam');
+    webCamDir = fullfile(folder, 'My_WebCam');
     timeStampFile = fullfile(folder, 'timeStamps.csv');
 
     % Read the timestamps data from the CSV file using readtable
@@ -120,6 +120,7 @@ function output = processSelectedFolder(folder, type1_for_cage_2_for_oval)
     posData = readtable(posFile);
 
     % Call the function dlc_fixpos and store the output in the giant structure
+
     output = dlc_fixpos(posData, timeStampData, type1_for_cage_2_for_oval);
 
 end

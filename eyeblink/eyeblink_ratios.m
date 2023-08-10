@@ -17,11 +17,6 @@ for i = 1:numel(fields_US) %going through each day
     fieldValue_US = US_time_structure.(fieldName_US);
     US = fieldValue_US;
 
-    if length(US)<5
-      fieldName_US
-      warning('there are no USs for this day')
-      continue
-    end
 
     index = strfind(fieldName_US, '_');
     US_date = fieldName_US(index(1)+1:end);
@@ -33,6 +28,14 @@ for i = 1:numel(fields_US) %going through each day
 
     index = strfind(fieldName_spikes, '_');
     spikes_date = fieldName_spikes(index(2)+1:end);
+
+    if length(US)<5
+      fieldName_US
+      warning('there are no USs for this day')
+      ratios.(sprintf('ratios_%s', spikes_date)) = NaN;
+      continue
+    end
+
 
     if strcmp(US_date, spikes_date)==1
       US_end = US+.750;
@@ -63,10 +66,19 @@ for i = 1:numel(fields_US) %going through each day
       CS_sum = sum(inCS);
       US_sum = sum(inUS);
 
-      %CS_change = CS_sum/pretrial_sum;
-      %US_change = US_sum/pretrial_sum;
+      if pretrial_sum+CS_sum>0
+      CS_change = CS_sum-pretrial_sum;
+      else
+      CS_change = NaN;
+      end
 
-      newdata = [pretrial_sum, CS_sum, US_sum];
+      if pretrial_sum+US_sum>0
+      US_change = US_sum-pretrial_sum;
+      else
+      US_change = NaN;
+      end
+
+      newdata = [pretrial_sum, CS_sum, US_sum, CS_change, US_change];
       output = vertcat(output, newdata);
     end
 

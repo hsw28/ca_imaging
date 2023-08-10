@@ -17,4 +17,4 @@ fixed_US_times = fixUS(starttime_raw, US_times)
 fixed_pos = fixPos_times(pos);
 
 %CA time stamps start at zero so just change them to seconds
-%CA_TS_fixed = fixCA_times(CA_TS);
+CA_TS_fixed = fixCA_times(CA_TS);
