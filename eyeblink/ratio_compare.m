@@ -2,8 +2,8 @@ function f = ratio_compare(ratios1, ratios2, days_to_average)
   %averages ratio response for ratios one and ratios 2
   %then scatter plots and finds best fit line
 
-  %ratios1 = nanmean(ratios1');
-  %ratios2 = nanmean(ratios2');
+  ratios1 = nanmean(ratios1');
+  ratios2 = nanmean(ratios2');
 
   x = ratios1;
   y = ratios2;

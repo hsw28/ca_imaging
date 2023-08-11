@@ -28,7 +28,7 @@ for i = min(days_for_condition_in_vector_form):max(days_for_condition_in_vector_
       %  warning('there are no USs for this day')
       %  continue
       %if strcmp(US_date, spikes_date)==1 | strcmp(ratios_date, spikes_date)==1
-        wanted_cells = find(ratios(:,i)<number_to_be_greater_than);
+        wanted_cells = find(ratios(:,i)>number_to_be_greater_than);
         wanted_index = [wanted_index; wanted_cells];
       %else
       %  US_date

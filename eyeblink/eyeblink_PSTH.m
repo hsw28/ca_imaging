@@ -11,12 +11,12 @@ end
 figure
 width = 5;
 height = ceil(length(fields_US)./5);
-height = 3;
+%height = 3;
 
 bars = [];
 
-%for i = 1:length(fields_US)
-  for i = 1:15
+for i = 1:length(fields_US)
+%  for i = 1:15
 
   fieldName_US = fields_US{i};
   fieldValue_US = US_time_structure.(fieldName_US);

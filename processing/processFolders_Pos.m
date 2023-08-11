@@ -1,5 +1,6 @@
-function giantStructure = processFolders_Pos(currentDir, type1_for_cage_2_for_oval)
-%makes a position structure with all your run days for one animal using dlc_fixpos
+function giantStructure = processFolders_Pos(currentDir)
+%makes a position structure with all your run days for one animal using dlc_fixposor
+%should auto detect if oval or rectangle
 %%FIXES POS USING dlc_fixpos
 %input 1 for the cage and 2 for the oval
 %currectDir should be the directory you wish to search from, ie './031423/'
@@ -16,7 +17,7 @@ function giantStructure = processFolders_Pos(currentDir, type1_for_cage_2_for_ov
             selected_folder_idx = selected_folders(i);
             if selected_folder_idx > 0 && selected_folder_idx <= numel(validFolders)
                 selected_folder = validFolders{selected_folder_idx};
-                output = processSelectedFolder(selected_folder, type1_for_cage_2_for_oval);
+                [output type1_for_cage_2_for_oval] = processSelectedFolder(selected_folder);
 
 
                 % Get the folder name three levels above My_WebCam
@@ -40,7 +41,7 @@ function giantStructure = processFolders_Pos(currentDir, type1_for_cage_2_for_ov
                 if type1_for_cage_2_for_oval == 1
                   giantStructure.(sprintf('pos_%s', pos_folder_date)) = output;
                 else
-                  giantStructure.(sprintf('posOVAL_%s', pos_folder_date)) = output;
+                  giantStructure.(sprintf('pos_%s', pos_folder_date, '_oval')) = output;
                 end
             else
                 fprintf('Invalid folder number: %d\n', selected_folder_idx);
@@ -49,6 +50,8 @@ function giantStructure = processFolders_Pos(currentDir, type1_for_cage_2_for_ov
     else
         fprintf('No valid folders found.\n');
     end
+
+    giantStructure = orderfields(giantStructure);
 end
 
 function validFolders = getValidFolders(currentDir)
@@ -97,7 +100,7 @@ function validFolders = getValidFolders(currentDir)
     end
 end
 
-function output = processSelectedFolder(folder, type1_for_cage_2_for_oval)
+function [output type1_for_cage_2_for_oval] = processSelectedFolder(folder)
 
     % Get the full file path for timestamps
     webCamDir = fullfile(folder, 'My_WebCam');
@@ -120,7 +123,16 @@ function output = processSelectedFolder(folder, type1_for_cage_2_for_oval)
     posData = readtable(posFile);
 
     % Call the function dlc_fixpos and store the output in the giant structure
+    pos = posData;
+    pos = pos(3:end, 2:end);
+    pos = table2array(pos);
+    pos = cellfun( @str2double, pos );
 
+    if size(pos,2)>18
+      type1_for_cage_2_for_oval = 1;
+    else
+      type1_for_cage_2_for_oval = 2;
+    end
     output = dlc_fixpos(posData, timeStampData, type1_for_cage_2_for_oval);
 
 end
