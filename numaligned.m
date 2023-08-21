@@ -1,4 +1,5 @@
 function f = numaligned(alignment)
+  %finds the number of cells aligned across sessions. i think. i wrote this comment way after i wrote the code
 
 num = [];
 for k=1:length(alignment)

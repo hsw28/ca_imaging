@@ -1,9 +1,10 @@
-function [peak_stuct all_traces] = loadCAtraces(currentDir)
+function [peak_stuct all_traces frame_timestamps] = loadCAtraces(currentDir)
 
 %loads calcium transients and/or peaks for all sorted files in the selected folder
 
 all_traces = struct();
 peak_stuct = struct();
+frame_timestamps = struct();
 validFoldersList = getValidFolders(currentDir);
 
 % Prompt the user to select which folders to process
@@ -36,7 +37,8 @@ if ~isempty(validFoldersList)
             signalPeaks = peaks(good,:);
             %converts frames to timestamps
 
-            peaks = converttotime(signalPeaks, timestamps);
+
+            [peaks times_sec] = converttotime(signalPeaks, timestamps);
 
 
             % Get the folder name three levels above My_WebCam
@@ -62,6 +64,8 @@ if ~isempty(validFoldersList)
 
                             all_traces.(sprintf('CA_traces_%s', folder_date)) = traces;
                             peak_stuct.(sprintf('CA_peaks_%s', folder_date)) = peaks;
+                            frame_timestamps.(sprintf('CA_frame_ts_%s', folder_date)) = times_sec;
+
                         else
                             fprintf('Invalid folder number: %d\n', selected_folder_idx);
                             %}

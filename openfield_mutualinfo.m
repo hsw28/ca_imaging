@@ -1,5 +1,6 @@
 function f = openfield_mutualinfo(spike_structure, pos_structure, dim)
 %finds mutual info for a bunch of cells
+%little did I know i already had code for this: ca_mutualinfo_openfield.m
 
 tic
 
