@@ -1,7 +1,8 @@
-function allframes = converttoframe(US_timestoconvert, timestamps)
+function allframes = converttoframe(US_timestoconvert, Ca_timestamps)
 %converts from a timestamp to a frame #.
 %then converts to a spike train (can uncomment this) putting a 10 for CS and a 20 for US
 
+timestamps = Ca_timestamps;
 if isa(timestamps,'table')
   timestamps = table2array(timestamps);
   timestamps = timestamps(:,2);
