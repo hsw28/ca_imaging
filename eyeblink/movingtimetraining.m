@@ -8,7 +8,7 @@ function [goodCA_trace env_CSUS] = movingtimetraining(trace, US_timestoconvert, 
 
 pos = convertpostoframe(pos, CA_timestamps);
 
-velthreshold = 6;
+velthreshold = 9;
 vel = ca_velocity(pos);
 goodvel = find(vel(1,:)>=velthreshold); %want these for their velocity
 
