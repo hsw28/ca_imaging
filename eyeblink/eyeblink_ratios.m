@@ -17,10 +17,8 @@ for i = 1:numel(fields_US) %going through each day
     fieldValue_US = US_time_structure.(fieldName_US);
     US = fieldValue_US;
 
-
     index = strfind(fieldName_US, '_');
     US_date = fieldName_US(index(1)+1:end);
-
 
     fieldName_spikes = fields_spikes{i};
     fieldValue_spikes = spike_structure.(fieldName_spikes);
