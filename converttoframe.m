@@ -1,4 +1,4 @@
-function allframes = converttoframe(CS_timestoconvert, US_timestoconvert, Ca_timestamps)
+function [allframes timestamps] = converttoframe(CS_timestoconvert, US_timestoconvert, Ca_timestamps)
 %converts from a timestamp to a frame #.
 %then converts to a spike train (can uncomment this) putting a 10 for CS and a 20 for US
 
@@ -40,4 +40,11 @@ for k=1:length(US_timestoconvert)
     allframes(CS_frame:US_frame-1)=10;
     allframes(US_frame+0:US_frame+2)=20;
 
+end
+
+tsindex = 2:2:length(timestamps);
+timestamps = timestamps(tsindex);
+
+if length(timestamps)~=length(allframes)
+  warning('your timestamps and frames arent same length')
 end

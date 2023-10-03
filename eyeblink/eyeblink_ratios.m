@@ -1,6 +1,7 @@
-function ratios = eyeblink_ratios(US_time_structure, spike_structure)
+function ratios = eyeblink_ratios(US_time_structure, spike_structure, cutoff)
 % input times_US structure and Ca_peaks structure
 %outputs number of spikes during pretrial, CS, US periods and the ratios of CS:pretrial and US:pretrial
+%cuttoff is spikes cell must have (>=) in CS, US, or intertrial period in order to count
 
   ratios = struct();
   fields_US = fieldnames(US_time_structure);
@@ -61,19 +62,28 @@ for i = 1:numel(fields_US) %going through each day
 
       pretrial_sum = sum(inPretrial);
 
+
       CS_sum = sum(inCS);
       US_sum = sum(inUS);
+      
+      if CS_sum >= cutoff | US_sum >= cutoff | CS_sum >= cutoff
+        if pretrial_sum+CS_sum>0
+          CS_change = CS_sum-pretrial_sum;
+        else
+          CS_change = NaN;
+        end
 
-      if pretrial_sum+CS_sum>0
-      CS_change = CS_sum-pretrial_sum;
+        if pretrial_sum+US_sum>0
+          US_change = US_sum-pretrial_sum;
+        else
+          US_change = NaN;
+        end
       else
-      CS_change = NaN;
-      end
-
-      if pretrial_sum+US_sum>0
-      US_change = US_sum-pretrial_sum;
-      else
-      US_change = NaN;
+        CS_change = NaN;
+        US_change = NaN;
+        pretrial_sum = NaN;
+        CS_sum = NaN;
+        US_sum = NaN;
       end
 
       newdata = [pretrial_sum, CS_sum, US_sum, CS_change, US_change];

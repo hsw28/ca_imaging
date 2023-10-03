@@ -20,10 +20,9 @@ function dat = mindAsFunction(data,parameters)
     %   x: trajectory in environment (time x dimensions)
     %   f: network activity over time (time x neurons)
 
+
     assert( size( data.t , 2 ) == 1);
     nt = size( data.t , 1 );
-    nt
-    size( data.f , 1 )
     assert( size( data.f , 1 ) == nt );
 
     dat.data.t = data.t;

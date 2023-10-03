@@ -1,7 +1,7 @@
-function [pre_response CS_resp US_resp CS_ratio US_ratio] = cells_across_days(ratios_structure, alignment)
+function alignment_response = cells_across_days(ratios_structure, alignment)
 
   %for every cell, finds the pre-trial response, CS response, and US response across all days the cell appears
-
+  %ratios is from eyeblink_ratios(times_US, Ca_peaks), where ratios are [pretrial_sum, CS_sum, US_sum, CS_change, US_change];
 
 fields = fieldnames(ratios_structure);
 pre_response = NaN(size(alignment,1),size(alignment,2));
@@ -29,3 +29,10 @@ for i = 1:size(alignment,1)
       end
   end
 end
+
+alignment_response = struct();
+alignment_response.pre_response = pre_response;
+alignment_response.CS_resp = CS_resp;
+alignment_response.US_resp = US_resp;
+alignment_response.CS_ratio = CS_ratio;
+alignment_response.US_ratio = US_ratio;
