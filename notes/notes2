@@ -1,0 +1,160 @@
+mutinfo0127_0602 = ca_mutualinfo(spiketimes0127_0602, pos0127_0602, 4);
+mutinfo0127_0604 = ca_mutualinfo(spiketimes0127_0604, pos0127_0604, 4);
+mutinfo0127_0608 = ca_mutualinfo(spiketimes0127_0608, pos0127_0608, 4);
+mutinfo0127_0609 = ca_mutualinfo(spiketimes0127_0609, pos0127_0609, 4);
+mutinfo0127_0603 = ca_mutualinfo(spiketimes0127_0603, pos0127_0603, 4);
+mutinfo0127_0607 = ca_mutualinfo(spiketimes0127_0607, pos0127_0607, 4);
+mutinfo0128_0513 = ca_mutualinfo(spiketimes0128_0513, pos0128_0513, 4);
+mutinfo0128_0514 = ca_mutualinfo(spiketimes0128_0514, pos0128_0514, 4);
+mutinfo0128_0517 = ca_mutualinfo(spiketimes0128_0517, pos0128_0517, 4);
+mutinfo0128_0524 = ca_mutualinfo(spiketimes0128_0524, pos0128_0524, 4);
+mutinfo0128_0518 = ca_mutualinfo(spiketimes0128_0518, pos0128_0518, 4);
+mutinfo0128_0520 = ca_mutualinfo(spiketimes0128_0520, pos0128_0520, 4);
+mutinfo0330_0525 = ca_mutualinfo(spiketimes0330_0525, pos0330_0525, 4);
+mutinfo0330_0526 = ca_mutualinfo(spiketimes0330_0526, pos0330_0526, 4);
+mutinfo0330_0604 = ca_mutualinfo(spiketimes0330_0604, pos0330_0604, 4);
+mutinfo0330_0607 = ca_mutualinfo(spiketimes0330_0607, pos0330_0607, 4);
+mutinfo0330_0608 = ca_mutualinfo(spiketimes0330_0608, pos0330_0608, 4);
+mutinfo0330_0609 = ca_mutualinfo(spiketimes0330_0609, pos0330_0609, 4);
+mutinfo0331_0525 = ca_mutualinfo(spiketimes0331_0525, pos0331_0525, 4);
+mutinfo0331_0526 = ca_mutualinfo(spiketimes0331_0526, pos0331_0526, 4);
+mutinfo0331_0608 = ca_mutualinfo(spiketimes0331_0608, pos0331_0608, 4);
+mutinfo0331_0609 = ca_mutualinfo(spiketimes0331_0609, pos0331_0609, 4);
+mutinfo0331_0603 = ca_mutualinfo(spiketimes0331_0603, pos0331_0603, 4);
+mutinfo0331_0607 = ca_mutualinfo(spiketimes0331_0607, pos0331_0607, 4);
+
+ shuff_mutinfo0127_0602 = ca_mutualinfo_shuff(spiketimes0127_0602, pos0127_0602, 4, 500,mutinfo0127_0602);
+ shuff_mutinfo0127_0604 = ca_mutualinfo_shuff(spiketimes0127_0604, pos0127_0604, 4, 500,mutinfo0127_0604);
+ shuff_mutinfo0127_0608 = ca_mutualinfo_shuff(spiketimes0127_0608, pos0127_0608, 4, 500,mutinfo0127_0608);
+ shuff_mutinfo0127_0609 = ca_mutualinfo_shuff(spiketimes0127_0609, pos0127_0609, 4, 500,mutinfo0127_0609);
+ shuff_mutinfo0127_0603 = ca_mutualinfo_shuff(spiketimes0127_0603, pos0127_0603, 4, 500,mutinfo0127_0603);
+ shuff_mutinfo0127_0607 = ca_mutualinfo_shuff(spiketimes0127_0607, pos0127_0607, 4, 500,mutinfo0127_0607);
+ shuff_mutinfo0128_0513 = ca_mutualinfo_shuff(spiketimes0128_0513, pos0128_0513, 4, 500,mutinfo0128_0513);
+ shuff_mutinfo0128_0514 = ca_mutualinfo_shuff(spiketimes0128_0514, pos0128_0514, 4, 500,mutinfo0128_0514);
+ shuff_mutinfo0128_0517 = ca_mutualinfo_shuff(spiketimes0128_0517, pos0128_0517, 4, 500,mutinfo0128_0517);
+ shuff_mutinfo0128_0524 = ca_mutualinfo_shuff(spiketimes0128_0524, pos0128_0524, 4, 500,mutinfo0128_0524);
+ shuff_mutinfo0128_0518 = ca_mutualinfo_shuff(spiketimes0128_0518, pos0128_0518, 4, 500,mutinfo0128_0518);
+ shuff_mutinfo0128_0520 = ca_mutualinfo_shuff(spiketimes0128_0520, pos0128_0520, 4, 500,mutinfo0128_0520);
+ shuff_mutinfo0330_0525 = ca_mutualinfo_shuff(spiketimes0330_0525, pos0330_0525, 4, 500,mutinfo0330_0525);
+ shuff_mutinfo0330_0526 = ca_mutualinfo_shuff(spiketimes0330_0526, pos0330_0526, 4, 500,mutinfo0330_0526);
+ shuff_mutinfo0330_0604 = ca_mutualinfo_shuff(spiketimes0330_0604, pos0330_0604, 4, 500,mutinfo0330_0604);
+ shuff_mutinfo0330_0607 = ca_mutualinfo_shuff(spiketimes0330_0607, pos0330_0607, 4, 500,mutinfo0330_0607);
+ shuff_mutinfo0330_0608 = ca_mutualinfo_shuff(spiketimes0330_0608, pos0330_0608, 4, 500,mutinfo0330_0608);
+ shuff_mutinfo0330_0609 = ca_mutualinfo_shuff(spiketimes0330_0609, pos0330_0609, 4, 500,mutinfo0330_0609);
+ shuff_mutinfo0331_0525 = ca_mutualinfo_shuff(spiketimes0331_0525, pos0331_0525, 4, 500,mutinfo0331_0525);
+ shuff_mutinfo0331_0526 = ca_mutualinfo_shuff(spiketimes0331_0526, pos0331_0526, 4, 500,mutinfo0331_0526);
+ shuff_mutinfo0331_0608 = ca_mutualinfo_shuff(spiketimes0331_0608, pos0331_0608, 4, 500,mutinfo0331_0608);
+ shuff_mutinfo0331_0609 = ca_mutualinfo_shuff(spiketimes0331_0609, pos0331_0609, 4, 500,mutinfo0331_0609);
+ shuff_mutinfo0331_0603 = ca_mutualinfo_shuff(spiketimes0331_0603, pos0331_0603, 4, 500,mutinfo0331_0603);
+ shuff_mutinfo0331_0607 = ca_mutualinfo_shuff(spiketimes0331_0607, pos0331_0607, 4, 500,mutinfo0331_0607);
+
+
+  good0127_0602_ = mutualinfo_diff(mutinfo0127_0602, shuff_mutinfo0127_0602);
+  good0127_0603 = mutualinfo_diff(mutinfo0127_0603, shuff_mutinfo0127_0603);
+  good0127_0604 = mutualinfo_diff(mutinfo0127_0604, shuff_mutinfo0127_0604);
+  good0127_0607 = mutualinfo_diff(mutinfo0127_0607, shuff_mutinfo0127_0607);
+  good0127_0608 = mutualinfo_diff(mutinfo0127_0608, shuff_mutinfo0127_0608);
+  good0127_0609 = mutualinfo_diff(mutinfo0127_0609, shuff_mutinfo0127_0609);
+  good0128_0513 = mutualinfo_diff(mutinfo0128_0513, shuff_mutinfo0128_0513);
+  good0128_0514 = mutualinfo_diff(mutinfo0128_0514, shuff_mutinfo0128_0514);
+  good0128_0517 = mutualinfo_diff(mutinfo0128_0517, shuff_mutinfo0128_0517);
+  good0128_0518 = mutualinfo_diff(mutinfo0128_0518, shuff_mutinfo0128_0518);
+  good0128_0520 = mutualinfo_diff(mutinfo0128_0520, shuff_mutinfo0128_0520);
+  good0128_0524 = mutualinfo_diff(mutinfo0128_0524, shuff_mutinfo0128_0524);
+  good0330_0525 = mutualinfo_diff(mutinfo0330_0525, shuff_mutinfo0330_0525);
+  good0330_0526 = mutualinfo_diff(mutinfo0330_0526, shuff_mutinfo0330_0526);
+  good0330_0604 = mutualinfo_diff(mutinfo0330_0604, shuff_mutinfo0330_0604);
+  good0330_0607 = mutualinfo_diff(mutinfo0330_0607, shuff_mutinfo0330_0607);
+  good0330_0608 = mutualinfo_diff(mutinfo0330_0608, shuff_mutinfo0330_0608);
+  good0330_0609 = mutualinfo_diff(mutinfo0330_0609, shuff_mutinfo0330_0609);
+  good0331_0525 = mutualinfo_diff(mutinfo0331_0525, shuff_mutinfo0331_0525);
+  good0331_0526 = mutualinfo_diff(mutinfo0331_0526, shuff_mutinfo0331_0526);
+  good0331_0603 = mutualinfo_diff(mutinfo0331_0603, shuff_mutinfo0331_0603);
+  good0331_0607 = mutualinfo_diff(mutinfo0331_0607, shuff_mutinfo0331_0607);
+  good0331_0608 = mutualinfo_diff(mutinfo0331_0608, shuff_mutinfo0331_0608);
+  good0331_0609 = mutualinfo_diff(mutinfo0331_0609, shuff_mutinfo0331_0609);
+
+  good0127_0602_std = mutualinfo_diff(mutinfo0127_0602, shuff_mutinfo0127_0602_stddev);
+  good0127_0603_std = mutualinfo_diff(mutinfo0127_0603, shuff_mutinfo0127_0603_stddev);
+  good0127_0604_std = mutualinfo_diff(mutinfo0127_0604, shuff_mutinfo0127_0604_stddev);
+  good0127_0607_std = mutualinfo_diff(mutinfo0127_0607, shuff_mutinfo0127_0607_stddev);
+  good0127_0608_std = mutualinfo_diff(mutinfo0127_0608, shuff_mutinfo0127_0608_stddev);
+  good0127_0609_std = mutualinfo_diff(mutinfo0127_0609, shuff_mutinfo0127_0609_stddev);
+  good0128_0513_std = mutualinfo_diff(mutinfo0128_0513, shuff_mutinfo0128_0513_stddev);
+  good0128_0514_std = mutualinfo_diff(mutinfo0128_0514, shuff_mutinfo0128_0514_stddev);
+  good0128_0517_std = mutualinfo_diff(mutinfo0128_0517, shuff_mutinfo0128_0517_stddev);
+  good0128_0518_std = mutualinfo_diff(mutinfo0128_0518, shuff_mutinfo0128_0518_stddev);
+  good0128_0520_std = mutualinfo_diff(mutinfo0128_0520, shuff_mutinfo0128_0520_stddev);
+  good0128_0524_std = mutualinfo_diff(mutinfo0128_0524, shuff_mutinfo0128_0524_stddev);
+  good0330_0525_std = mutualinfo_diff(mutinfo0330_0525, shuff_mutinfo0330_0525_stddev);
+  good0330_0526_std = mutualinfo_diff(mutinfo0330_0526, shuff_mutinfo0330_0526_stddev);
+  good0330_0604_std = mutualinfo_diff(mutinfo0330_0604, shuff_mutinfo0330_0604_stddev);
+  good0330_0607_std = mutualinfo_diff(mutinfo0330_0607, shuff_mutinfo0330_0607_stddev);
+  good0330_0608_std = mutualinfo_diff(mutinfo0330_0608, shuff_mutinfo0330_0608_stddev);
+  good0330_0609_std = mutualinfo_diff(mutinfo0330_0609, shuff_mutinfo0330_0609_stddev);
+  good0331_0525_std = mutualinfo_diff(mutinfo0331_0525, shuff_mutinfo0331_0525_stddev);
+  good0331_0526_std = mutualinfo_diff(mutinfo0331_0526, shuff_mutinfo0331_0526_stddev);
+  good0331_0603_std = mutualinfo_diff(mutinfo0331_0603, shuff_mutinfo0331_0603_stddev);
+  good0331_0607_std = mutualinfo_diff(mutinfo0331_0607, shuff_mutinfo0331_0607_stddev);
+  good0331_0608_std = mutualinfo_diff(mutinfo0331_0608, shuff_mutinfo0331_0608_stddev);
+  good0331_0609_std = mutualinfo_diff(mutinfo0331_0609, shuff_mutinfo0331_0609_stddev);
+
+
+placecount = [];
+placecount(end+1) = length(unique(good0127_0602(:,1)));
+>> placecount(end+1) = length(unique(good0127_0603(:,1)));
+>> placecount(end+1) = length(unique(good0127_0604(:,1)));
+>> placecount(end+1) = length(unique(good0127_0607(:,1)));
+>> placecount(end+1) = length(unique(good0127_0608(:,1)));
+>> placecount(end+1) = length(unique(good0127_0609(:,1)));
+>> placecount(end+1) = length(unique(good0128_0513(:,1)));
+>> placecount(end+1) = length(unique(good0128_0514(:,1)));
+>> placecount(end+1) = length(unique(good0128_0517(:,1)));
+>> placecount(end+1) = length(unique(good0128_0518(:,1)));
+>> placecount(end+1) = length(unique(good0128_0520(:,1)));
+>> placecount(end+1) = length(unique(good0128_0524(:,1)));
+>> placecount(end+1) = length(unique(good0330_0525(:,1)));
+>> placecount(end+1) = length(unique(good0330_0526(:,1)));
+>> placecount(end+1) = length(unique(good0330_0604(:,1)));
+>> placecount(end+1) = length(unique(good0330_0607(:,1)));
+>> placecount(end+1) = length(unique(good0330_0608(:,1)));
+>> placecount(end+1) = length(unique(good0330_0609(:,1)));
+>> placecount(end+1) = length(unique(good0331_0525(:,1)));
+>> placecount(end+1) = length(unique(good0331_0526(:,1)));
+>> placecount(end+1) = length(unique(good0331_0603(:,1)));
+>> placecount(end+1) = length(unique(good0331_0607(:,1)));
+>> placecount(end+1) = length(unique(good0331_0608(:,1)));
+>> placecount(end+1) = length(unique(good0331_0609(:,1)));
+
+
+
+------
+
+
+
+
+alignment parameters
+testing with 1-28
+1/10/.4/_/3/1/corr2/.5/.3/1e-6/0/0
+= 77
+
+1/10/.4/1/2/1/corr2/.5/.3/1e-6/0/0
+= 84
+
+1/10/.4/_/2/1/corr2/.6/.3/1e-6/0/0
+= 67
+
+1/10/.4/_/2/1/corr2/.5/.3/1e-6/0/0
+= 107
+
+1/5/.4/_/2/1/corr2/.5/.2/1e-6/0/0
+= 106
+
+1/5/.4/_/2/1/corr2/.5/.3/1e-6/0/0
+= 106
+
+1/5/.4/6/2/1/corr2/.5/.3/1e-6/0/0 <-- not sure if it should be to the session with most cells or last
+= 108
+
+3/5/.4/6/2/1/corr2/.5/.3/1e-6/0/0 <-- not sure what that does
+= 114
