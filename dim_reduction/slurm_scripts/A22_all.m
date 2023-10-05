@@ -5,7 +5,10 @@ addpath(genpath('~/Documents/ca_imaging/eyeblink'),'-end');
 addpath(('~/Documents/ca_imaging'),'-end');
 
 cd ~/Documents
+load('EVERYTHING2.mat', 'frame_ts521')
 load('EVERYTHING2.mat', 'frame_ts522')
+load('EVERYTHING2.mat', 'frame_ts524')
+load('EVERYTHING2.mat', 'frame_ts525')
 load('EVERYTHING2.mat', 'Ca_traces')
 load('EVERYTHING2.mat', 'times_US')
 load('EVERYTHING2.mat', 'times_CS')
