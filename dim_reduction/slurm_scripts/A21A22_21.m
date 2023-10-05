@@ -13,6 +13,7 @@ load('EVERYTHING2.mat', 'Ca_traces')
 load('EVERYTHING2.mat', 'times_US')
 load('EVERYTHING2.mat', 'times_CS')
 load('EVERYTHING2.mat', 'pos')
+load('EVERYTHING2.mat', 'alignment_medium')
 
 %an-1 and an, sep and combined
 vA21A22 = find(alignment_medium(:,15)>0 & alignment_medium(:,14)>0);

@@ -13,6 +13,8 @@ load('EVERYTHING2.mat', 'Ca_traces')
 load('EVERYTHING2.mat', 'times_US')
 load('EVERYTHING2.mat', 'times_CS')
 load('EVERYTHING2.mat', 'pos')
+load('EVERYTHING2.mat', 'alignment_medium')
+
 [wanted22 temp temp1 vel post] = movingtimetraining(Ca_traces.CA_traces_2023_05_22, times_CS.CS_2023_05_22, times_US.US_2023_05_22, frame_ts522, pos.pos_2023_05_22, 1, 0);
 wanted22 = wanted22(245:end);
 time22 = vel(2,245:end);

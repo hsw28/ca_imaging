@@ -13,6 +13,7 @@ load('EVERYTHING2.mat', 'Ca_traces')
 load('EVERYTHING2.mat', 'times_US')
 load('EVERYTHING2.mat', 'times_CS')
 load('EVERYTHING2.mat', 'pos')
+load('EVERYTHING2.mat', 'alignment_medium')
 
 %b1 and b2, sep and combined
 vB24B25 = find(alignment_medium(:,17)>0 & alignment_medium(:,18)>0);
