@@ -24,17 +24,17 @@ time22 = vel(2,245:end);
 moving22 = (Ca_traces.CA_traces_2023_05_22(vA22B24_22,wanted22));
 result_AA22B24_22 = runMIND(moving22, time22);
 
-%{
-A22B24 = find(alignment_medium(:,15)>0 & alignment_medium(:,17)>0);
-A22B24_24 = alignment_medium(A22B24,17);
-[wanted24 temp temp1 vel post] = movingtimetraining(Ca_traces.CA_traces_2023_05_24, times_CS.CS_2023_05_24, times_US.US_2023_05_24, frame_ts524, pos.pos_2023_05_24_oval, 1, 0);
-time24 = vel(2,:);
-moving24 = (Ca_traces.CA_traces_2023_05_24(A22B24_24,wanted24));
+%
+%A22B24 = find(alignment_medium(:,15)>0 & alignment_medium(:,17)>0);
+%A22B24_24 = alignment_medium(A22B24,17);
+%[wanted24 temp temp1 vel post] = movingtimetraining(Ca_traces.CA_traces_2023_05_24, times_CS.CS_2023_05_24, times_US.US_2023_05_24, frame_ts524, pos.pos_2023_05_24_oval, 1, 0);
+%time24 = vel(2,:);
+%moving24 = (Ca_traces.CA_traces_2023_05_24(A22B24_24,wanted24));
 %result_A22B24_24 = runMIND(moving24, time24);
-
-moving22_24 = [moving22 moving24];
-time22_24 = [time22 time24];
-result_A22B24_concat = runMIND(moving22_24, time22_24);
-%}
+%
+%moving22_24 = [moving22 moving24];
+%time22_24 = [time22 time24];
+%result_A22B24_concat = runMIND(moving22_24, time22_24);
+%
 
 save result_AA22B24_22.mat result_AA22B24_22

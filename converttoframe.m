@@ -36,7 +36,7 @@ for k=1:length(US_timestoconvert)
     CS_frame = floor(index./2);
   end
     allframes(CS_frame:US_frame-1)=10;
-    allframes(US_frame+0:US_frame+3)=20;    
+    allframes(US_frame+0:US_frame+2)=20;
 
 end
 
