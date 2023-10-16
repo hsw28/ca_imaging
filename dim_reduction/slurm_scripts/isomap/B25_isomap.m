@@ -6,7 +6,7 @@ addpath(('~/Documents/ca_imaging'),'-end');
 
 cd ~/Documents
 load('EVERYTHING2.mat', 'frame_ts525')
-load('EVERYTHING2.mat', 'frame_ts522')
+load('EVERYTHING2.mat', 'frame_ts525')
 load('EVERYTHING2.mat', 'frame_ts525')
 load('EVERYTHING2.mat', 'frame_ts525')
 load('EVERYTHING2.mat', 'Ca_traces')
@@ -21,9 +21,9 @@ D25_all = L2_distance(Ca_traces.CA_traces_2023_05_25, Ca_traces.CA_traces_2023_0
 
 
 [wanted25 temp temp1 vel post] = movingtimetraining(Ca_traces.CA_traces_2023_05_25, times_CS.CS_2023_05_25, times_US.US_2023_05_25, frame_ts525, pos.pos_2023_05_25_oval, 1, 0);
-time22 = vel(2,:);
-moving22 = (Ca_traces.CA_traces_2023_05_22(:,wanted25));
-D25_moving = L2_distance(moving22, moving22);
+time25 = vel(2,:);
+moving25 = (Ca_traces.CA_traces_2023_05_25(:,wanted25));
+D25_moving = L2_distance(moving25, moving25);
 [Y25_moving, R25_moving, E25_moving] = IsomapII(D25_moving, 'k', 20, options);
 
 [training25 ts25] = converttoframe(times_CS.CS_2023_05_25, times_US.US_2023_05_25, frame_ts525);
