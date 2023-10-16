@@ -30,7 +30,6 @@ timestamps = timestamps./1000;
 end
 tsindex = 2:2:length(timestamps);
 
-time = timestamps(tsindex);
-time21 = frame_ts521(time);
+time21 = timestamps(tsindex);
 result_A21_all = runMIND(Ca_traces.CA_traces_2023_05_21, time21);
 save result_A21_ALL_TIMES.mat
