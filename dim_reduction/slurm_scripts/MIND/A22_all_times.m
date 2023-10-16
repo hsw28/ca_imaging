@@ -15,8 +15,22 @@ load('EVERYTHING2.mat', 'times_CS')
 load('EVERYTHING2.mat', 'pos')
 load('EVERYTHING2.mat', 'alignment_medium')
 
-[wanted21 temp temp1 vel post] = movingtimetraining(Ca_traces.CA_traces_2023_05_21, times_CS.CS_2023_05_21, times_US.US_2023_05_21, frame_ts521, pos.pos_2023_05_21, 1, 0);
-time21 = vel(2,:);
-moving21 = (Ca_traces.CA_traces_2023_05_21(:,wanted21));
-result_A21_all = runMIND(moving21, time21);
-save result_A21_all.mat result_A21_all
+timestamps = frame_ts522;
+if isa(timestamps,'table')
+  timestamps = table2array(timestamps);
+  timestamps = timestamps(:,2);
+end
+
+if size(timestamps,2)==3
+  timestamps = timestamps(:,2);
+end
+
+if timestamps(5)>2
+timestamps = timestamps./1000;
+end
+tsindex = 2:2:length(timestamps);
+
+time = (2:2(length(frame_ts522)));
+time22 = frame_ts522(time);
+result_A22_all = runMIND(Ca_traces.CA_traces_2023_05_22(:,647:end), time22);
+save result_A22_ALL_TIMES.mat
