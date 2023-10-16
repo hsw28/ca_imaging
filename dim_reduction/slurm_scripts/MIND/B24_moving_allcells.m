@@ -15,20 +15,6 @@ load('EVERYTHING2.mat', 'times_CS')
 load('EVERYTHING2.mat', 'pos')
 load('EVERYTHING2.mat', 'alignment_medium')
 
-timestamps = frame_ts524;
-if isa(timestamps,'table')
-  timestamps = table2array(timestamps);
-  timestamps = timestamps(:,2);
-end
-
-if size(timestamps,2)==3
-  timestamps = timestamps(:,2);
-end
-
-if timestamps(5)>2
-timestamps = timestamps./1000;
-end
-tsindex = 2:2:length(timestamps);
 
 [wanted24 temp temp1 vel post] = movingtimetraining(Ca_traces.CA_traces_2023_05_24, times_CS.CS_2023_05_24, times_US.US_2023_05_24, frame_ts524, pos.pos_2023_05_24_oval, 1, 0);
 time24 = vel(2,:);

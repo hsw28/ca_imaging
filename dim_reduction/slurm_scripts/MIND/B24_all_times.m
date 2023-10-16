@@ -15,8 +15,22 @@ load('EVERYTHING2.mat', 'times_CS')
 load('EVERYTHING2.mat', 'pos')
 load('EVERYTHING2.mat', 'alignment_medium')
 
+timestamps = frame_ts524;
+if isa(timestamps,'table')
+  timestamps = table2array(timestamps);
+  timestamps = timestamps(:,2);
+end
 
-time = (2:2(length(frame_ts524)));
+if size(timestamps,2)==3
+  timestamps = timestamps(:,2);
+end
+
+if timestamps(5)>2
+timestamps = timestamps./1000;
+end
+tsindex = 2:2:length(timestamps);
+
+time = timestamps(tsindex);
 time24 = frame_ts524(time);
 result_A24_all = runMIND(Ca_traces.CA_traces_2023_05_24, time24);
 save result_A24_ALL_TIMES.mat
