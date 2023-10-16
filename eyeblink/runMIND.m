@@ -44,6 +44,8 @@ mindparameters.verbose = true;
 mindparameters.lm.lmf = 1; %landmark fraction
 mindparameters.lm.n = length(data.t); %number of landmarks?? can be given as, for ex, round(size(dataDFF,1)/2). we dont want to use landmarks so I think this should be equal to number of data points?
 
+
+
 mindparameters.rwd.type = 'discrete'; %type of random walk ('continuous' or 'discrete')
 mindparameters.rwd.sym = 'avg'; % how to symmetrize global distances ('avg' or 'min')
 mindparameters.rwd.all_geo = true; % if true, all distances will be geodesic distances. otherwise,
@@ -75,7 +77,7 @@ mindparameters.mapping.lambda = [0, 10.^(-8:.5:0)]; % choices of regularization 
 mindparameters.mapping.mode = 'lle'; %for local linear embedding, other options are w-n kernel, tlle which is lle with time blocked cv?, or gp
 mindparameters.mapping.nfolds_lle = 10; %choices of regularization parameter
 mindparameters.prune_lm_by_time = false; % prune landmarks so they are separated in time, if requested
-
+%mindparameters.prune_lm_by_time = true;
 
 
 %%%%%%%%%%
