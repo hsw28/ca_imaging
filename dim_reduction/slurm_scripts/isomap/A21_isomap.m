@@ -34,4 +34,4 @@ D21_training = L2_distance(training21, training21);
 [Y21_training, R21_training, E21_training] = IsomapII(D21_training, 'k', 20, options);
 
 
-save result_A21_isomap.mat
+save result_A21_isomap.mat -v7.3
