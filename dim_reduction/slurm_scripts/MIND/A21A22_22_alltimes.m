@@ -15,7 +15,7 @@ load('EVERYTHING2.mat', 'times_CS')
 load('EVERYTHING2.mat', 'pos')
 load('EVERYTHING2.mat', 'alignment_medium')
 
-timestamps = frame_ts22;
+timestamps = frame_ts522;
 if isa(timestamps,'table')
   timestamps = table2array(timestamps);
   timestamps = timestamps(:,2);
