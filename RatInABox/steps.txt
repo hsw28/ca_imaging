@@ -12,6 +12,7 @@ STEPS
 2. Simulate Task-Specific Learning (tEBC)
     •	CombinedPlaceTebcNeurons.py
           - class that combines tEBC and place cell data into one cell type
+          - adjust the BALANCE PARAMETER to adjust how much each cell incorporates spatial vs tEBC data
     •	trial_marker.py
           - Function to Determine CS/US Presentation ()
 
@@ -20,7 +21,7 @@ STEPS
 
 4. Transfer Learning to EnvB
     - Since the rat has already learned the tEBC task in EnvA, you should use the same CombinedPlaceTebcNeurons class in EnvB. This ensures that the neuronal responses to the CS and US are consistent with the learning that occurred in EnvA.
-    - Simulate Neuronal Activity in EnvB: Run a simulation in EnvB using the trajectory data for this environment. The key here is to observe how the neurons, which have specific firing patterns associated with the CS and US from EnvA, behave in the new spatial layout of EnvB.
+    - Simulate Neuronal Activity in EnvB: Run a simulation in EnvB using the trajectory data for this environment. observe how the neurons, which have specific firing patterns associated with the CS and US from EnvA, behave in the new spatial layout of EnvB.
 
 5. Simulate in Both Environments with Varying Balances
     Run simulations in both EnvA and EnvB, varying the balance parameter across different runs. This will allow you to see how different levels of emphasis on tEBC learning versus spatial coding affect the neuronal activity in each environment.
@@ -34,9 +35,9 @@ STEPS
      - Spatial Coding Accuracy: How accurately do the neurons represent space in each environment under different balance settings?
      • actualVexpected.py
           - Comparing Expected vs. Actual place cell Firing Rates
-     • also want to run through CEBRA and see decoding accuracy / do bayesian decoding
+     (will also want to run through CEBRA and see decoding accuracy / do bayesian decoding)
 
      - Optimal Balance: Determine which balance setting provides the best compromise between effective learning transfer and accurate spatial representation.
 
 7. Iterate and Refine
-    Based on your findings, you may need to iterate and refine the balance parameter or even the model itself. This iterative process will help you find the most effective configuration for your specific research question.
+    Based on findings, iterate and refine the balance parameter or  the model
