@@ -29,13 +29,14 @@ STEPS
 6. Analyze the Results
     After each simulation run, analyze the results to assess:
      - Learning Transfer: How well does the tEBC learning transfer to EnvB with different balance levels?
-    • learningTransfer.py
+     • learningTransfer.py
         - comparing the neuronal responses to the conditioned stimuli (CS) and unconditioned stimuli (US) in both environments and quantifying the similarity or consistency of these responses.
-
+     • (will also want to run through CEBRA and see decoding accuracy)
+     
      - Spatial Coding Accuracy: How accurately do the neurons represent space in each environment under different balance settings?
      • actualVexpected.py
           - Comparing Expected vs. Actual place cell Firing Rates
-     (will also want to run through CEBRA and see decoding accuracy / do bayesian decoding)
+     • (will also want to run through CEBRA and see decoding accuracy / do bayesian decoding)
 
      - Optimal Balance: Determine which balance setting provides the best compromise between effective learning transfer and accurate spatial representation.
 
