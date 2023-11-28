@@ -1,9 +1,17 @@
-function f = ca_mutualinfo_openfield(peaks_time, pos, dim, velthreshold)
+function f = ca_mutualinfo_openfield(peaks_time, pos, dim, velthreshold, varargin)
 %finds mutual info for a bunch of cells
+
+if size(varargin)==0
+psize = 6.85; %some REAL ratio of pixels to cm -- 3.5 for wilson, 2.5 for disterhoft linear, 6.85 for eyeblink
+else
+psize = varargin;
+end
+
 
 %%%%%%%%%%%%%%NEED TO FIGURE OUT SOME SMOOTHING
 tic
-mutinfo = NaN(1, size(peaks_time,1));
+numunits = size(peaks_time,1);
+mutinfo = NaN(numunits,1);
 
 
 
@@ -16,7 +24,7 @@ goodpos = pos(goodvel,:);
 mintime = vel(2,1);
 maxtime = vel(2,end);
 
-numunits = size(peaks_time,1);
+
 
 for k=1:numunits
   highspeedspikes = [];
@@ -40,14 +48,14 @@ for k=1:numunits
 
   if fr > .01 && length(highspeedspikes)>0
 
-    [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(highspeedspikes,goodpos,dim, 6.85);
+    [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(highspeedspikes,goodpos,dim, psize);
     totspikes
-    mutinfo(1, k) = mutualinfo([spikeprob', occprob']);
+    mutinfo(k, 1) = mutualinfo([spikeprob', occprob']);
   else
-    mutinfo(1, k) = NaN;
+    mutinfo(k, 1) = NaN;
   end
 
 end
 
-f = mutinfo';
+f = mutinfo;
 toc

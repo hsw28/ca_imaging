@@ -3,7 +3,7 @@ function f = ca_decodederror(decoded, pos, decodedinterval)
 %decodedinterval is the length of decoding, for ex .5 for half a second
 
 %pos = fixpos(pos);
-pos(:,3) = 0;
+%pos(:,3) = 0;
 
 
 if size(decoded,1)>size(decoded,2)
@@ -16,7 +16,7 @@ pointstime = decoded(4,:);
 X = decoded(1,:);
 Y = decoded(2,:);
 
-decin = decodedinterval*30;
+decin = decodedinterval*7.5;
 
 
 
@@ -58,7 +58,7 @@ for i=1:length(decoded)
   if decodedinterval>.5
     postimes1 = (i-1)*(decodedinterval*30/2)+1;
     postimes2 = postimes1+(decodedinterval*30)-1;
-    postimes = [postimes1:1:postimes2]
+    postimes = [postimes1:1:postimes2];
   else
     postimes1 = (i-1)*(decodedinterval*30)+1;
     postimes2 = postimes1+(decodedinterval*30)-1;
@@ -84,9 +84,10 @@ for i=1:length(decoded)
 
     alldiff(end+1) = diff;
     %numpoints(end+1) = c;
-
+    size(postimes)
+    size(pos)
     realX(end+1) = nanmean(pos(postimes,2));
-   realT(end+1) = nanmean(pos(postimes(1),1));
+    realT(end+1) = nanmean(pos(postimes(1),1));
     %realT(end+1) = pointstime(i);
     predX(end+1) = X(i);
     predY(end+1) = Y(i);
@@ -97,11 +98,12 @@ for i=1:length(decoded)
 
 end
 
-nanmean(alldiff)./2.5
-nanmedian(alldiff)./2.5
+nanmean(alldiff)./6.85
+nanmedian(alldiff)./6.85
 
 size(predX);
 size(realX);
 size(realT);
 f = [predX; realX; realT]';
+f = (alldiff)./2.5
 %f = [alldiff/2.5; realT];

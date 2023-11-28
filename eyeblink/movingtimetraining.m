@@ -25,10 +25,12 @@ allwant = goodvel(setdiff(1:end,IA));
 %%%%%%
 
 %if want moving and CS/US
-%first = min(goodCSUS);
 %allwant = [goodvel, goodCSUS];
 %allwant = sort(allwant);
 %allwant = unique(allwant);
+%SI = find(allwant==first);
+%EI = find(allwant==last);
+%allwant = allwant(SI:EI);
 
 %outputs wanted trace
 trace(:,1:first) = NaN;
@@ -58,6 +60,7 @@ wanted1 = find(allwant>first);
 wanted2 = find(allwant<last);
 wanted3 = intersect(wanted1, wanted2);
 wanted = allwant(wanted3);
+max(wanted)
 vel = vel(:,wanted);
 pos = pos(wanted, :);
 env_CSUS = [env_train; CSUStrain];

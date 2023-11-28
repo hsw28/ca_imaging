@@ -1,4 +1,4 @@
-function f = openfield_mutualinfo(spike_structure, pos_structure, dim)
+function f = openfield_mutualinfo(spike_structure, pos_structure, velthreshold, dim)
 %finds mutual info for a bunch of cells
 %little did I know i already had code for this: ca_mutualinfo_openfield.m
 
@@ -30,9 +30,9 @@ for i = 1:numel(fields_spikes)
       index = strfind(fieldName_spikes, '_');
       pos_date = fieldName_spikes(index(2)+1:end)
 
-      mutinfo = NaN(size(peaks_time,1));
+      mutinfo = NaN(size(peaks_time,1),1);
 
-velthreshold = 8;
+velthreshold = 2;
 vel = ca_velocity(pos);
 %vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30.0005); %originally had this at 30, trying with 15 now
 goodvel = find(vel(1,:)>=velthreshold);
@@ -66,7 +66,7 @@ for k=1:numunits
   set(0,'DefaultFigureVisible', 'off');
 
   if length(highspeedspikes)>0
-  [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(highspeedspikes,goodpos,dim, 2.5);
+  [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(highspeedspikes, goodpos, dim, 6.85);
   mutinfo(k) = mutualinfo([spikeprob', occprob']);
   else
     mutinfo(k) = NaN;

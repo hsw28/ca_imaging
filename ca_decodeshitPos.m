@@ -5,9 +5,9 @@ function f = ca_decodeshitPos(pos, clusters, tdecode, dim)
 %auto detects of REM based on time input
 
 
-velthreshold = 12;
+velthreshold = 2;
 
-pos(:,3) = 0;
+%pos(:,3) = 0;
 
 
 if isa(clusters,'double')==1
@@ -49,11 +49,11 @@ end
 
 
 vel = ca_velocity(posData);
-vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30); %originally had this at 30, trying with 15 now
+vel(1,:) = smoothdata(vel(1,:), 'gaussian', 15); %originally had this at 30, trying with 15 now
 goodvel = find(vel>=velthreshold);
 
 tdecodesec = tdecode;
-t = 30*tdecode;
+t = round(30*tdecode);
 
 
 %find number of clusters
@@ -61,7 +61,7 @@ clustname = (fieldnames(clusters));
 numclust = length(clustname);
 
 %BIN
-psize = 2.5 * dim;
+psize = 6.85 * dim;
 
 xvals = posData(:,2);
 yvals = posData(:,3);
@@ -82,12 +82,12 @@ yinc = ymin +(0:ybins)*psize; %makes a vector of all the y values at each increm
 
 
 % for each cluster,find the firing rate at esch velocity range
-fxmatrix = ca_firingPerPos(posData, clusters, dim, tdecodesec, 30, velthreshold);
+fxmatrix = ca_firingPerPos(posData, clusters, dim, tdecodesec, 7.5, velthreshold);
 names = (fieldnames(fxmatrix));
 for k=1:length(names)
   curname = char(names(k));
-
-  if size(fxmatrix.(curname),2)>1
+  now = fxmatrix.(curname);
+  if size(fxmatrix.(curname),2)>1 & max(now)>0
   fxmatrix.(curname) = chartinterp(fxmatrix.(curname));
   fxmatrix.(curname) = ndnanfilter(fxmatrix.(curname), 'gausswin', [dim*2/dim, dim*2/dim], 2, {}, {'replicate'}, 1);
 

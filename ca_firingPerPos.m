@@ -4,16 +4,16 @@ function f = ca_firingPerPos(posData, clusters, dim, tdecode, pos_samp_per_sec, 
 if length(varargin)>1
   velthreshold = cell2mat(varargin)
 else
-velthreshold = 12;
+velthreshold = 2;
 end
 
-pos(:,3) = 0;
+%pos(:,3) = 0;
 
 spikenames = (fieldnames(clusters));
 spikenum = length(spikenames);
 
 
-psize = 2.5 * dim; %some REAL ratio of pixels to cm
+psize = 6.85 * dim; %some REAL ratio of pixels to cm
 
 
 
@@ -22,7 +22,7 @@ psize = 2.5 * dim; %some REAL ratio of pixels to cm
 mintime = min(posData(:,1));
 maxtime = max(posData(:,1));
 
-pos_samp_per_sec = length(posData(:,1))./(maxtime-mintime);  %29
+pos_samp_per_sec = length(posData(:,1))./(maxtime-mintime)  %29
 %tms = [posData(1,1):.0333:posData(end,1)];
 %posData = assignpos(tms, posData);
 
@@ -61,7 +61,7 @@ vel = ca_velocity(posData);
 
 
 
-vel(1,:) = smoothdata(vel(1,:), 'gaussian', pos_samp_per_sec); %originally had this at 30, trying with 15 now
+%vel(1,:) = smoothdata(vel(1,:), 'gaussian', round(pos_samp_per_sec)); %originally had this at 30, trying with 15 now
 
 fastvel = find(vel(1,:) > velthreshold);
 
