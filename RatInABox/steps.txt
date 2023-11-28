@@ -9,7 +9,6 @@ STEPS
     •	envB_oval.py
           - Environment B (EnvB): This is an oval-shaped environment with dimensions 18 inches x 26 inches. The code for EnvB includes a custom movement function to simulate the oval shape with a tolerance for the agent rearing up slightly beyond the confines of the oval. It also includes the calculation of place cell firing rates based on the agent's trajectory.
 
-
 2. Simulate Task-Specific Learning (tEBC)
     •	CombinedPlaceTebcNeurons.py
           - class that combines tEBC and place cell data into one cell type
@@ -29,7 +28,14 @@ STEPS
 6. Analyze the Results
     After each simulation run, analyze the results to assess:
      - Learning Transfer: How well does the tEBC learning transfer to EnvB with different balance levels?
+    • learningTransfer.py
+        - comparing the neuronal responses to the conditioned stimuli (CS) and unconditioned stimuli (US) in both environments and quantifying the similarity or consistency of these responses.
+
      - Spatial Coding Accuracy: How accurately do the neurons represent space in each environment under different balance settings?
+     • actualVexpected.py
+          - Comparing Expected vs. Actual place cell Firing Rates
+     • also want to run through CEBRA and see decoding accuracy / do bayesian decoding
+
      - Optimal Balance: Determine which balance setting provides the best compromise between effective learning transfer and accurate spatial representation.
 
 7. Iterate and Refine

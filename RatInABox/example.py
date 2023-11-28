@@ -1,29 +1,49 @@
-########EXAMPLE#####
+# Import necessary modules and custom classes
+from envA_rectangle import simulate_envA
+from envB_oval import simulate_envB
+from CombinedPlaceTebcNeurons import CombinedPlaceTebcNeurons
+from trial_marker import determine_cs_us
+from learningTransfer import assess_learning_transfer
+from actualVexpected import compare_actual_expected_firing
 
-import pandas as pd
-from ratinabox import Environment  # or the appropriate module for your environment
-from your_neuron_module import tEBCNeurons  # Replace with your actual module name
+# Parameters
+balance_levels = [0.2, 0.4, 0.6, 0.8, 1.0]  # Example balance levels
 
-# Initialize the environment
-environment = Environment(...)  # Set up your environment here
-
-# Initialize the tEBC neurons
-tEBC_neurons = tEBCNeurons(environment, N=900, tEBC_data=your_tEBC_data)
-
-# Load the position data
-position_data = pd.read_csv('your_position_data.csv')
+# Results containers
+learning_transfer_results = {}
+spatial_coding_accuracy_results = {}
 
 # Main simulation loop
-for index, row in trajectory_data.iterrows():
-    current_time = row['timestamp']
-    agent.position = np.array([row['x'], row['y']])
-    trial_marker = row['trial_marker']  # Assuming the fourth column is named 'trial_marker'
+for balance in balance_levels:
+    # Update balance parameter in CombinedPlaceTebcNeurons
+    CombinedPlaceTebcNeurons.set_balance(balance)
 
-    # Determine if CS or US should be presented
-    cs_present, us_present = determine_stimulus(trial_marker)
+    # Simulate in Environment A
+    firing_rates_envA, position_data_envA = simulate_envA()
 
-    # Update combined neuron firing rates
-    combined_neurons.update_firing_rate(agent.position, cs_present, us_present, current_time)
+    # Simulate in Environment B
+    firing_rates_envB, position_data_envB = simulate_envB()
 
-    # Record firing rates and other relevant data
-    # ...
+    # Assess learning transfer
+    learning_transfer_score = assess_learning_transfer(firing_rates_envA, firing_rates_envB)
+    learning_transfer_results[balance] = learning_transfer_score
+
+    # Compare actual vs. expected firing rates for spatial coding accuracy
+    accuracy_envA = compare_actual_expected_firing(firing_rates_envA, position_data_envA)
+    accuracy_envB = compare_actual_expected_firing(firing_rates_envB, position_data_envB)
+    spatial_coding_accuracy_results[balance] = (accuracy_envA, accuracy_envB)
+
+    # Additional analysis (e.g., decoding accuracy) can be added here
+
+# Output results
+for balance, transfer_score in learning_transfer_results.items():
+    print(f"Balance Level: {balance}, Learning Transfer Score: {transfer_score}")
+
+for balance, (accuracy_A, accuracy_B) in spatial_coding_accuracy_results.items():
+    print(f"Balance Level: {balance}, Spatial Accuracy EnvA: {accuracy_A}, EnvB: {accuracy_B}")
+
+# Further analysis to determine optimal balance
+# ...
+
+# Iterate and refine based on findings
+# ...
