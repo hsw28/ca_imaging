@@ -10,9 +10,12 @@ STEPS
           - Environment B (EnvB): This is an oval-shaped environment with dimensions 18 inches x 26 inches. The code for EnvB includes a custom movement function to simulate the oval shape with a tolerance for the agent rearing up slightly beyond the confines of the oval. It also includes the calculation of place cell firing rates based on the agent's trajectory.
 
 2. Simulate Task-Specific Learning (tEBC)
+    •	tebc_response.py
+          - defines 8 classes of tebc neurons based on the paper "Sequence of Single Neuron Changes in CA1 Hippocampus of Rabbits During Acquisition of Trace Eyeblink Conditioned Responses"
     •	CombinedPlaceTebcNeurons.py
           - class that combines tEBC and place cell data into one cell type
           - adjust the BALANCE PARAMETER to adjust how much each cell incorporates spatial vs tEBC data
+          - adjust tebc_responsive_rate that specifies the percentage of neurons that are responsive to tEBC signals.
     •	trial_marker.py
           - Function to Determine CS/US Presentation ()
 
@@ -32,7 +35,7 @@ STEPS
      • learningTransfer.py
         - comparing the neuronal responses to the conditioned stimuli (CS) and unconditioned stimuli (US) in both environments and quantifying the similarity or consistency of these responses.
      • (will also want to run through CEBRA and see decoding accuracy)
-     
+
      - Spatial Coding Accuracy: How accurately do the neurons represent space in each environment under different balance settings?
      • actualVexpected.py
           - Comparing Expected vs. Actual place cell Firing Rates

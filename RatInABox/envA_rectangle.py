@@ -1,9 +1,7 @@
 import numpy as np
-import pandas as pd
 from ratinabox.Environment import Environment
 from ratinabox.Agent import Agent
-from your_custom_neuron_class import CombinedPlaceTebcNeurons  # Import your custom class
-
+from CombinedPlaceTebcNeurons import CombinedPlaceTebcNeurons
 
 #modeling environment A (rectangle)
 #using equation from https://www.biorxiv.org/content/10.1101/2023.10.08.561112v1.full :
@@ -17,39 +15,36 @@ a place input model, which penalizes both incorrect classifications of active an
 
 #allows me to upload my own trajectory <-- I HAVE TO SCALE THIS
 
-# Function to determine CS/US presentation
-def determine_stimulus(trial_marker):
-    cs_present = 1 <= trial_marker <= 5
-    us_present = 6 <= trial_marker <= 10
-    return cs_present, us_present
+def simulate_envA(position_data):
+    # Convert inches to meters for environment dimensions
+    width_in_meters = 31 * 0.0254
+    height_in_meters = 20 * 0.0254
 
-# Convert inches to meters for EnvA
-width_in_meters_A = 31 * 0.0254
-height_in_meters_A = 20 * 0.0254
+    # Create an environment with the converted size
+    env = Environment(size=(width_in_meters, height_in_meters), boundary_conditions='solid')
 
-# Create EnvA with the converted size
-envA = Environment(size=(width_in_meters_A, height_in_meters_A), boundary_conditions='solid')
+    # Create an agent in the environment
+    agent = Agent(environment=env)
 
-# Create an agent in EnvA
-agentA = Agent(environment=envA)
+    # Number of neurons
+    N = 900  # Adjust as needed
 
-# Number of neurons
-N = 900  # Adjust as per your data
+    # Create CombinedPlaceTebcNeurons
+    combined_neurons = CombinedPlaceTebcNeurons(environment=env, N=N)
 
-# Create combined neurons
-combined_neurons_A = CombinedPlaceTebcNeurons(environment=envA, N=N)
+    # Initialize an array to store firing rates
+    firing_rates = np.zeros((N, position_data.shape[1]))
 
-# Load your trajectory data for EnvA
-trajectory_data_A = pd.read_csv('your_trajectory_envA.csv')
+    # Iterate over the trajectory data
+    for index in range(position_data.shape[1]):  # Iterate over columns
+        # Update agent's position
+        agent.position = np.array([position_data[1, index], position_data[2, index]])  # x and y
 
-# Main simulation loop for EnvA
-for index, row in trajectory_data_A.iterrows():
-    current_time = row['timestamp']
-    agentA.position = np.array([row['x'], row['y']])
-    trial_marker = row['trial_marker']
+        # Update neuron's state
+        combined_neurons.update_state(agent.position, position_data[0, index])  # timestamp
 
-    cs_present, us_present = determine_stimulus(trial_marker)
-    combined_neurons_A.update_firing_rate(agentA.position, cs_present, us_present, current_time)
+        # Store firing rates
+        firing_rates[:, index] = combined_neurons.get_firing_rates()
 
-    # Record firing rates and other relevant data
-    # ...
+    # Return the firing rates for further analysis
+    return firing_rates
