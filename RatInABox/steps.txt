@@ -17,7 +17,6 @@ STEPS
             - multiply y dimensions by 0.0015, subtract minimum
 
 
-
 2. Simulate Task-Specific Learning (tEBC)
     •	tebc_response.py
           - defines 8 classes of tebc neurons based on the paper "Sequence of Single Neuron Changes in CA1 Hippocampus of Rabbits During Acquisition of Trace Eyeblink Conditioned Responses"

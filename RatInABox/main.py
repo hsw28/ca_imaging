@@ -1,6 +1,5 @@
 import numpy as np
 import scipy.io
-import scipy.stats as stats
 import argparse
 import itertools
 from envA_rectangle import simulate_envA
@@ -47,8 +46,7 @@ Examples:
     python main.py --balance_values 0.3,0.5,0.7 --balance_dist gaussian --balance_std 0.1
                    --responsive_values 0.4,0.6,0.8 --responsive_type binomial
 
-    python main.py --balance_values 0.5 --balance_dist fixed
-                   --responsive_values 0.5 --responsive_type fixed
+    python main.py --balance_values 0.5 --balance_dist fixed --responsive_values 0.5 --responsive_type fixed
 
 Description:
     The script conducts simulations to evaluate how different configurations of balance factors and responsive rates affect neuronal firing patterns. Balance can be set as a fixed value or as a mean for a Gaussian distribution. The responsive rate determines the proportion of neurons responsive to tEBC signals and can be set as a fixed value or sampled from specified distributions.
@@ -64,7 +62,20 @@ Requirements:
 
 
 def parse_list(arg_value):
-    return [float(item) for item in arg_value.split(',')]
+    if isinstance(arg_value, list):
+        return [float(item) for item in arg_value]
+    else:
+        return [float(item) for item in arg_value.split(',')]
+
+
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description='Simulation Script for Neuronal Firing Rate Analysis')
+parser.add_argument('--balance_values', type=parse_list, help='List of balance values or means for Gaussian distribution')
+parser.add_argument('--balance_dist', choices=['fixed', 'gaussian'], default='fixed', help='Distribution type for balance')
+parser.add_argument('--balance_std', type=float, default=0.1, help='Standard deviation for Gaussian balance distribution')
+parser.add_argument('--responsive_values', type=parse_list, help='List of responsive rates or probabilities for distributions')
+parser.add_argument('--responsive_type', choices=['fixed', 'binomial', 'normal', 'poisson'], default='fixed', help='Type of distribution for responsive rate')
+args = parser.parse_args()
 
 def get_distribution_values(dist_type, params, size):
     if dist_type == 'fixed':
@@ -82,15 +93,6 @@ def get_distribution_values(dist_type, params, size):
         lam = params[0]
         return np.clip(stats.poisson(lam).rvs(size=size), 0, 1)
 
-# Parse command-line arguments
-parser = argparse.ArgumentParser(description='Simulation Script for Neuronal Firing Rate Analysis')
-parser.add_argument('--balance_values', type=parse_list, help='List of balance values or means for Gaussian distribution')
-parser.add_argument('--balance_dist', choices=['fixed', 'gaussian'], default='fixed', help='Distribution type for balance')
-parser.add_argument('--balance_std', type=float, default=0.1, help='Standard deviation for Gaussian balance distribution')
-parser.add_argument('--responsive_values', type=parse_list, help='List of responsive rates or probabilities for distributions')
-parser.add_argument('--responsive_type', choices=['fixed', 'binomial', 'normal', 'poisson'], default='fixed', help='Type of distribution for responsive rate')
-args = parser.parse_args()
-
 # Load MATLAB file and extract position data
 matlab_file_path = '/Users/Hannah/Programming/data_eyeblink/rat314/ratinabox_data/pos314.mat'  # Replace with your MATLAB file path
 data = scipy.io.loadmat(matlab_file_path)
@@ -98,9 +100,10 @@ position_data_envA = data['envA314_522']  # Adjust variable name as needed
 position_data_envB = data['envB314_524']  # Adjust variable name as needed
 
 # Set parameters
-num_neurons = 100
-balance_values = args.balance_values if args.balance_values else [0.5]
-responsive_values = args.responsive_values if args.responsive_values else [0.5]
+# Set parameters
+num_neurons = 80
+balance_values = parse_list(args.balance_values) if args.balance_values else [0.5]
+responsive_values = parse_list(args.responsive_values) if args.responsive_values else [0.5]
 
 # Perform grid search over balance and responsive rates
 for balance_value, responsive_val in itertools.product(balance_values, responsive_values):
@@ -108,22 +111,9 @@ for balance_value, responsive_val in itertools.product(balance_values, responsiv
     responsive_distribution = get_distribution_values(args.responsive_type, [responsive_val], num_neurons)
 
     # Simulate in Environment A and Environment B
-    firing_rates_envA = simulate_envA(position_data_envA, balance_distribution, responsive_distribution)
-    firing_rates_envB = simulate_envB(position_data_envB, balance_distribution, responsive_distribution)
+    response_envA = simulate_envA(position_data_envA, balance_distribution, responsive_distribution)
+    response_envB = simulate_envB(position_data_envB, balance_distribution, responsive_distribution)
 
-    # Assess learning transfer and compare actual vs. expected firing rates
-    similarity_scores = assess_learning_transfer(responses_envA, responses_envB, balance_values)
-    # Analyze similarity scores
-    for balance_level, score in similarity_scores.items():
-        print(f"Balance Level: {balance_level}, Similarity Score: {score}")
-
-    accuracy_scores_envA, accuracy_scores_envB = compare_actual_expected_firing(actual_firing_rates_envA, actual_firing_rates_envB, expected_firing_rates, balance_levels, number_of_neurons)
-    # Analyze accuracy scores
-    for (neuron_id, balance_level), score in accuracy_scores_envA.items():
-        print(f"EnvA - Neuron: {neuron_id}, Balance Level: {balance_level}, Accuracy Score: {score}")
-    for (neuron_id, balance_level), score in accuracy_scores_envB.items():
-        print(f"EnvB - Neuron: {neuron_id}, Balance Level: {balance_level}, Accuracy Score: {score}")
-
-
-    # Output results for each combination
-    print(f"Balance: {balance_values}, Responsive Rate: {responsive_val}, Learning Transfer: {learning_transfer_score}, Accuracy EnvA: {accuracy_envA}, EnvB: {accuracy_envB}")
+    # Assess learning transfer and other metrics
+    similarity_score = assess_learning_transfer(response_envA, response_envB, balance_value, responsive_val)
+    print(f"Balance: {balance_value}, Responsive Rate: {responsive_val}, Learning Transfer: {similarity_score}")
