@@ -15,22 +15,26 @@ a place input model, which penalizes both incorrect classifications of active an
 
 #allows me to upload my own trajectory <-- I HAVE TO SCALE THIS
 
-def simulate_envA(position_data):
-    # Convert inches to meters for environment dimensions
-    width_in_meters = 31 * 0.0254
-    height_in_meters = 20 * 0.0254
 
-    # Create an environment with the converted size
-    env = Environment(size=(width_in_meters, height_in_meters), boundary_conditions='solid')
+def simulate_envA(position_data, balance_distribution, responsive_distribution):
 
-    # Create an agent in the environment
-    agent = Agent(environment=env)
+
+    # Define environment parameters for a rectangular environment
+    env_params = {
+        'boundary': [[0, 0], [0, 20 * 0.0254], [31 * 0.0254, 20 * 0.0254], [31 * 0.0254, 0]],  # Adjust the coordinates as needed
+        'boundary_conditions': 'solid'
+    }
+    env = Environment(params=env_params)
+
+     # Create an agent in the environment
+    agent = Agent(env)  # Pass the environment object 'env' to the Agent
 
     # Number of neurons
     N = 900  # Adjust as needed
 
-    # Create CombinedPlaceTebcNeurons
-    combined_neurons = CombinedPlaceTebcNeurons(environment=env, N=N)
+    # Create CombinedPlaceTebcNeurons with the environment
+    combined_neurons = CombinedPlaceTebcNeurons(agent, N, balance_distribution, responsive_distribution)
+
 
     # Initialize an array to store firing rates
     firing_rates = np.zeros((N, position_data.shape[1]))

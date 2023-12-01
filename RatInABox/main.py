@@ -12,6 +12,15 @@ from actualVexpected import compare_actual_expected_firing
 
 """
 Simulation Script for Neuronal Firing Rate Analysis
+Note: advise using a conda environment:
+    conda create -n ratinabox python=3.9
+    conda activate ratinabox
+    conda install numpy
+    conda install scipy
+    conda install matplotlib
+    export PYTHONPATH="${PYTHONPATH}:/Users/Hannah/Programming/RatInABox"
+    pip install shapely
+
 
 Usage:
     python main.py [--balance_values BALANCE_VALUES] [--balance_dist BALANCE_DIST] [--balance_std BALANCE_STD]
@@ -83,10 +92,10 @@ parser.add_argument('--responsive_type', choices=['fixed', 'binomial', 'normal',
 args = parser.parse_args()
 
 # Load MATLAB file and extract position data
-matlab_file_path = 'path_to_your_matlab_file.mat'  # Replace with your MATLAB file path
+matlab_file_path = '/Users/Hannah/Programming/data_eyeblink/rat314/ratinabox_data/pos314.mat'  # Replace with your MATLAB file path
 data = scipy.io.loadmat(matlab_file_path)
-position_data_envA = data['position_data_envA']  # Adjust variable name as needed
-position_data_envB = data['position_data_envB']  # Adjust variable name as needed
+position_data_envA = data['envA314_522']  # Adjust variable name as needed
+position_data_envB = data['envB314_524']  # Adjust variable name as needed
 
 # Set parameters
 num_neurons = 100
@@ -94,21 +103,27 @@ balance_values = args.balance_values if args.balance_values else [0.5]
 responsive_values = args.responsive_values if args.responsive_values else [0.5]
 
 # Perform grid search over balance and responsive rates
-for balance_val, responsive_val in itertools.product(balance_values, responsive_values):
-    balance_distribution = get_distribution_values(args.balance_dist, [balance_val, args.balance_std], num_neurons)
+for balance_value, responsive_val in itertools.product(balance_values, responsive_values):
+    balance_distribution = get_distribution_values(args.balance_dist, [balance_value, args.balance_std], num_neurons)
     responsive_distribution = get_distribution_values(args.responsive_type, [responsive_val], num_neurons)
 
-    # Initialize CombinedPlaceTebcNeurons
-    combined_neurons = CombinedPlaceTebcNeurons(environment, place_cells, balance_distribution, responsive_distribution)
-
     # Simulate in Environment A and Environment B
-    firing_rates_envA = simulate_envA(position_data_envA)
-    firing_rates_envB = simulate_envB(position_data_envB)
+    firing_rates_envA = simulate_envA(position_data_envA, balance_distribution, responsive_distribution)
+    firing_rates_envB = simulate_envB(position_data_envB, balance_distribution, responsive_distribution)
 
     # Assess learning transfer and compare actual vs. expected firing rates
-    learning_transfer_score = assess_learning_transfer(firing_rates_envA, firing_rates_envB)
-    accuracy_envA = compare_actual_expected_firing(firing_rates_envA, position_data_envA)
-    accuracy_envB = compare_actual_expected_firing(firing_rates_envB, position_data_envB)
+    similarity_scores = assess_learning_transfer(responses_envA, responses_envB, balance_values)
+    # Analyze similarity scores
+    for balance_level, score in similarity_scores.items():
+        print(f"Balance Level: {balance_level}, Similarity Score: {score}")
+
+    accuracy_scores_envA, accuracy_scores_envB = compare_actual_expected_firing(actual_firing_rates_envA, actual_firing_rates_envB, expected_firing_rates, balance_levels, number_of_neurons)
+    # Analyze accuracy scores
+    for (neuron_id, balance_level), score in accuracy_scores_envA.items():
+        print(f"EnvA - Neuron: {neuron_id}, Balance Level: {balance_level}, Accuracy Score: {score}")
+    for (neuron_id, balance_level), score in accuracy_scores_envB.items():
+        print(f"EnvB - Neuron: {neuron_id}, Balance Level: {balance_level}, Accuracy Score: {score}")
+
 
     # Output results for each combination
-    print(f"Balance: {balance_val}, Responsive Rate: {responsive_val}, Learning Transfer: {learning_transfer_score}, Accuracy EnvA: {accuracy_envA}, EnvB: {accuracy_envB}")
+    print(f"Balance: {balance_values}, Responsive Rate: {responsive_val}, Learning Transfer: {learning_transfer_score}, Accuracy EnvA: {accuracy_envA}, EnvB: {accuracy_envB}")

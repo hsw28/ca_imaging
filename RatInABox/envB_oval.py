@@ -17,23 +17,30 @@ a place input model, which penalizes both incorrect classifications of active an
 # Similar to EnvA, but with adjustments for EnvB dimensions and trajectory data
 
 
-def simulate_envB(position_data):
-    # Convert inches to meters for environment dimensions
-    width_in_meters = 18 * 0.0254
-    height_in_meters = 26 * 0.0254
+def simulate_envB(position_data, balance_distribution, responsive_distribution):
+    # Parameters for oval shape
+    height_in_meters = 18 * 0.0254
+    width_in_meters = 26 * 0.0254
+    num_points = 100  # Number of points to define the oval
 
-    # Create an oval-shaped environment
-    # Custom implementation for oval shape needed here
-    env = Environment(size=(width_in_meters, height_in_meters), boundary_conditions='solid')
+    # Create an oval-shaped boundary
+    boundary = [[width_in_meters / 2 * np.cos(theta), height_in_meters / 2 * np.sin(theta)] for theta in np.linspace(0, 2 * np.pi, num_points)]
 
-    # Create an agent in the environment
-    agent = Agent(environment=env)
+    # Create the environment with the oval boundary
+    env_params = {
+        'boundary': boundary,
+        'boundary_conditions': 'solid'
+    }
+    env = Environment(params=env_params)
+
+     # Create an agent in the environment
+    agent = Agent(env)  # Pass the environment object 'env' to the Agent
 
     # Number of neurons
     N = 900  # Adjust as needed
 
-    # Create CombinedPlaceTebcNeurons
-    combined_neurons = CombinedPlaceTebcNeurons(environment=env, N=N)
+    # Create CombinedPlaceTebcNeurons with the environment
+    combined_neurons = CombinedPlaceTebcNeurons(agent, N, balance_distribution, responsive_distribution)
 
     # Initialize an array to store firing rates
     firing_rates = np.zeros((N, position_data.shape[1]))

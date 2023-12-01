@@ -45,11 +45,3 @@ response_profiles = {
     7: {'response_func': lambda t: gaussian_response(t, peak_per_trial=0.001, start=-50, end=350, peak_time=100, baseline=0.01)},
     8: {'response_func': lambda t: low_level_response(t, start=-100, end=900, baseline=0.015)},
 }
-
-# Example usage:
-cell_type = 1
-time_since_CS = 100  # Time in ms
-# Assuming the time_since_US doesn't affect the response for simplicity
-# If it does, you will need to modify the functions to incorporate the effect of US
-firing_rate = response_profiles[cell_type]['response_func'](time_since_CS)
-print(firing_rate)

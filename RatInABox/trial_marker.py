@@ -1,4 +1,4 @@
-def determine_stimulus(trial_marker):
+def determine_cs_us(trial_marker):
     """
     Determines if the conditioned stimulus (CS) or unconditioned stimulus (US) should be presented.
 

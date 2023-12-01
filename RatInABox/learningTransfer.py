@@ -5,18 +5,12 @@ def calculate_similarity(response_envA, response_envB):
     similarity = np.corrcoef(response_envA, response_envB)[0, 1]
     return similarity
 
-# Example data structure to store responses
-responses_envA = {}  # {balance_level: [firing_rates_during_CS_and_US]}
-responses_envB = {}  # Similar structure for EnvB
+def assess_learning_transfer(responses_envA, responses_envB, balance_levels):
+    # Calculate similarity scores for each balance level
+    similarity_scores = {}
+    for balance_level in balance_levels:  # Use a different name for the loop variable
+        response_envA = responses_envA[balance_level]
+        response_envB = responses_envB[balance_level]
+        similarity_scores[balance_level] = calculate_similarity(response_envA, response_envB)
 
-# After running simulations and collecting data
-similarity_scores = {}
-for balance_level in balance_levels:
-    response_envA = responses_envA[balance_level]
-    response_envB = responses_envB[balance_level]
-    similarity_scores[balance_level] = calculate_similarity(response_envA, response_envB)
-
-# Analyze similarity scores
-# Higher scores indicate better learning transfer
-for balance_level, score in similarity_scores.items():
-    print(f"Balance Level: {balance_level}, Similarity Score: {score}")
+    return similarity_scores

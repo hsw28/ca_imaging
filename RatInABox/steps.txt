@@ -8,6 +8,15 @@ STEPS
           - Environment A (EnvA): This is a rectangular environment with dimensions 31 inches x 20 inches. The code for EnvA includes the setup for this environment and the calculation of place cell firing rates based on the agent's position.
     •	envB_oval.py
           - Environment B (EnvB): This is an oval-shaped environment with dimensions 18 inches x 26 inches. The code for EnvB includes a custom movement function to simulate the oval shape with a tolerance for the agent rearing up slightly beyond the confines of the oval. It also includes the calculation of place cell firing rates based on the agent's trajectory.
+    -- remember to change the environment from pixels to m:
+        - rectangle is .7874m x .508m
+            - multiply x dimensions by 0.0019, subtract minimum
+            - multiply y dimensions by 0.0015, subtract minimum
+        - oval is 0.6604m x  0.4572
+            - multiply x dimensions by 0.0014, subtract minimum
+            - multiply y dimensions by 0.0015, subtract minimum
+
+
 
 2. Simulate Task-Specific Learning (tEBC)
     •	tebc_response.py
