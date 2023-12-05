@@ -67,4 +67,4 @@ def simulate_envA(position_data, balance_distribution, responsive_distribution):
         firing_rates[:, index] = combined_neurons.get_firing_rates()
 
     # Return the firing rates for further analysis
-    return firing_rates, agent
+    return firing_rates, agent, combined_neurons

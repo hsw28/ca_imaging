@@ -18,31 +18,33 @@ combined_neurons = CombinedPlaceTebcNeurons(num_neurons, place_cells, balance, t
 '''
 
 
-class CombinedPlaceTebcNeurons(Neurons):
+class CombinedPlaceTebcNeurons(PlaceCells):
+    default_params = dict()
     def __init__(self, agent, N, balance_distribution, responsive_distribution):
+        # Define parameters for PlaceCells
+        place_cells_params = {
+            "n": N,  # Number of place cells
+            "description": "gaussian",  # Example parameter, adjust as needed
+            "widths": 0.20,  # Adjust as needed
+            "place_cell_centres": None,  # Adjust as needed
+            "wall_geometry": "geodesic",  # Adjust as needed
+            "min_fr": 0,  # Adjust as needed
+            "max_fr": 1,  # Adjust as needed
+            "save_history": True  # Save history for plotting
+        }
+
+        # Initialize PlaceCells with parameters
+        super().__init__(agent, place_cells_params)
+
+        # Initialize additional properties for CombinedPlaceTebcNeurons
         self.agent = agent
         self.num_neurons = N
-
-        # Define parameters for PlaceCells and initialize them
-        place_cells_params = {
-            "n": N,
-            "name": "PlaceCells",
-            "description": "gaussian",
-            "widths": 0.20,
-            "place_cell_centres": None,
-            "wall_geometry": "geodesic",
-            "min_fr": 0,
-            "max_fr": 1,
-        }
-        self.place_cells = PlaceCells(agent, place_cells_params)
-
-        # Set balance and responsiveness distributions
         self.balance_distribution = balance_distribution
         self.responsive_distribution = responsive_distribution
-
-        # Assign TEBC responsiveness and cell types
         self.tebc_responsive_neurons, self.cell_types = self.assign_tebc_responsiveness_and_types()
         self.firing_rates = np.zeros(N)
+        self.history = {'t': [], 'firingrate': [], 'spikes': []}
+
 
     def assign_tebc_responsiveness_and_types(self):
         # Check if responsive_distribution is a single value or an array
@@ -61,12 +63,12 @@ class CombinedPlaceTebcNeurons(Neurons):
 
     def update_state(self, agent_position, time_since_CS, time_since_US):
         self.agent.position = agent_position
-        self.place_cells.update()
+        self.update()  # This updates the PlaceCells part of this class
 
         for i in range(self.num_neurons):
             # Check if the history for each neuron is populated
-            if len(self.place_cells.history['firingrate']) > i and len(self.place_cells.history['firingrate'][i]) > 0:
-                place_response = self.place_cells.history['firingrate'][i][-1]
+            if len(self.history['firingrate']) > i and len(self.history['firingrate'][i]) > 0:
+                place_response = self.history['firingrate'][i][-1]
             else:
                 place_response = 0  # default value if history not populated
 
@@ -76,7 +78,10 @@ class CombinedPlaceTebcNeurons(Neurons):
                 response_func = response_profiles[cell_type]['response_func']
                 tebc_response = response_func(time_since_CS)
 
+            # Retrieve firing rates from Agent.history
             self.firing_rates[i] = (1 - self.balance_distribution[i]) * place_response + self.balance_distribution[i] * tebc_response
+
+        self.save_to_history()  # Save current state to history
 
     def calculate_firing_rate(self, agent_position, time_since_CS, time_since_US):
         firing_rates = np.zeros(self.num_neurons)

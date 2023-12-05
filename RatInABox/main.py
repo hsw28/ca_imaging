@@ -121,8 +121,8 @@ for balance_value, responsive_val in itertools.product(balance_values, responsiv
     responsive_distribution = get_distribution_values(args.responsive_type, [responsive_val], num_neurons)
 
     # Simulate in Environment A and Environment B
-    response_envA, agentA = simulate_envA(position_data_envA, balance_distribution, responsive_distribution)
-    response_envB, agentB = simulate_envB(position_data_envB, balance_distribution, responsive_distribution)
+    response_envA, agentA, combined_neuronsA = simulate_envA(position_data_envA, balance_distribution, responsive_distribution)
+    response_envB, agentB, combined_neuronsB = simulate_envB(position_data_envB, balance_distribution, responsive_distribution)
 
     ratinabox.autosave_plots = True
     agentA.plot_trajectory(t_end=120)
@@ -130,10 +130,10 @@ for balance_value, responsive_val in itertools.product(balance_values, responsiv
 
     agentA.plot_position_heatmap()
     agentA.plot_histogram_of_speeds()
-    response_envA.plot_rate_timeseries()
-    response_envA.plot_rate_timeseries(imshow=True)
-    response_envA.plot_ratemap()
-    response_envA.plot_place_cell_centres()
+
+    combined_neuronsA.plot_rate_timeseries()
+    combined_neuronsA.plot_ratemap()
+    combined_neuronsA.plot_place_cell_centres()
 
 
     filename_envA = f"response_envA_balance_{balance_value}_{args.balance_dist}_responsive_{responsive_val}_{args.responsive_type}.npy"

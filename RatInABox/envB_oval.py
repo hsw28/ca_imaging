@@ -47,8 +47,6 @@ def simulate_envB(position_data, balance_distribution, responsive_distribution):
     # Import trajectory into the agent
     times = position_data[0]  # Timestamps
     positions = position_data[1:3].T  # Positions (x, y)
-
-    # Check for and handle duplicate timestamps
     unique_times, indices = np.unique(times, return_index=True)
     unique_positions = positions[indices]
 
@@ -92,4 +90,4 @@ def simulate_envB(position_data, balance_distribution, responsive_distribution):
         firing_rates[:, index] = combined_neurons.get_firing_rates()
 
     # Return the firing rates for further analysis
-    return firing_rates, agent
+    return firing_rates, agent, combined_neurons
