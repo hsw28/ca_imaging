@@ -8,6 +8,8 @@ from CombinedPlaceTebcNeurons import CombinedPlaceTebcNeurons
 from trial_marker import determine_cs_us
 from learningTransfer import assess_learning_transfer
 from actualVexpected import compare_actual_expected_firing
+import os
+import ratinabox
 
 """
 Simulation Script for Neuronal Firing Rate Analysis
@@ -19,6 +21,12 @@ Note: advise using a conda environment:
     conda install matplotlib
     export PYTHONPATH="${PYTHONPATH}:/Users/Hannah/Programming/RatInABox"
     pip install shapely
+
+For cebra in env:
+    conda install pytorch::pytorch torchvision torchaudio -c pytorch <-- or other, look at https://pytorch.org/
+    pip install cebra
+
+
 
 
 Usage:
@@ -59,7 +67,10 @@ Requirements:
     - Adjust environment settings and neuron parameters as needed in the script.
 """
 
-
+save_directory='/Users/Hannah/Programming/data_eyeblink/rat314/ratinabox_data/results'
+ratinabox.figure_directory = '/Users/Hannah/Programming/data_eyeblink/rat314/ratinabox_data/results'
+# Create the directory if it doesn't exist
+os.makedirs(save_directory, exist_ok=True)
 
 def parse_list(arg_value):
     if isinstance(arg_value, list):
@@ -100,7 +111,6 @@ position_data_envA = data['envA314_522']  # Adjust variable name as needed
 position_data_envB = data['envB314_524']  # Adjust variable name as needed
 
 # Set parameters
-# Set parameters
 num_neurons = 80
 balance_values = parse_list(args.balance_values) if args.balance_values else [0.5]
 responsive_values = parse_list(args.responsive_values) if args.responsive_values else [0.5]
@@ -111,9 +121,36 @@ for balance_value, responsive_val in itertools.product(balance_values, responsiv
     responsive_distribution = get_distribution_values(args.responsive_type, [responsive_val], num_neurons)
 
     # Simulate in Environment A and Environment B
-    response_envA = simulate_envA(position_data_envA, balance_distribution, responsive_distribution)
-    response_envB = simulate_envB(position_data_envB, balance_distribution, responsive_distribution)
+    response_envA, agentA = simulate_envA(position_data_envA, balance_distribution, responsive_distribution)
+    response_envB, agentB = simulate_envB(position_data_envB, balance_distribution, responsive_distribution)
+
+    ratinabox.autosave_plots = True
+    agentA.plot_trajectory(t_end=120)
+    ratinabox.stylize_plots()
+
+    agentA.plot_position_heatmap()
+    agentA.plot_histogram_of_speeds()
+    response_envA.plot_rate_timeseries()
+    response_envA.plot_rate_timeseries(imshow=True)
+    response_envA.plot_ratemap()
+    response_envA.plot_place_cell_centres()
+
+
+    filename_envA = f"response_envA_balance_{balance_value}_{args.balance_dist}_responsive_{responsive_val}_{args.responsive_type}.npy"
+    filename_envB = f"response_envB_balance_{balance_value}_{args.balance_dist}_responsive_{responsive_val}_{args.responsive_type}.npy"
+
+    # Construct the full file paths
+    full_path_envA = os.path.join(save_directory, filename_envA)
+    full_path_envB = os.path.join(save_directory, filename_envB)
+
+    # Save the response arrays to files
+    np.save(full_path_envA, response_envA)
+    np.save(full_path_envB, response_envB)
+
+    # Print confirmation
+    print(f"Saved results to {full_path_envA} and {full_path_envB}")
+
 
     # Assess learning transfer and other metrics
-    similarity_score = assess_learning_transfer(response_envA, response_envB, balance_value, responsive_val)
-    print(f"Balance: {balance_value}, Responsive Rate: {responsive_val}, Learning Transfer: {similarity_score}")
+    #similarity_score = assess_learning_transfer(response_envA, response_envB, balance_value, responsive_val)
+    #print(f"Balance: {balance_value}, Responsive Rate: {responsive_val}, Learning Transfer: {similarity_score}")

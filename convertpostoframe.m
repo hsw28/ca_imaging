@@ -19,11 +19,16 @@ end
 
 pos_time = pos(:,1);
 allframes = NaN(floor(length(timestamps)./2), 3);
-for k=1:length(allframes)
+j=2;
+k=1;
+while j <= length(timestamps) && k<=length(allframes)
 
-  currconv = timestamps(k);
+
+  currconv = timestamps(j);
   [c index] = min(abs(pos_time-currconv));
 
-  allframes(k, :) =  pos(index, :);
 
+  allframes(k, :) =  pos(index, :);
+    j=j+2;
+    k = k+1;
 end
