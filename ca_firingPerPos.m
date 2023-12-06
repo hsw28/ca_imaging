@@ -13,7 +13,7 @@ spikenames = (fieldnames(clusters));
 spikenum = length(spikenames);
 
 
-psize = 6.85 * dim; %some REAL ratio of pixels to cm
+psize = 1.000 * dim; %some REAL ratio of pixels to cm
 
 
 

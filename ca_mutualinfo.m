@@ -5,7 +5,7 @@ tic
 mutinfo = NaN(2, size(peaks_time,1));
 
 if size(varargin)==0
-psize = 6.85; %some REAL ratio of pixels to cm -- 3.5 for wilson, 2.5 for disterhoft linear, 6.85 for eyeblink
+psize = 1.000; %some REAL ratio of pixels to cm -- 3.5 for wilson, 2.5 for disterhoft linear, 1.000 for eyeblink
 else
 psize = varargin;
 end

@@ -34,4 +34,4 @@ end
 v = smoothdata(velvector,'gaussian',15);
 v = v(1:length(timevector));
 
-v = [(v/6.85); timevector];
+v = [(v/1.000); timevector];

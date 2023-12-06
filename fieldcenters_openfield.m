@@ -43,13 +43,13 @@ function fieldcent  = fieldcenters_openfield(peaks_time, goodcells, pos, dim, ve
 
     if fr > .000001 && length(highspeedspikes)>0
 
-      [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(highspeedspikes,goodpos,dim, 6.85);
+      [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(highspeedspikes,goodpos,dim, 1.000);
       rate;
       rate = smoothdata(rate, 'gaussian', dim);
       [maxval, maxindex] = max(rate(:));
       [x,y] = ind2sub(size(rate), maxindex);
-      maxrate(1, k) = x*6.85;
-      maxrate(2, k) = y*6.85;
+      maxrate(1, k) = x*1.000;
+      maxrate(2, k) = y*1.000;
     else
       maxrate(1, k) = NaN;
       maxrate(2, k) = NaN;

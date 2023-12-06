@@ -61,7 +61,7 @@ clustname = (fieldnames(clusters));
 numclust = length(clustname);
 
 %BIN
-psize = 6.85 * dim;
+psize = 1.000 * dim;
 
 xvals = posData(:,2);
 yvals = posData(:,3);

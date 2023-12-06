@@ -26,7 +26,7 @@ for k=1:numunits
   %subplot(ceil(sqrt(numunits)),ceil(sqrt(numunits)), k)
 
   axes(ha(k));
-  [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(highspeedspikes,pos,dim, 6.85);
+  [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(highspeedspikes,pos,dim, 1.000);
 
   sigma = 1; % set sigma to the value you need
   sz = 2*ceil(2.6 * sigma) + 1; % See note below

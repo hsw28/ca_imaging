@@ -67,6 +67,8 @@ if env_shape == 1 %sq/rectangle. this is to set the bounds but the tracking seem
   topy = min(median(LRy), median(LLy))+500;
   leftx = min(median(ULx), median(LLx))-500;
   rightx = max(median(UR), median(LR))+500;
+
+
 end
 
 
@@ -173,5 +175,20 @@ ypos = (pos(:, 2));
 %ypos = filloutliers(ypos, 'pchip', 'movmedian',30);
 ypos =  smoothdata(ypos, 'gaussian', 15);
 timestamps = timestamps/1000;
+
+if env_shape == 1 %sq/rectangle. this is to set the bounds but the tracking seems good without so?
+  xpos = xpos*.19;
+  xpos = xpos-min(xpos);
+  ypos = ypos*.15
+  ypos = ypos-min(ypos);
+end
+
+if env_shape == 2 %sq/rectangle. this is to set the bounds but the tracking seems good without so?
+  xpos = xpos*.14;
+  xpos = xpos-min(xpos);
+  ypos = ypos*.15
+  ypos = ypos-min(ypos);
+end
+
 pos = [timestamps, xpos, ypos];
 f = pos;

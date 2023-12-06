@@ -66,7 +66,7 @@ for k=1:numunits
   set(0,'DefaultFigureVisible', 'off');
 
   if length(highspeedspikes)>0
-  [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(highspeedspikes, goodpos, dim, 6.85);
+  [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(highspeedspikes, goodpos, dim, 1.000);
   mutinfo(k) = mutualinfo([spikeprob', occprob']);
   else
     mutinfo(k) = NaN;

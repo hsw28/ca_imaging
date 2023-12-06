@@ -98,8 +98,8 @@ for i=1:length(decoded)
 
 end
 
-nanmean(alldiff)./6.85
-nanmedian(alldiff)./6.85
+nanmean(alldiff)./1.000
+nanmedian(alldiff)./1.000
 
 size(predX);
 size(realX);

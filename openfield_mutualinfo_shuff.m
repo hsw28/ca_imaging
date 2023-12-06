@@ -74,7 +74,7 @@ for i = 1:numel(fields_spikes)
                 shufff = randsample(goodtime, length(highspeedspikes));
                 shufff = sort(shufff);
 
-                [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(shufff,goodpos,dim, 6.85);
+                [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(shufff,goodpos,dim, 1.000);
 
                 shuf(l) = mutualinfo([spikeprob', occprob']);
               else
