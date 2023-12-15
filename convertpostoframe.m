@@ -1,4 +1,4 @@
-function allframes = convertpostoframe(pos, CA_timestamps)
+function newpos = convertpostoframe(pos, CA_timestamps, for_rec_1_for_oval_2)
 %converts pos to same frames/times as CA imaging
 
 
@@ -32,3 +32,22 @@ while j <= length(timestamps) && k<=length(allframes)
     j=j+2;
     k = k+1;
 end
+
+newpos = allframes;
+xpos = newpos(:,2);
+ypos = newpos(:,3);
+if for_rec_1_for_oval_2 == 1 %sq/rectangle. this is to set the bounds but the tracking seems good without so?
+  xpos = xpos*.19;
+  xpos = xpos-min(xpos);
+  ypos = ypos*.15;
+  ypos = ypos-min(ypos);
+end
+
+if for_rec_1_for_oval_2 == 2 %oval
+  xpos = xpos-min(xpos);
+  ypos = ypos*.15;
+  ypos = ypos-min(ypos);
+end
+
+newpos(:,2) = xpos;
+newpos(:,3) = ypos;

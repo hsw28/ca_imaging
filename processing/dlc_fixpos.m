@@ -176,6 +176,7 @@ ypos = (pos(:, 2));
 ypos =  smoothdata(ypos, 'gaussian', 15);
 timestamps = timestamps/1000;
 
+%{
 if env_shape == 1 %sq/rectangle. this is to set the bounds but the tracking seems good without so?
   xpos = xpos*.19;
   xpos = xpos-min(xpos);
@@ -189,6 +190,7 @@ if env_shape == 2 %sq/rectangle. this is to set the bounds but the tracking seem
   ypos = ypos*.15
   ypos = ypos-min(ypos);
 end
+%}
 
 pos = [timestamps, xpos, ypos];
 f = pos;

@@ -31,7 +31,7 @@ end
 %velvector = filloutliers(velvector, 'pchip', 'movmedian',10);
 
 %v = hampel(velvector, 30, 3);
-v = smoothdata(velvector,'gaussian',15);
+v = smoothdata(velvector,'gaussian',7);
 v = v(1:length(timevector));
 
 v = [(v/1.000); timevector];
