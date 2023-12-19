@@ -2,7 +2,7 @@ function f = ACL_ca_mutualinfo(peaks_time, pos, dim, varargin)
 %finds mutual info for a bunch of cells
 
 tic
-mutinfo = NaN(2, size(peaks_time,1));
+
 
 if size(varargin)==0
 psize = 1.000; %some REAL ratio of pixels to cm -- 3.5 for wilson, 2.5 for disterhoft linear, 1.000 for eyeblink
@@ -14,11 +14,16 @@ if size(pos,2) > size(pos,1)
   pos = pos';
 end
 
+if size(peaks_time,2) > size(peaks_time,1)
+  peaks_time = peaks_time';
+end
+
+mutinfo = NaN(2, size(peaks_time,2));
+
 pos(:,3) = 1;
 
 velthreshold = 8;
 vel = ca_velocity(pos);
-size(vel)
 goodvel = find(vel(1,:)>=velthreshold);
 goodtime = pos(goodvel, 1);
 goodpos = pos(goodvel,:);

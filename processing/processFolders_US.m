@@ -5,6 +5,7 @@ function [US_EMG, CS_EMG] = processFolders_US(currentDir)
 
 
     US_EMG = struct();
+    CS_EMG = struct();
     validFoldersList = getValidFolders(currentDir);
 
     % Prompt the user to select which folders to process

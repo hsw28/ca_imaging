@@ -13,9 +13,13 @@ function f = ACL_ca_mutualinfo_shuff(peaks_time, pos, dim, num_times_to_run, ca_
    pos = pos';
  end
 
+ if size(peaks_time,2) > size(peaks_time,1)
+   peaks_time = peaks_time';
+ end
 
-mutinfo = NaN(4, size(peaks_time,1));
-stddev3 = NaN(2, size(peaks_time,1));
+
+mutinfo = NaN(4, size(peaks_time,2));
+stddev3 = NaN(2, size(peaks_time,2));
 
 velthreshold = 8;
 vel = ca_velocity(pos);
@@ -28,7 +32,7 @@ goodpos = pos(goodvel,:);
 
 figure
 
-numunits = size(peaks_time,1);
+numunits = size(peaks_time,2);
 
 for k=1:numunits
   want = find(peaks_time(:,k)>0);
@@ -91,7 +95,7 @@ parfor l = 1:num_times_to_run
   end
 end
 
-%{
+
 topMI5 = floor(num_times_to_run*.95);
 topMI1 = floor(num_times_to_run*.99);
 fwdshuf = sort(fwdshuf);
@@ -100,17 +104,17 @@ mutinfo(1, k) = fwdshuf(topMI5);
 mutinfo(2, k) = bwdshuf(topMI5);
 mutinfo(3, k) = fwdshuf(topMI1);
 mutinfo(4, k) = bwdshuf(topMI1);
-%}
 
-stddev3(1,k) = nanmean(fwdshuf)+(3*nanstd(fwdshuf));
-stddev3(2,k) = nanmean(bwdshuf)+(3*nanstd(bwdshuf));
+
+%stddev3(1,k) = nanmean(fwdshuf)+(3*nanstd(fwdshuf));
+%stddev3(2,k) = nanmean(bwdshuf)+(3*nanstd(bwdshuf));
 
 end
 end
 
 toc
-%f = mutinfo';
-f = stddev3';
+f = mutinfo';
+f% = stddev3';
 
 
 
