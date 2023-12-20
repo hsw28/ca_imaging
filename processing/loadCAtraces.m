@@ -44,17 +44,17 @@ if ~isempty(validFoldersList)
             % Get the folder name three levels above My_WebCam
             folder = (fileparts(fileparts((selected_folder))));
             % Split the text using '/' as the delimiter
-            folder_parts = strsplit(folder, '/');
+            folder_parts = strsplit(folder, '\');
             % Get the last part, which contains the date
             folder_date = folder_parts{end};
 
-            folder = strsplit(selected_folder, '/');
+            folder = strsplit(selected_folder, '\');
             folder = folder{end};
 
 
             if strcmp(folder_date, 'extinction')==1
               folder = fileparts(fileparts(fileparts((selected_folder))));
-              folder_parts = strsplit(folder, '/');
+              folder_parts = strsplit(folder, '\');
               folder_date = folder_parts{end};
               folder_date=sprintf('exinction_%s', folder_date);
             end
