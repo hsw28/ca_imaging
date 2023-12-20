@@ -74,6 +74,10 @@ if ~isempty(validFoldersList)
                 else
                     fprintf('No valid folders found.\n');
                 end
+
+    peak_stuct = orderfields(peak_stuct);
+    all_traces = orderfields(all_traces);
+
 end
 
 
@@ -128,7 +132,7 @@ end
             % Merge the subfolder list with the main list
             validFoldersList = [validFoldersList, subValidFolders];
         end
-    end
+end
 
 
     function [trace_file sorting timestamps] = processSelectedFolder(parentFolder)
@@ -179,7 +183,3 @@ end
             timestamps = readtable(filePath);
         end
     end
-
-
-peak_stuct = orderfields(peak_stuct);
-all_traces = orderfields(all_traces);
