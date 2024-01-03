@@ -171,15 +171,20 @@ end
 
         % Check if any 'Events' file was found
         if isempty(largestFilePath)
+             dir(fullfile(parentFolder, '*cnmfeAnalysis.mat'));
+
             disp('No file starting with ''Events'' found');
         else
             % Run the getRawTTLs function on the largest 'Events' file
+            dir(fullfile(parentFolder, '*cnmfeAnalysis.mat'));
             trace_file = load(largestFilePath);
 
             filePath = fullfile(parentFolder, sorted.name);
+            
             sorting = load(filePath);
 
             filePath = fullfile(parentFolder, timestamps.name);
+            filePath
             timestamps = readtable(filePath);
         end
     end
