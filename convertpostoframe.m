@@ -34,20 +34,23 @@ while j <= length(timestamps) && k<=length(allframes)
 end
 
 newpos = allframes;
+
+%{
 xpos = newpos(:,2);
 ypos = newpos(:,3);
-if for_rec_1_for_oval_2 == 1 %sq/rectangle. this is to set the bounds but the tracking seems good without so?
-  xpos = xpos*.19;
-  xpos = xpos-min(xpos);
-  ypos = ypos*.15;
-  ypos = ypos-min(ypos);
-end
-
 if for_rec_1_for_oval_2 == 2 %oval
+  xpos = xpos*.14;
   xpos = xpos-min(xpos);
   ypos = ypos*.15;
   ypos = ypos-min(ypos);
+else
+  %sq/rectangle. this is to set the bounds but the tracking seems good without so?
+    xpos = xpos*.19;
+    xpos = xpos-min(xpos);
+    ypos = ypos*.15;
+    ypos = ypos-min(ypos);
 end
-
 newpos(:,2) = xpos;
 newpos(:,3) = ypos;
+end
+%}

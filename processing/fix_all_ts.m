@@ -13,7 +13,8 @@ function [fixed_events fixed_EMG_ts fixed_EMG fixed_US_times fixed_pos] = fix_al
 
 fixed_US_times = fixUS(starttime_raw, US_times)
 
-%position time stamps start at zero so just change them to seconds
+%position time stamps start at zero so just change them to seconds.
+%also changes px to cm
 fixed_pos = fixPos_times(pos);
 
 %CA time stamps start at zero so just change them to seconds
