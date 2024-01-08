@@ -1,4 +1,4 @@
-function giantStructure = processFolders_Pos(currentDir)
+function giantStructure = processFolders_Pos(currentDir, type1_for_cage_2_for_oval)
 %makes a position structure with all your run days for one animal using dlc_fixposor
 %should auto detect if oval or rectangle
 %%FIXES POS USING dlc_fixpos
@@ -108,6 +108,8 @@ function [output type1_for_cage_2_for_oval] = processSelectedFolder(folder)
 
     % Read the timestamps data from the CSV file using readtable
     timeStampData = readtable(timeStampFile);
+    timeStampData = table2array(timeStampData);
+
 
     % Find the pos file in the My_WebCam folder
     posFiles = dir(fullfile(folder, '*.csv'));

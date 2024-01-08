@@ -5,13 +5,12 @@ function f = dlc_fixpos(pos, timestamps, env_shape)
 %can import CSV from dlc and timestamps using: pos = readtable('file.csv');
 
 
-pos = pos(3:end, 2:end);
-pos = table2array(pos);
-pos = cellfun( @str2double, pos );
+if size(pos,2)>22
+  pos = pos(3:end, 2:end);
+end
 posx  = pos(:,1);
 posy = pos(:,2);
 
-timestamps = table2array(timestamps);
 timestamps = timestamps(:,2);
 
 

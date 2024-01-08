@@ -1,4 +1,4 @@
-function f = openfield_mutualinfo(spike_structure, pos_structure, velthreshold, dim)
+function f = mutualinfo_openfield_trace(spike_structure, pos_structure, velthreshold, dim)
 %finds mutual info for a bunch of cells
 %little did I know i already had code for this: ca_mutualinfo_openfield.m
 
@@ -44,6 +44,10 @@ maxtime = vel(2,end);
 
 numunits = size(peaks_time,1);
 
+if numunits<=1
+  mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+  warning('you have no spikes')
+else
 for k=1:numunits
   highspeedspikes = [];
 
@@ -64,10 +68,9 @@ for k=1:numunits
 
 
   set(0,'DefaultFigureVisible', 'off');
-
   if length(highspeedspikes)>0
-  [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(highspeedspikes, goodpos, dim, 1.000);
-  mutinfo(k) = mutualinfo([spikeprob', occprob']);
+  [trace_mean occprob] = CA_normalizePosData_trace(highspeedspikes, goodpos, dim, 1.000);
+  mutinfo(k) = mutualinfo([trace_mean', occprob']);
   else
     mutinfo(k) = NaN;
   end
@@ -75,6 +78,7 @@ for k=1:numunits
 end
 
 mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
+end
 end
 
 f = mutualinfo_struct;

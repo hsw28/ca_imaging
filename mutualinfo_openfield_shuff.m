@@ -1,4 +1,4 @@
-function f = openfield_mutualinfo_shuff(spike_structure, pos_structure, velthreshold, dim, num_times_to_run, ca_MI)
+function f = mutualinfo_openfield_shuff(spike_structure, pos_structure, velthreshold, dim, num_times_to_run, ca_MI)
 %finds mutual info for a bunch of cells
 %little did I know i already had code for this: ca_mutualinfo_openfield.m
 
@@ -74,7 +74,7 @@ for i = 1:numel(fields_spikes)
                 shufff = randsample(goodtime, length(highspeedspikes));
                 shufff = sort(shufff);
 
-                [rate totspikes totstime colorbar spikeprob occprob] = normalizePosData(shufff,goodpos,dim, 1.000);
+                [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(shufff,goodpos,dim, 1.000);
 
                 shuf(l) = mutualinfo([spikeprob', occprob']);
               else
