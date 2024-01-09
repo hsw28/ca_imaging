@@ -15,4 +15,5 @@
 module load matlab/r2018b
 
 # Run MATLAB script
-matlab -nodisplay -nosplash -nodesktop -r   "addpath('/home/hsw967/Programming/ca_imaging'); SLURM_mutual_info_shuff; exit;"
+
+matlab -nodisplay -nosplash -nodesktop -r "addpath(genpath('/home/hsw967/Programming/ca_imaging')); addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/')); SLURM_mutual_info_shuff; exit;"
