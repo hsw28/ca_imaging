@@ -23,12 +23,7 @@ if ~isempty(getenv('SLURM_CPUS_PER_TASK'))
     maxNumCompThreads(str2num(getenv('SLURM_CPUS_PER_TASK')));
 end
 
-% Start a parallel pool with the specified number of workers
-numWorkers = 8;
-poolobj = gcp('nocreate');
-if isempty(poolobj)
-    poolobj = parpool(numWorkers);
-end
+pool = c.parpool(8);
 
 pos_structure = load('pos.mat');
 calcium_traces = load('traces.mat')

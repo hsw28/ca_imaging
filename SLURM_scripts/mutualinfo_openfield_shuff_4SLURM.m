@@ -12,6 +12,7 @@ function mutualinfo_openfield_shuff_4SLURM
   c.AdditionalProperties.QueueName = 'normal';
   c.AdditionalProperties.MemUsage = '64gb';
 
+
   addpath(pwd);
   addpath(genpath('/home/hsw967/Programming/ca_imaging'));
   addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/'));
@@ -22,12 +23,7 @@ function mutualinfo_openfield_shuff_4SLURM
       maxNumCompThreads(str2num(getenv('SLURM_CPUS_PER_TASK')));
   end
 
-  % Start a parallel pool with the specified number of workers
-  numWorkers = 8;
-  poolobj = gcp('nocreate');
-  if isempty(poolobj)
-      poolobj = parpool(numWorkers);
-  end
+  pool = c.parpool(8);
 
 pos_structure = load('pos.mat');
 spikes = load('spikes.mat')
