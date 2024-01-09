@@ -37,7 +37,6 @@ for i = 1:numel(fields_spikes)
       %vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30.0005); %originally had this at 30, trying with 15 now
       goodvel = find(vel(1,:)>=velthreshold);
       goodtime = pos(goodvel, 1);
-      length(goodtime)
       goodpos = pos(goodvel,:);
 
       mintime = vel(2,1);
@@ -68,10 +67,14 @@ for i = 1:numel(fields_spikes)
               end
 
 
+              length(goodtime)
+              length(highspeedspikes)
+              
             shuf = NaN(num_times_to_run,1);
             parfor l = 1:num_times_to_run
 
               if isnan(MI(k))==0 && length(highspeedspikes)>1
+
                 shufff = randsample(goodtime, length(highspeedspikes));
                 shufff = sort(shufff);
 
