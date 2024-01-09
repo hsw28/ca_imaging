@@ -1,11 +1,11 @@
-function f = mutualinfo_openfield_shuff(spike_structure, pos_structure, velthreshold, dim, num_times_to_run, ca_MI)
+function f = mutualinfo_openfield_shuff(calcium_traces, pos_structure, velthreshold, dim, num_times_to_run, ca_MI)
 %finds mutual info for a bunch of cells
-%little did I know i already had code for this: ca_mutualinfo_openfield.m
+
 
 tic
 
 
-
+calcium_traces = spike_structure;
 
 fields_spikes = fieldnames(spike_structure);
 fields_pos = fieldnames(pos_structure);
@@ -50,7 +50,7 @@ for i = 1:numel(fields_spikes)
       MI = fieldValue_MI;
 
       for k=1:numunits
-          k
+
           currspikes = peaks_time(k,:);
           if isnan(MI)==1
             mutinfo(1, k) = NaN;

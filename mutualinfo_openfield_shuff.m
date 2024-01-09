@@ -50,7 +50,7 @@ for i = 1:numel(fields_spikes)
       MI = fieldValue_MI;
 
       for k=1:numunits
-          k
+          
           currspikes = peaks_time(k,:);
           if isnan(MI)==1
             mutinfo(1, k) = NaN;

@@ -1,6 +1,9 @@
 function f = mutualinfo_openfield_trace(spike_structure, pos_structure, velthreshold, dim)
 %finds mutual info for a bunch of cells
-%little did I know i already had code for this: ca_mutualinfo_openfield.m
+%idea modified from  HippoBellum: acute cerebellar modulation alters hippocampal dynamics and function
+%The spatial information content of a cell's activity (in bits) was defined as: I= Σ୧(λ୧⁄λ) x logଶ(λ୧⁄λ) x p୧, where λ is the mean calcium activity ( Σ୧ p୧ x λ୧), λ୧  is the mean
+%calcium activity in the i-th pixel, and p୧ is the probability of being in bin I (Skaggs et al., 1997;
+%Rochefort et al., 2011; Shuman et al., 2020).
 
 tic
 
