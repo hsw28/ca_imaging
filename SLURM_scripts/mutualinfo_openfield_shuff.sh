@@ -14,4 +14,4 @@
 
 module load matlab/r2018b
 
-matlab -batch -nodisplay -nosplash -nodesktop -r "addpath(genpath('/home/hsw967/Programming/ca_imaging')); addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/')); mutualinfo_openfield_shuff_4SLURM; exit;"
+matlab -batch "addpath(genpath('/home/hsw967/Programming/ca_imaging')); addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/')); mutualinfo_openfield_shuff_4SLURM" -nodisplay -nosplash -nodesktop
