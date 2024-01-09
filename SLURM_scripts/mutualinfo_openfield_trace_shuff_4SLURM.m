@@ -6,6 +6,10 @@ rehash toolboxcache;
 % Custom configuration for the cluster (if required)
 configCluster;
 
+c = parcluster;
+c.AdditionalProperties.AccountName = 'p32072'; % Replace with your actual account name
+c.saveProfile;
+
 addpath(pwd);
 addpath(genpath('/home/hsw967/Programming/ca_imaging'));
 addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/'));
