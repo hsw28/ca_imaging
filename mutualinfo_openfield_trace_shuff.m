@@ -37,6 +37,7 @@ for i = 1:numel(fields_spikes)
       %vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30.0005); %originally had this at 30, trying with 15 now
       goodvel = find(vel(1,:)>=velthreshold);
       goodtime = pos(goodvel, 1);
+      length(goodtime)
       goodpos = pos(goodvel,:);
 
       mintime = vel(2,1);
@@ -74,8 +75,7 @@ for i = 1:numel(fields_spikes)
                 shufff = randsample(goodtime, length(highspeedspikes));
                 shufff = sort(shufff);
 
-
-                [trace_mean occprob] = CA_normalizePosData_trace(highspeedspikes, goodpos, dim, 1.000);
+                [trace_mean occprob] = CA_normalizePosData_trace(shufff, goodpos, dim, 1.000);
                 shuf(l) = mutualinfo([trace_mean', occprob']);
 
               else
