@@ -13,4 +13,5 @@ ca_MI = load('MI_trace.mat')
 
 f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, 2, 2.5, 500, ca_MI)
 % Save the output to a .mat file
-save('mutualinfo_shuff_output.mat', 'MI_shuff');
+MI_trace_shuff = f;
+save('mutualinfo_trace_shuff_output.mat', 'MI_trace_shuff');
