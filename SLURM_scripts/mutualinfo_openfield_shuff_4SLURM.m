@@ -8,8 +8,9 @@ function mutualinfo_openfield_shuff_4SLURM
 
   c = parcluster;
   c.AdditionalProperties.AccountName = 'p32072'; % Replace with your actual account name
+  c.AdditionalProperties.WallTime = '24:00:00'; % Set to match the wall time in your SLURM script
   c.saveProfile;
-  
+
   addpath(pwd);
   addpath(genpath('/home/hsw967/Programming/ca_imaging'));
   addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/'));

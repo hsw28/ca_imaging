@@ -8,6 +8,7 @@ configCluster;
 
 c = parcluster;
 c.AdditionalProperties.AccountName = 'p32072'; % Replace with your actual account name
+c.AdditionalProperties.WallTime = '24:00:00'; % Set to match the wall time in your SLURM script
 c.saveProfile;
 
 addpath(pwd);
