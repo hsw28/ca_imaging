@@ -23,7 +23,7 @@ if ~isempty(getenv('SLURM_CPUS_PER_TASK'))
     maxNumCompThreads(str2num(getenv('SLURM_CPUS_PER_TASK')));
 end
 
-pool = c.parpool(8);
+%pool = c.parpool(8);
 
 pos_structure = load('pos.mat');
 calcium_traces = load('traces.mat')

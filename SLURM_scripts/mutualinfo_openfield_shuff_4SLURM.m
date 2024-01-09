@@ -23,7 +23,7 @@ function mutualinfo_openfield_shuff_4SLURM
       maxNumCompThreads(str2num(getenv('SLURM_CPUS_PER_TASK')));
   end
 
-  pool = c.parpool(8);
+%  pool = c.parpool(8);
 
 pos_structure = load('pos.mat');
 spikes = load('spikes.mat')
