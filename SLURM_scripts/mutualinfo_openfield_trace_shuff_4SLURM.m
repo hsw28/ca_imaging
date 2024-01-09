@@ -25,9 +25,17 @@ end
 
 %pool = c.parpool(8);
 
-pos_structure = load('pos.mat');
-calcium_traces = load('traces.mat')
-ca_MI = load('MI_trace.mat')
+%file allvariables.mat should contain
+  %all_traces
+  %MI
+  %MI_trace
+  %peaks
+  %pos
+
+allvariables = load('allvariables.mat');
+pos_structure = allvariables.pos;
+calcium_traces = allvariables.all_traces;
+ca_MI = allvariables.MI_trace;
 
 f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, 2, 2.5, 500, ca_MI)
 % Save the output to a .mat file

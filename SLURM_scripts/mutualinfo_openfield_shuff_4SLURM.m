@@ -25,9 +25,17 @@ function mutualinfo_openfield_shuff_4SLURM
 
 %  pool = c.parpool(8);
 
-pos_structure = load('pos.mat');
-spikes = load('spikes.mat')
-ca_MI = load('MI.mat')
+%file allvariables.mat should contain
+  %all_traces
+  %MI
+  %MI_trace
+  %peaks
+  %pos
+
+allvariables = load('allvariables.mat');
+pos_structure = allvariables.pos;
+spikes = allvariables.peaks;
+ca_MI = allvariables.MI;
 
 f = mutualinfo_openfield_shuff(spikes, pos_structure, 2, 2.5, 500, ca_MI)
 MI_shuff = f;

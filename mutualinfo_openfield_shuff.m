@@ -26,7 +26,7 @@ for i = 1:numel(fields_spikes)
 
       fieldName_pos = fields_pos{i};
       fieldValue_pos = pos_structure.(fieldName_pos);
-      pos = fieldValue_pos
+      pos = fieldValue_pos;
 
       index = strfind(fieldName_spikes, '_');
       pos_date = fieldName_spikes(index(2)+1:end)
