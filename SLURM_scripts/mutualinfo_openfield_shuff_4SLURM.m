@@ -28,10 +28,11 @@ addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/'))
 
 
 % Finally we will submit the MATLAB script quest_gpu_example to SLURM such that MATLAB
-job = c.batch('mutualinfo_openfield_shuff_4SLURM', 'CurrentFolder', '.');
+job = c.batch('shuff_4SLURM', 'CurrentFolder', '.');
 
 
-function mutualinfo_openfield_shuff_4SLURM
+%function mutualinfo_openfield_shuff_4SLURM
+function shuff_4SLURM
 
   % Refresh MATLAB's toolbox cache
   rehash toolboxcache;
