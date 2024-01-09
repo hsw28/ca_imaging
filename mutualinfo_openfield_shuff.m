@@ -26,13 +26,13 @@ for i = 1:numel(fields_spikes)
 
       fieldName_pos = fields_pos{i};
       fieldValue_pos = pos_structure.(fieldName_pos);
-      pos = fieldValue_pos;
+      pos = fieldValue_pos
 
       index = strfind(fieldName_spikes, '_');
       pos_date = fieldName_spikes(index(2)+1:end)
 
 
-
+      size(pos)
       vel = ca_velocity(pos);
       %vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30.0005); %originally had this at 30, trying with 15 now
       goodvel = find(vel(1,:)>=velthreshold);
@@ -50,7 +50,7 @@ for i = 1:numel(fields_spikes)
       MI = fieldValue_MI;
 
       for k=1:numunits
-          
+
           currspikes = peaks_time(k,:);
           if isnan(MI)==1
             mutinfo(1, k) = NaN;
