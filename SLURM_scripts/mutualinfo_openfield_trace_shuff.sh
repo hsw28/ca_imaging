@@ -1,10 +1,8 @@
 #!/bin/bash
 #SBATCH --account=p32072
 #SBATCH --partition=normal
-#SBATCH --gres=gpu:a100:1
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --array=1 ## number of jobs to run "in parallel"
 #SBATCH --mem=64GB
 #SBATCH --time=24:00:00
 #SBATCH --job-name="sample_job_\${SLURM_ARRAY_TASK_ID}" ## use the task id in the name of the job
@@ -17,5 +15,4 @@
 module load matlab/r2018b
 
 # Run MATLAB script
-matlab -nodisplay -nosplash -nodesktop -r   "addpath('/path/to/your/directory');
-                                            SLURM_mutual_info_shuff; exit;"
+matlab -nodisplay -nosplash -nodesktop -r   "addpath('/home/hsw967/Programming/ca_imaging'); SLURM_mutual_info_shuff; exit;"
