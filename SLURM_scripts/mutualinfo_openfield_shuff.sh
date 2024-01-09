@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --account=w10001 ## YOUR ACCOUNT pXXXX or bXXXX
+#SBATCH --account=p32072 ## YOUR ACCOUNT pXXXX or bXXXX
 #SBATCH --partition=normal
 #SBATCH --nodes=1 ## Never need to change this
 #SBATCH --ntasks-per-node=1 ## Never need to change this
@@ -9,6 +9,7 @@
 #SBATCH --output=openfield_shuff.%A_%a.out ## use the jobid (A) and the specific job index (a) to name your log file
 #SBATCH --mail-type=ALL ## you can receive e-mail alerts from SLURM when your job begins and when your job finishes (completed, failed, etc)
 #SBATCH --mail-user=hsw@northwestern.edu  ## your email
+
 
 
 module load matlab/r2018b

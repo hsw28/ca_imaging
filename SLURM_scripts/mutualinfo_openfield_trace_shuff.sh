@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --account=w10001 ## YOUR ACCOUNT pXXXX or bXXXX
+#SBATCH --account=p32072 ## YOUR ACCOUNT pXXXX or bXXXX
 #SBATCH --partition=normal
 #SBATCH --nodes=1 ## Never need to change this
 #SBATCH --ntasks-per-node=1 ## Never need to change this
