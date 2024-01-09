@@ -5,7 +5,7 @@ function f = mutualinfo_openfield_shuff(calcium_traces, pos_structure, velthresh
 tic
 
 
-calcium_traces = spike_structure;
+spike_structure = calcium_traces;
 
 fields_spikes = fieldnames(spike_structure);
 fields_pos = fieldnames(pos_structure);
