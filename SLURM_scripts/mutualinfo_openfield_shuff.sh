@@ -11,6 +11,6 @@
 #SBATCH --mail-type=ALL ## you can receive e-mail alerts from SLURM when your job begins and when your job finishes (completed, failed, etc)
 #SBATCH --mail-user=hsw@northwestern.edu  ## your email
 
-module load matlab/r2018b
 
-matlab -batch mutualinfo_openfield_shuff_4SLURM" -nodisplay -nosplash -nodesktop
+module load matlab/r2018b
+matlab -batch "addpath(genpath('/home/hsw967/Programming/ca_imaging')); addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/')); mutualinfo_openfield_shuff_4SLURM" -nodisplay -nosplash -nodesktop
