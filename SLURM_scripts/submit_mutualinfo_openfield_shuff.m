@@ -14,7 +14,7 @@ c.AdditionalProperties.QueueName = 'short';
 c.AdditionalProperties.MemUsage = '32gb';
 
 % Specify number of nodes to use
-c.AdditionalProperties.Nodes = 12
+c.AdditionalProperties.Nodes = 12;
 
 % Specify e-mail address to receive notifications about your job
 c.AdditionalProperties.EmailAddress = 'hsw@northwestern.edu';
@@ -23,4 +23,4 @@ c.AdditionalProperties.EmailAddress = 'hsw@northwestern.edu';
 c.AdditionalProperties.RequireExclusiveNode = false;
 
 
-job = c.batch('/home/hsw967/Programming/ca_imaging/SLURM_scripts/mutualinfo_openfield_shuff_4SLURM', 'CurrentFolder', '.'))
+job = c.batch('/home/hsw967/Programming/ca_imaging/SLURM_scripts/mutualinfo_openfield_shuff_4SLURM', 'CurrentFolder', '.');
