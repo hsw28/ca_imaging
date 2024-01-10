@@ -22,6 +22,11 @@ for i = 1:numel(fields_spikes)
       fieldName_spikes = fields_spikes{i};
       fieldValue_spikes = spike_structure.(fieldName_spikes);
       peaks_time = fieldValue_spikes;
+
+      fieldName_MI = fields_MI{i};
+      fieldValue_MI = ca_MI.(fieldName_MI);
+      MI = fieldValue_MI;
+
       if length(peaks_time)>1
 
       fieldName_cats = fields_cats{i};
@@ -88,9 +93,6 @@ for i = 1:numel(fields_spikes)
       numunits = size(peaks_time,1);
       mutinfo = NaN(2,numunits);
 
-      fieldName_MI = fields_MI{i};
-      fieldValue_MI = pos_structure.(fieldName_MI);
-      MI = fieldValue_MI;
 
       for k=1:numunits
           currspikes = peaks_time(k,:);
