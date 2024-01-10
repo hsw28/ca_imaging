@@ -1,5 +1,7 @@
 
 function mutualinfo_openfield_trace_shuff_4SLURM
+  outputFile = fopen('mutualinfo_shuff_output.log', 'w');
+  try
   maxNumCompThreads(str2num(getenv('SLURM_NPROCS')));
 
   % Refresh MATLAB's toolbox cache
@@ -56,5 +58,9 @@ catch e
     disp(e.message);
 end
 
-
+fprintf(outputFile, 'Computation completed successfully.\n');
+catch e
+fprintf(outputFile, 'An error occurred: %s\n', e.message);
+end
+ fclose(outputFile);
 end
