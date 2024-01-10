@@ -33,7 +33,7 @@ function giantStructure = processFolders_CaTime(currentDir)
                   ca_folder_parts = strsplit(ca_folder, '/');
                   ca_folder_date = ca_folder_parts{end};
                   ca_folder_date=sprintf('exinction_%s', ca_folder_date);
-                en
+                end
                   giantStructure.(sprintf('pos_%s', ca_folder_date)) = output;
 
             else
