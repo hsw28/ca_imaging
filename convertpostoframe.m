@@ -1,4 +1,4 @@
-function newpos = convertpostoframe(pos, CA_timestamps, for_rec_1_for_oval_2)
+function newpos = convertpostoframe(pos, CA_timestamps)
 %converts pos to same frames/times as CA imaging
 
 

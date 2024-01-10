@@ -14,7 +14,7 @@ fields_spikes = fieldnames(spike_structure);
 fields_pos = fieldnames(pos_structure);
 
 if numel(fields_spikes) ~= numel(fields_pos)
-  error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
+%  error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
 end
 
 
@@ -35,50 +35,63 @@ for i = 1:numel(fields_spikes)
 
       mutinfo = NaN(size(peaks_time,1),1);
 
-velthreshold = 2;
-vel = ca_velocity(pos);
-%vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30.0005); %originally had this at 30, trying with 15 now
-goodvel = find(vel(1,:)>=velthreshold);
-goodtime = pos(goodvel, 1);
-goodpos = pos(goodvel,:);
+      if length(pos)./length(peaks_time) > 1.5
+        pos = pos(1:2:end, :);
+        pos = pos(1:length(peaks_time),:);
+      end
 
-mintime = vel(2,1);
-maxtime = vel(2,end);
+      if length(peaks_time)>length(pos)
+        peaks_time = peaks_time(1:length(pos));
+      end
 
-numunits = size(peaks_time,1);
+      velthreshold = 2;
+      vel = ca_velocity(pos);
 
-if numunits<=1
-  mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
-  warning('you have no spikes')
-else
-for k=1:numunits
-  highspeedspikes = [];
+      times = vel(2,:);
+      velocities = vel(1,:);
 
-  [c indexmin] = (min(abs(peaks_time(k,:)-mintime))); %
-  [c indexmax] = (min(abs(peaks_time(k,:)-maxtime))); %
-  currspikes = peaks_time(k,indexmin:indexmax);
+      %want highspeedspikes
+      % Thresholds
+      velThreshold = 2; % cm/s
+      timeThreshold = 1; % second
+      % Find indices where velocity is greater than the threshold
+      highVelIndices = find(velocities >= velThreshold);
+      % Find indices where velocity is less than or equal to the threshold
+      lowVelIndices = find(velocities < velThreshold);
+      % Filter out high velocity indices that are too close to low velocities
+      validHighVelIndices = [];
+      for i = 1:length(highVelIndices)
+          highVelTime = times(highVelIndices(i));
+          % Find the closest low velocity time
+          [~, closestLowVelIndex] = min(abs(highVelTime - times(lowVelIndices)));
+          closestLowVelTime = times(lowVelIndices(closestLowVelIndex));
 
-  for i=1:length(currspikes) %finding if in good vel
-    [minValue,closestIndex] = min(abs(currspikes(i)-goodtime));
+          % Check if the high velocity time is more than 1 second away from the closest low velocity time
+          if abs(highVelTime - closestLowVelTime) > timeThreshold
+              validHighVelIndices = [validHighVelIndices, highVelIndices(i)];
+          end
+      end
 
-    if minValue <= 1 %if spike is within 1 second of moving. no idea if good time
-      highspeedspikes(end+1) = currspikes(i);
-    end;
-  end
+      goodtime = pos(validHighVelIndices, 1);
+      goodpos = pos(validHighVelIndices,:);
+      all_highspeedspikes = peaks_time(:,validHighVelIndices);
 
-%want highspeedspikes
+      numunits = size(peaks_time,1);
+      for k=1:numunits
+        highspeedspikes = all_highspeedspikes(k,:);
+        if numunits<=1
+          mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+          warning('you have no cells and no spikes')
+        else
+          set(0,'DefaultFigureVisible', 'off');
+          if length(highspeedspikes)>0
+            [trace_mean occprob] = CA_normalizePosData_trace(highspeedspikes, goodpos, dim, 1.000);
+            mutinfo(k) = mutualinfo([trace_mean', occprob']);
+          else
+            mutinfo(k) = NaN;
+          end
 
-
-
-  set(0,'DefaultFigureVisible', 'off');
-  if length(highspeedspikes)>0
-  [trace_mean occprob] = CA_normalizePosData_trace(highspeedspikes, goodpos, dim, 1.000);
-  mutinfo(k) = mutualinfo([trace_mean', occprob']);
-  else
-    mutinfo(k) = NaN;
-  end
-
-end
+        end
 
 mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
 end

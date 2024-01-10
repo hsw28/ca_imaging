@@ -23,16 +23,12 @@ if size(eventData, 1)>size(eventData,2)
 	eventData = eventData';
 end
 
-%eventData = cutclosest(posData(1,1), posData(end,1), eventData, eventData);
-ls = placeevent(eventData,posData);
-
-
-ls = ls';
 if size(varargin)==0
 psize = 1 * dim; %some REAL ratio of pixels to cm -- 3.5 for wilson, 2.5 for disterhoft linear, 6.85 for eyeblink
 else
 psize = cell2mat(varargin) *dim;
 end
+
 
 
 %only find occupancy map if one hasn't been provided
@@ -59,32 +55,12 @@ end
         	A2 = posData(:,3)>((j-1)*ystep) & posData(:,3)<=(j*ystep); %finds all rows that are in the current y axis bin
         	A = [A1 A2]; %merge results
         	B = sum(A,2); %find the rows that satisfy both previous conditions
-				%	if length(B) >= 1
-						C = B > 1;
-        		time(ybins+1-j,i) = sum(C); %set the matrix cell for that bin to the number of rows that satisfy both
-				%	else
-				%		time(ybins+1-j,i) = NaN;
-				%	end
+					C = B > 1;
+        	time(ybins+1-j,i) = sum(C); %set the matrix cell for that bin to the number of rows that satisfy both
+					events(ybins+1-j,i) = mean(trace_data(C));
+
 			end
 		end
-
-
-%events
-for i = 1:xbins
-    for j = 1:ybins
-        A1 = ls(:,2)>((i-1)*xstep) & ls(:,2)<=(i*xstep); %finds all rows that are in the current x axis bin
-        A2 = ls(:,3)>((j-1)*ystep) & ls(:,3)<=(j*ystep); %finds all rows that are in the current y axis bin
-        A = [A1 A2]; %merge results
-        B = sum(A,2); %find the rows that satisfy both previous conditions
-			%	if length(B) >= 1
-					C = B > 1;
-        	events(ybins+1-j,i) = mean(C); %set the matrix cell for that bin to the number of rows that satisfy both
-			%	else
-			%		events(ybins+1-j,i) = NaN;
-			%	end
-		end
-end
-
 
 
 trace_mean = imgaussfilt(events);
