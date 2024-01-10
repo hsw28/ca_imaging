@@ -42,7 +42,7 @@ calcium_traces = allvariables.all_traces;
 MI_trace = load('MI_trace.mat');
 ca_MI = MI_trace.MI_trace;
 
-ca_ts = load('ca_ts.mat')
+Ca_ts = load('Ca_ts.mat')
 ca_ts = Ca_ts.Ca_ts;
 
 f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, 2, 2.5, 500, ca_MI, ca_ts);
