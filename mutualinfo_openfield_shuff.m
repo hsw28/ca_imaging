@@ -70,7 +70,7 @@ for i = 1:numel(fields_spikes)
             shuf = NaN(num_times_to_run,1);
             parfor l = 1:num_times_to_run
 
-              fprintf('survived the great parfor loop trauma of jan 10')
+              %fprintf('survived the great parfor loop trauma of jan 10')
               if isnan(MI(k))==0 && length(highspeedspikes)>1
                 shufff = randsample(goodtime, length(highspeedspikes));
                 shufff = sort(shufff);
