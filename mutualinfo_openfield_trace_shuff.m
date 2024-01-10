@@ -12,8 +12,9 @@ fields_pos = fieldnames(pos_structure);
 fields_MI = fieldnames(pos_structure);
 fields_cats = fieldnames(CA_timestamps);
 
+
 if numel(fields_spikes) ~= numel(fields_pos)
-%  error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
+  warning('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
 end
 
 
@@ -21,6 +22,7 @@ for i = 1:numel(fields_spikes)
       fieldName_spikes = fields_spikes{i};
       fieldValue_spikes = spike_structure.(fieldName_spikes);
       peaks_time = fieldValue_spikes;
+      if length(peaks_time)>1
 
       fieldName_cats = fields_cats{i};
       curr_CA_timestamps = CA_timestamps.(fieldName_cats);
@@ -36,17 +38,24 @@ for i = 1:numel(fields_spikes)
       pos_date = fieldName_spikes(index(2)+1:end)
 
 
+
+
+
       if length(pos)./length(peaks_time) > 1.3
-          pos = convertpostoframe(pos, curr_CA_timestamps);
+        pos = convertpostoframe(pos, curr_CA_timestamps);
+        length(pos)
+        fprintf('converting')
       end
+
 
       if length(peaks_time)>length(pos)
         peaks_time = peaks_time(1:length(pos));
+      elseif length(peaks_time)<length(pos)
+        pos = pos(1:length(peaks_time),:);
       end
 
       velthreshold = 2;
       vel = ca_velocity(pos);
-
       times = vel(2,:);
       velocities = vel(1,:);
 
@@ -88,7 +97,6 @@ for i = 1:numel(fields_spikes)
           if isnan(MI)==1
             mutinfo(1, k) = NaN;
             mutinfo(2, k) = NaN;
-
           else
             highspeedspikes = all_highspeedspikes(k,:);
           end
@@ -124,13 +132,16 @@ for i = 1:numel(fields_spikes)
               mutinfo(2, k) = NaN;
             end
 
-          end
-      end
+        end
+
 
 
 
 
 mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
+else
+  mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+end
 end
 
 

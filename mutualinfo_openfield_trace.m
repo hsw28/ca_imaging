@@ -102,8 +102,9 @@ for i = 1:numel(fields_spikes)
 
         end
 
-mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
-end
+      end
+  mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
+
 else
   mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
 end
