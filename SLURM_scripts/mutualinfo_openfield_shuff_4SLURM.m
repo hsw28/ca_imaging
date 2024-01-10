@@ -44,5 +44,15 @@ ca_MI = allvariables.MI;
 f = mutualinfo_openfield_shuff(spikes, pos_structure, 2, 2.5, 500, ca_MI)
 MI_shuff = f;
 % Save the output to a .mat file
-save('mutualinfo_shuff_output.mat', 'MI_shuff');
+
+save('/path/to/directory/mutualinfo_shuff_output.mat', 'MI_shuff');
+
+try
+    save('./mutualinfo_shuff_output.mat', 'MI_shuff');
+catch e
+    disp('Error occurred while saving the file:');
+    disp(e.message);
+end
+
+
 end

@@ -48,5 +48,13 @@ ca_ts = Ca_ts.Ca_ts;
 f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, 2, 2.5, 500, ca_MI, ca_ts);
 % Save the output to a .mat file
 MI_trace_shuff = f;
-save('mutualinfo_trace_shuff_output.mat', 'MI_trace_shuff');
+
+try
+    save('./mutualinfo_trace_shuff_output.mat', 'MI_trace_shuff');
+catch e
+    disp('Error occurred while saving the file:');
+    disp(e.message);
+end
+
+
 end
