@@ -1,4 +1,4 @@
-function f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, velthreshold, dim, num_times_to_run, ca_MI)
+function f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, velthreshold, dim, num_times_to_run, ca_MI, CA_timestamps)
 %finds mutual info for a bunch of cells
 
 
@@ -10,6 +10,7 @@ spike_structure = calcium_traces;
 fields_spikes = fieldnames(spike_structure);
 fields_pos = fieldnames(pos_structure);
 fields_MI = fieldnames(pos_structure);
+fields_cats = fieldnames(CA_timestamps);
 
 if numel(fields_spikes) ~= numel(fields_pos)
 %  error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
@@ -20,6 +21,9 @@ for i = 1:numel(fields_spikes)
       fieldName_spikes = fields_spikes{i};
       fieldValue_spikes = spike_structure.(fieldName_spikes);
       peaks_time = fieldValue_spikes;
+
+      fieldName_cats = fields_cats{i};
+      curr_CA_timestamps = CA_timestamps.(fieldName_cats);
 
       index = strfind(fieldName_spikes, '_');
       spikes_date = fieldName_spikes(index(2)+1:end)
@@ -32,9 +36,8 @@ for i = 1:numel(fields_spikes)
       pos_date = fieldName_spikes(index(2)+1:end)
 
 
-      if length(pos)./length(peaks_time) > 1.5
-        pos = pos(1:2:end, :);
-        pos = pos(1:length(peaks_time),:);
+      if length(pos)./length(peaks_time) > 1.3
+          pos = convertpostoframe(pos, curr_CA_timestamps);
       end
 
       if length(peaks_time)>length(pos)

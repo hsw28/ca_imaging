@@ -1,4 +1,4 @@
-function f = mutualinfo_openfield_trace(spike_structure, pos_structure, velthreshold, dim)
+function f = mutualinfo_openfield_trace(spike_structure, pos_structure, velthreshold, dim, CA_timestamps)
 %finds mutual info for a bunch of cells
 %idea modified from  HippoBellum: acute cerebellar modulation alters hippocampal dynamics and function
 %The spatial information content of a cell's activity (in bits) was defined as: I= Σ୧(λ୧⁄λ) x logଶ(λ୧⁄λ) x p୧, where λ is the mean calcium activity ( Σ୧ p୧ x λ୧), λ୧  is the mean
@@ -12,6 +12,7 @@ tic
 
 fields_spikes = fieldnames(spike_structure);
 fields_pos = fieldnames(pos_structure);
+fields_cats = fieldnames(CA_timestamps);
 
 if numel(fields_spikes) ~= numel(fields_pos)
 %  error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
@@ -22,9 +23,13 @@ for i = 1:numel(fields_spikes)
       fieldName_spikes = fields_spikes{i};
       fieldValue_spikes = spike_structure.(fieldName_spikes);
       peaks_time = fieldValue_spikes;
+      if length(peaks_time)>1
+
+      fieldName_cats = fields_cats{i};
+      curr_CA_timestamps = CA_timestamps.(fieldName_cats);
 
       index = strfind(fieldName_spikes, '_');
-      spikes_date = fieldName_spikes(index(2)+1:end)
+      spikes_date = fieldName_spikes(index(2)+1:end);
 
       fieldName_pos = fields_pos{i};
       fieldValue_pos = pos_structure.(fieldName_pos);
@@ -35,18 +40,22 @@ for i = 1:numel(fields_spikes)
 
       mutinfo = NaN(size(peaks_time,1),1);
 
-      if length(pos)./length(peaks_time) > 1.5
-        pos = pos(1:2:end, :);
-        pos = pos(1:length(peaks_time),:);
+
+      if length(pos)./length(peaks_time) > 1.3
+        pos = convertpostoframe(pos, curr_CA_timestamps);
+        length(pos)
+        fprintf('converting')
       end
+
 
       if length(peaks_time)>length(pos)
         peaks_time = peaks_time(1:length(pos));
+      elseif length(peaks_time)<length(pos)
+        pos = pos(1:length(peaks_time),:);
       end
 
       velthreshold = 2;
       vel = ca_velocity(pos);
-
       times = vel(2,:);
       velocities = vel(1,:);
 
@@ -94,6 +103,9 @@ for i = 1:numel(fields_spikes)
         end
 
 mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
+end
+else
+  mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
 end
 end
 

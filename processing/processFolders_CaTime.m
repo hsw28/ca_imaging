@@ -1,6 +1,5 @@
 function giantStructure = processFolders_CaTime(currentDir)
 %makes a position structure with all your ca miniscope timestamps for one animal
-%input 1 for the cage and 2 for the oval
 %currectDir should be the directory you wish to search from, ie
 %'./031423/'. dont use dot indexing
 %you have to change things between windows and mac
@@ -31,10 +30,10 @@ function giantStructure = processFolders_CaTime(currentDir)
 
                 ca_folder = strsplit(selected_folder, '/');
                 ca_folder = strsplit(selected_folder, '\');
-               
+
                 ca_folder = ca_folder{end};
 
-                
+
                 if strcmp(ca_folder_date, 'extinction')==1
                   ca_folder = (fileparts(fileparts((selected_folder))))
                   ca_folder_parts = strsplit(ca_folder, '\')

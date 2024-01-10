@@ -33,14 +33,19 @@ addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/'))
   %MI_trace
   %peaks
   %pos
+  %ca_ts
 
 allvariables = load('allvariables.mat');
-MI_trace = load('allvariables.mat');
 pos_structure = allvariables.pos;
 calcium_traces = allvariables.all_traces;
+
+MI_trace = load('MI_trace.mat');
 ca_MI = MI_trace.MI_trace;
 
-f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, 2, 2.5, 500, ca_MI)
+ca_ts = load('ca_ts.mat')
+ca_ts = Ca_ts.Ca_ts;
+
+f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, 2, 2.5, 500, ca_MI, ca_ts);
 % Save the output to a .mat file
 MI_trace_shuff = f;
 save('mutualinfo_trace_shuff_output.mat', 'MI_trace_shuff');
