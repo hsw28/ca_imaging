@@ -65,9 +65,9 @@ function validFolders = getValidFolders(currentDir)
             csvFiles = dir(fullfile(webCamDir, '*.csv'));
 
             % Check if My_WebCam folder contains two CSV files with timeStamps.csv
-            if numel(csvFiles) == 2 && any(strcmpi({csvFiles.name}, 'timeStamps.csv'))
+            if numel(csvFiles) >= 1 && any(strcmpi({csvFiles.name}, 'timeStamps.csv'))
                 % Get the folder name three levels above My_WebCam
-                ca_folder = (fileparts(fileparts(fileparts(webCamDir))));
+                ca_folder = (fileparts(fileparts(webCamDir)));
 
                 % Split the text using '/' as the delimiter
                 ca_folder_parts = strsplit(ca_folder, '/');
