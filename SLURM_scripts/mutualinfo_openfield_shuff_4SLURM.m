@@ -1,8 +1,8 @@
 function mutualinfo_openfield_shuff_4SLURM
 
-  fprintf('starting1')
-  maxNumCompThreads(str2num(getenv('SLURM_NPROCS')));
-fprintf('starting2')
+
+  %maxNumCompThreads(str2num(getenv('SLURM_NPROCS'))); %%%%%trying without this
+
 %{
   % Refresh MATLAB's toolbox cache
   rehash toolboxcache;
@@ -17,6 +17,7 @@ fprintf('starting2')
   c.AdditionalProperties.QueueName = 'normal';
   c.AdditionalProperties.MemUsage = '64gb';
 
+  fprintf('this should not print')
 
   % Set the number of computational threads to the number of allocated CPUs
   if ~isempty(getenv('SLURM_CPUS_PER_TASK'))
