@@ -99,6 +99,7 @@ for i = 1:numel(fields_spikes)
           if isnan(MI)==1
             mutinfo(1, k) = NaN;
             mutinfo(2, k) = NaN;
+            continue
           else
             highspeedspikes = all_highspeedspikes(k,:);
           end
