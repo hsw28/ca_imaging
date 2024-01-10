@@ -1,7 +1,7 @@
 c = parcluster;
 
 % Specify the walltime (e.g. 4 hours)
-c.AdditionalProperties.WallTime = '02:00:00';
+c.AdditionalProperties.WallTime = '00:10:00';
 
 % Specify an account to use for MATLAB jobs (e.g. pXXXX, bXXXX, etc)
 c.AdditionalProperties.AccountName = 'p32072';
