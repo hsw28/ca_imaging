@@ -1,6 +1,6 @@
 function mutualinfo_openfield_shuff_4SLURM
 
-  maxNumCompThreads(str2num(getenv('SLURM_NPROCS')));
+  maxNumCompThreads(12);
 
   % Refresh MATLAB's toolbox cache
   rehash toolboxcache;
