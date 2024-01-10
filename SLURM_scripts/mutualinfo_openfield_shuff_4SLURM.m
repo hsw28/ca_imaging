@@ -38,6 +38,7 @@ function mutualinfo_openfield_shuff_4SLURM
   %peaks
   %pos
 
+parpool('p32072', 12)
 allvariables = load('allvariables.mat');
 pos_structure = allvariables.pos;
 spikes = allvariables.peaks;
