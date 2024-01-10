@@ -39,7 +39,7 @@ function mutualinfo_openfield_shuff_4SLURM
   %pos
 
 parpool('p32072', 12)
-allvariables = load('allvariables.mat');
+allvariables = load('/projects/p32072/data_eyeblink/rat314/slurm_variables/allvariables.mat');
 pos_structure = allvariables.pos;
 spikes = allvariables.peaks;
 ca_MI = allvariables.MI;
