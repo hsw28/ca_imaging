@@ -1,4 +1,4 @@
-function giantStructure = processFolders_CaTime(currentDir, type1_for_cage_2_for_oval)
+function giantStructure = processFolders_CaTime(currentDir)
 %makes a position structure with all your run days for one animal using dlc_fixposor
 %should auto detect if oval or rectangle
 %%FIXES POS USING dlc_fixpos
