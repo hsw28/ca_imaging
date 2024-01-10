@@ -3,7 +3,7 @@ function giantStructure = processFolders_CaTime(currentDir)
 %input 1 for the cage and 2 for the oval
 %currectDir should be the directory you wish to search from, ie
 %'./031423/'. dont use dot indexing
-%you have to change things between windows and mac
+%you have to change things between windows and max
 
     giantStructure = struct()
     validFolders = getValidFolders(currentDir);
@@ -23,23 +23,23 @@ function giantStructure = processFolders_CaTime(currentDir)
 
 
                 % Get the folder name three levels above My_WebCam
-                ca_folder = (fileparts(fileparts((selected_folder))));
+                ca_folder = (fileparts(fileparts((selected_folder))))
                 % Split the text using '/' as the delimiter
-                ca_folder_parts = strsplit(ca_folder, '\');
+                ca_folder_parts = strsplit(ca_folder, '\')
                 % Get the last part, which contains the date
-                ca_folder_date = ca_folder_parts{end};
+                ca_folder_date = ca_folder_parts{end}
 
-                ca_folder = strsplit(selected_folder, '/');
-                ca_folder = strsplit(selected_folder, '\');
+                ca_folder = strsplit(selected_folder, '/')
+                ca_folder = strsplit(selected_folder, '\')
                
-                ca_folder = ca_folder{end};
+                ca_folder = ca_folder{end}
 
-                
+
                 if strcmp(ca_folder_date, 'extinction')==1
-                  ca_folder = (fileparts(fileparts((selected_folder))))
-                  ca_folder_parts = strsplit(ca_folder, '\')
-                  ca_folder_date = ca_folder_parts{2}
-                  ca_folder_date=sprintf('exinction_%s', ca_folder_date)
+                  ca_folder = fileparts(fileparts(fileparts((selected_folder))));
+                  ca_folder_parts = strsplit(ca_folder, '/');
+                  ca_folder_date = ca_folder_parts{end};
+                  ca_folder_date=sprintf('exinction_%s', ca_folder_date);
                 end
                   giantStructure.(sprintf('CA_time_%s', ca_folder_date)) = output;
 
