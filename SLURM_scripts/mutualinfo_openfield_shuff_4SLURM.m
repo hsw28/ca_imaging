@@ -1,7 +1,9 @@
 function mutualinfo_openfield_shuff_4SLURM
 
   maxNumCompThreads(12);
-
+  cd ('/projects/p32072/data_eyeblink/rat314/slurm_variables')
+  outputFile = fopen('mutualinfo_shuff_output.log', 'w');
+  try
   % Refresh MATLAB's toolbox cache
   rehash toolboxcache;
 
@@ -54,4 +56,9 @@ catch e
 end
 
 
+fprintf(outputFile, 'Computation completed successfully.\n');
+catch e
+fprintf(outputFile, 'An error occurred: %s\n', e.message);
+end
+ fclose(outputFile);
 end

@@ -1,5 +1,6 @@
 
 function mutualinfo_openfield_trace_shuff_4SLURM
+  cd ('/projects/p32072/data_eyeblink/rat314/slurm_variables')
   outputFile = fopen('mutualinfo_shuff_output.log', 'w');
   try
   maxNumCompThreads(str2num(getenv('SLURM_NPROCS')));
