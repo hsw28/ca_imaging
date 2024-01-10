@@ -10,6 +10,7 @@ function giantStructure = processFolders_CaTime(currentDir)
 
     % Prompt the user to select which folders to process
     if ~isempty(validFolders)
+        size(validFolders)
         selected_folders = input('Enter the numbers of the folders to process (e.g., [1, 3, 5]): ');
 
         % Process the selected folders using dlc_fixpos
