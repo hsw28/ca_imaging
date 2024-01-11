@@ -18,7 +18,7 @@ function mutualinfo_openfield_shuff_4SLURM
 
 
 
-
+parpool(4)
 %    c = parcluster;
 %    c.AdditionalProperties.WallTime = '03:00:00';
 %    c.AdditionalProperties.AccountName = 'p32072';
