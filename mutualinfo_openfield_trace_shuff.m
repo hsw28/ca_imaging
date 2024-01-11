@@ -94,57 +94,59 @@ for i = 1:numel(fields_spikes)
       mutinfo = NaN(2,numunits);
 
 
-      for k=1:numunits
-          currspikes = peaks_time(k,:);
-          if isnan(MI)==1
-            mutinfo(1, k) = NaN;
-            mutinfo(2, k) = NaN;
-            continue
-          else
-            highspeedspikes = all_highspeedspikes(k,:);
-          end
+      if numunits<=1
+        mutinfo = NaN;
+        warning('you have no cells and no spikes')
+        mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+      else
+          for k=1:numunits
+                    currspikes = peaks_time(k,:);
+                    if isnan(MI)==1
+                      mutinfo(1, k) = NaN;
+                      mutinfo(2, k) = NaN;
+                      continue
+                    else
+                      highspeedspikes = all_highspeedspikes(k,:);
+                    end
 
-            shuf = NaN(num_times_to_run,1);
-            parfor l = 1:num_times_to_run
+                    shuf = NaN(num_times_to_run,1);
+                    parfor l = 1:num_times_to_run
 
-              if isnan(MI(k))==0 && length(highspeedspikes)>1
+                          if isnan(MI(k))==0 && length(highspeedspikes)>1
 
-                shufff = highspeedspikes(randperm(length(highspeedspikes)))
-                [trace_mean occprob] = CA_normalizePosData_trace(shufff, goodpos, dim, 1.000);
-                shuf(l) = mutualinfo([trace_mean', occprob']);
+                            shufff = highspeedspikes(randperm(length(highspeedspikes)))
+                            [trace_mean occprob] = CA_normalizePosData_trace(shufff, goodpos, dim, 1.000);
+                            shuf(l) = mutualinfo([trace_mean', occprob']);
 
-              else
-                shuf(l) = NaN;
-              end
-
-
-            end
-
-
-            topMI5 = floor(num_times_to_run*.95);
-            topMI1 = floor(num_times_to_run*.99);
-            shuf = sort(shuf);
-            if isnan(topMI5)==0
-              mutinfo(1, k) = shuf(topMI5);
-            else
-              mutinfo(1, k) = NaN;
-            end
-            if isnan(topMI1)==0
-              mutinfo(2, k) = shuf(topMI1);
-            else
-              mutinfo(2, k) = NaN;
-            end
-
-        end
+                          else
+                            shuf(l) = NaN;
+                          end
 
 
+                      end
 
 
+                      topMI5 = floor(num_times_to_run*.95);
+                      topMI1 = floor(num_times_to_run*.99);
+                      shuf = sort(shuf);
+                      if isnan(topMI5)==0
+                        mutinfo(1, k) = shuf(topMI5);
+                      else
+                        mutinfo(1, k) = NaN;
+                      end
+                      if isnan(topMI1)==0
+                        mutinfo(2, k) = shuf(topMI1);
+                      else
+                        mutinfo(2, k) = NaN;
+                      end
 
-mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
-else
-  mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
-end
+                  end %ending the for loop for units
+
+
+    mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
+  end % ending if numunits<=1
+
+
 end
 
 

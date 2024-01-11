@@ -23,7 +23,7 @@ for i = 1:numel(fields_spikes)
       fieldName_spikes = fields_spikes{i};
       fieldValue_spikes = spike_structure.(fieldName_spikes);
       peaks_time = fieldValue_spikes;
-      if length(peaks_time)>1
+    %  if length(peaks_time)>1
 
       fieldName_cats = fields_cats{i};
       curr_CA_timestamps = CA_timestamps.(fieldName_cats);
@@ -43,8 +43,6 @@ for i = 1:numel(fields_spikes)
 
       if length(pos)./length(peaks_time) > 1.3
         pos = convertpostoframe(pos, curr_CA_timestamps);
-        length(pos)
-        fprintf('converting')
       end
 
 
@@ -86,28 +84,33 @@ for i = 1:numel(fields_spikes)
       all_highspeedspikes = peaks_time(:,validHighVelIndices);
 
       numunits = size(peaks_time,1);
-      for k=1:numunits
-        highspeedspikes = all_highspeedspikes(k,:);
-        if numunits<=1
-          mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
-          warning('you have no cells and no spikes')
-        else
+      if numunits<=1
+        mutinfo = NaN;
+        warning('you have no cells and no spikes')
+      else
+          for k=1:numunits
+          highspeedspikes = all_highspeedspikes(k,:);
+
+
           set(0,'DefaultFigureVisible', 'off');
-          if length(highspeedspikes)>0
-            [trace_mean occprob] = CA_normalizePosData_trace(highspeedspikes, goodpos, dim, 1.000);
-            mutinfo(k) = mutualinfo([trace_mean', occprob']);
-          else
-            mutinfo(k) = NaN;
+            if length(highspeedspikes)>0
+              [trace_mean occprob] = CA_normalizePosData_trace(highspeedspikes, goodpos, dim, 1.000);
+                  if k==1
+                    trace_mean
+
+                    occprob
+
+                  end
+              mutinfo(k) = mutualinfo([trace_mean', occprob']);
+            else
+              mutinfo(k) = NaN;
+            end
           end
-
-        end
-
       end
-  mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
 
-else
-  mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
-end
+
+mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
+
 end
 
 f = mutualinfo_struct;

@@ -49,65 +49,64 @@ for i = 1:numel(fields_spikes)
       fieldValue_MI = pos_structure.(fieldName_MI);
       MI = fieldValue_MI;
 
-      for k=1:numunits
+      if numunits<=1
+        mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+        warning('you have no spikes')
+      else
+          for k=1:numunits
 
-          currspikes = peaks_time(k,:);
-          if isnan(MI)==1
-            mutinfo(1, k) = NaN;
-            mutinfo(2, k) = NaN;
+                currspikes = peaks_time(k,:);
+                if isnan(MI)==1
+                  mutinfo(1, k) = NaN;
+                  mutinfo(2, k) = NaN;
+                  continue
+                else
+                  highspeedspikes = [];
+                end
 
-          else
-            highspeedspikes = [];
-            for i=1:length(currspikes) %finding if in good vel
-              [minValue,closestIndex] = min(abs(currspikes(i)-goodtime));
+                for i=1:length(currspikes) %finding if in good vel
+                    [minValue,closestIndex] = min(abs(currspikes(i)-goodtime));
+                    if minValue <= 1 %if spike is within 1 second of moving. no idea if good time
+                      highspeedspikes(end+1) = currspikes(i);
+                    end
+                end
 
-              if minValue <= 1 %if spike is within 1 second of moving. no idea if good time
-                highspeedspikes(end+1) = currspikes(i);
-              end;
+
+                shuf = NaN(num_times_to_run,1);
+                parfor l = 1:num_times_to_run
+                      %fprintf('survived the great parfor loop trauma of jan 10')
+                      if isnan(MI(k))==0 && length(highspeedspikes)>1
+                        shufff = randsample(goodtime, length(highspeedspikes));
+                        shufff = sort(shufff);
+
+                        [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(shufff,goodpos,dim, 1.000);
+
+                        shuf(l) = mutualinfo([spikeprob', occprob']);
+                      else
+                        shuf(l) = NaN;
+                      end
+                  end
+
+
+                topMI5 = floor(num_times_to_run*.95);
+                topMI1 = floor(num_times_to_run*.99);
+                shuf = sort(shuf);
+                    if isnan(topMI5)==0
+                      mutinfo(1, k) = shuf(topMI5);
+                    else
+                      mutinfo(1, k) = NaN;
+                    end
+                    if isnan(topMI1)==0
+                      mutinfo(2, k) = shuf(topMI1);
+                    else
+                      mutinfo(2, k) = NaN;
+                    end
+
               end
 
-
-            shuf = NaN(num_times_to_run,1);
-            parfor l = 1:num_times_to_run
-
-              %fprintf('survived the great parfor loop trauma of jan 10')
-              if isnan(MI(k))==0 && length(highspeedspikes)>1
-                shufff = randsample(goodtime, length(highspeedspikes));
-                shufff = sort(shufff);
-
-                [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(shufff,goodpos,dim, 1.000);
-
-                shuf(l) = mutualinfo([spikeprob', occprob']);
-              else
-                shuf(l) = NaN;
-              end
-
-
-              end
-
-
-            topMI5 = floor(num_times_to_run*.95);
-            topMI1 = floor(num_times_to_run*.99);
-            shuf = sort(shuf);
-            if isnan(topMI5)==0
-              mutinfo(1, k) = shuf(topMI5);
-            else
-              mutinfo(1, k) = NaN;
-            end
-            if isnan(topMI1)==0
-              mutinfo(2, k) = shuf(topMI1);
-            else
-              mutinfo(2, k) = NaN;
-            end
-
-          end
-      end
-
-
-
-
-mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
-end
+    mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
+    end
+  end
 
 
 f = mutualinfo_struct;

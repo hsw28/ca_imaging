@@ -57,18 +57,35 @@ end
         	B = sum(A,2); %find the rows that satisfy both previous conditions
 					C = B > 1;
         	time(ybins+1-j,i) = sum(C); %set the matrix cell for that bin to the number of rows that satisfy both
-					events(ybins+1-j,i) = mean(trace_data(C));
+					events(ybins+1-j,i) = nanmean(trace_data(C));
 
 			end
 		end
 
 
-trace_mean = imgaussfilt(events);
 
-occupancy = imgaussfilt(time*tstep);
-occprob = occupancy./nansum(occupancy);
+%occupancy = imgaussfilt(time*tstep);
+%occprob = occupancy./nansum(occupancy);
 
-%[x,y] = find(isinf(rate)==1);
+filtWidth = 3;
+filtSigma = .5;
+imageFilter=fspecial('gaussian',filtWidth,filtSigma);
+
+trace_mean = (events);
+trace_mean = nanconv(trace_mean,imageFilter, 'edge', 'nanout');
+
+occupancy = (time*tstep);
+occupancy2 = occupancy;
+occupancy2(occupancy == 0) = NaN;
+occupancy2 = nanconv(occupancy2,imageFilter, 'edge', 'nanout');
+
+
+occprob = occupancy2./nansum(occupancy2);
+
+
+%occprob = occupancy./nansum(occupancy);
+
+
 
 
 
