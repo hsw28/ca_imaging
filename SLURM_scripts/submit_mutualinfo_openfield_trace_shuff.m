@@ -23,8 +23,6 @@ c.AdditionalProperties.Nodes = 1;
 % Specify e-mail address to receive notifications about your job
 c.AdditionalProperties.EmailAddress = 'hsw@northwestern.edu';
 
-% The script that you want to run through SLURM needs to be in the MATLAB PATH
-% Here we assume that quest_parallel_example.m lives in the same folder as submit_matlab_job.m
 
 % Finally we will submit the MATLAB script quest_parallel_example to SLURM such that MATLAB
 % will request enough resources to run a parallel pool of size 4 (i.e. parallelize over 4 CPUs).,
@@ -32,4 +30,4 @@ addpath(pwd)
 addpath(genpath('/home/hsw967/Programming/ca_imaging'))
 addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/'));
 addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/include'));
-job = c.batch('mutualinfo_openfield_shuff_4SLURM', 'Pool', 52, 'CurrentFolder', '.');
+job = c.batch('mutualinfo_openfield_trace_shuff_4SLURM', 'Pool', 52, 'CurrentFolder', '.');

@@ -1,5 +1,4 @@
 function mutualinfo_openfield_trace_shuff_4SLURM
-  maxNumCompThreads(str2num(getenv('SLURM_NPROCS')));
 
 addpath(pwd);
 addpath(genpath('/home/hsw967/Programming/ca_imaging'));

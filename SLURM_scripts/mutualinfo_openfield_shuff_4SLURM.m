@@ -1,5 +1,4 @@
 function mutualinfo_openfield_shuff_4SLURM
-  maxNumCompThreads(str2num(getenv('SLURM_NPROCS')));
 
 
     addpath(pwd);
@@ -9,23 +8,6 @@ function mutualinfo_openfield_shuff_4SLURM
 
 
 
-
-    % open the parallel pool, recording the time it takes
-  %  p = parcluster('local');
-  %  tic;
-  %  parpool(p, 52); % open the pool using 28 workers
-  %  fprintf('Opening the parallel pool took %g seconds.\n', toc)
-
-
-
-%parpool(4)
-    c = parcluster;
-    c.AdditionalProperties.WallTime = '03:00:00';
-    c.AdditionalProperties.AccountName = 'p32072';
-    c.AdditionalProperties.QueueName = 'short';
-    c.parpool(4)
-    tic;
-    fprintf('Opening the parallel pool took %g seconds.\n', toc)
 
 
 %file allvariables.mat should contain
