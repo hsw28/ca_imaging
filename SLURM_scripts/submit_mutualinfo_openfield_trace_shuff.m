@@ -25,7 +25,7 @@ c.AdditionalProperties.EmailAddress = 'hsw@northwestern.edu';
 
 
 % Finally we will submit the MATLAB script quest_parallel_example to SLURM such that MATLAB
-% will request enough resources to run a parallel pool of size 4 (i.e. parallelize over 4 CPUs).,
+% will request enough resources to run a parallel pool of size 52 (i.e. parallelize over 52 CPUs).,
 addpath(pwd)
 addpath(genpath('/home/hsw967/Programming/ca_imaging'))
 addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/'));
