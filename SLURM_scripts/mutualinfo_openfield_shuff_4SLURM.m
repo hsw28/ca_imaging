@@ -5,6 +5,8 @@ function mutualinfo_openfield_shuff_4SLURM
     addpath(pwd);
     addpath(genpath('/home/hsw967/Programming/ca_imaging'));
     addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/'));
+    addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/include'));
+
 
 
 
