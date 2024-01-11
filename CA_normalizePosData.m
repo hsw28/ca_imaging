@@ -98,7 +98,7 @@ events = (events);
 events = nanconv(events,imageFilter, 'edge', 'nanout');
 
 occupancy = (time*tstep);
-occupancy2 = occupanc  y;
+occupancy2 = occupancy;
 occupancy2(occupancy == 0)= NaN;
 occupancy2 = nanconv(occupancy2,imageFilter, 'edge', 'nanout');
 

@@ -20,10 +20,12 @@ end
 
 
 for i = 1:numel(fields_spikes)
-      fieldName_spikes = fields_spikes{i};
+
+      fieldName_spikes = fields_spikes{i}
       fieldValue_spikes = spike_structure.(fieldName_spikes);
       peaks_time = fieldValue_spikes;
-    %  if length(peaks_time)>1
+        if length(peaks_time)>1
+
 
       fieldName_cats = fields_cats{i};
       curr_CA_timestamps = CA_timestamps.(fieldName_cats);
@@ -36,11 +38,16 @@ for i = 1:numel(fields_spikes)
       pos = fieldValue_pos;
 
       index = strfind(fieldName_spikes, '_');
-      pos_date = fieldName_spikes(index(2)+1:end)
+      pos_date = fieldName_spikes(index(2)+1:end);
 
       mutinfo = NaN(size(peaks_time,1),1);
 
-
+%length(peaks_time)
+%length(curr_CA_timestamps)
+%length(pos)
+%(peaks_time(2:10))
+%curr_CA_timestamps(1:10)
+%(pos(1:10,1))
       if length(pos)./length(peaks_time) > 1.3
         pos = convertpostoframe(pos, curr_CA_timestamps);
       end
@@ -95,12 +102,6 @@ for i = 1:numel(fields_spikes)
           set(0,'DefaultFigureVisible', 'off');
             if length(highspeedspikes)>0
               [trace_mean occprob] = CA_normalizePosData_trace(highspeedspikes, goodpos, dim, 1.000);
-                  if k==1
-                    trace_mean
-
-                    occprob
-
-                  end
               mutinfo(k) = mutualinfo([trace_mean', occprob']);
             else
               mutinfo(k) = NaN;
@@ -110,6 +111,9 @@ for i = 1:numel(fields_spikes)
 
 
 mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
+else
+  mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+end
 
 end
 

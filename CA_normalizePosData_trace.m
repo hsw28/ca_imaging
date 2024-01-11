@@ -78,8 +78,6 @@ occupancy = (time*tstep);
 occupancy2 = occupancy;
 occupancy2(occupancy == 0) = NaN;
 occupancy2 = nanconv(occupancy2,imageFilter, 'edge', 'nanout');
-
-
 occprob = occupancy2./nansum(occupancy2);
 
 

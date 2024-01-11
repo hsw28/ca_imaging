@@ -36,11 +36,13 @@ addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/'))
   %MI_trace
   %peaks
   %pos
-  %ca_ts
+  %Ca_ts
 
 allvariables = load('allvariables.mat');
-pos_structure = allvariables.pos;
 calcium_traces = allvariables.all_traces;
+
+allvariables = load('pos.mat');
+pos_structure = pos.pos;
 
 MI_trace = load('MI_trace.mat');
 ca_MI = MI_trace.MI_trace;
