@@ -111,3 +111,4 @@ for i = 1:numel(fields_spikes)
 
 
 f = mutualinfo_struct;
+end
