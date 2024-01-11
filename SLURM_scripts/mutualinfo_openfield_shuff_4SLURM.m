@@ -6,12 +6,25 @@ function mutualinfo_openfield_shuff_4SLURM
     addpath(genpath('/home/hsw967/Programming/ca_imaging'));
     addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/'));
 
-c = parcluster;
-c.AdditionalProperties.WallTime = '03:00:00';
-c.AdditionalProperties.AccountName = 'p32072';
-c.AdditionalProperties.QueueName = 'short';
 
-%  pool = c.parpool(8);
+
+    % open the parallel pool, recording the time it takes
+  %  p = parcluster('local');
+  %  tic;
+  %  parpool(p, 52); % open the pool using 28 workers
+  %  fprintf('Opening the parallel pool took %g seconds.\n', toc)
+
+
+
+
+    c = parcluster;
+    c.AdditionalProperties.WallTime = '03:00:00';
+    c.AdditionalProperties.AccountName = 'p32072';
+    c.AdditionalProperties.QueueName = 'short';
+    tic;
+    parpool(c, 52); % open the pool using 28 workers
+    fprintf('Opening the parallel pool took %g seconds.\n', toc)
+
 
 %file allvariables.mat should contain
   %all_traces
@@ -22,7 +35,7 @@ c.AdditionalProperties.QueueName = 'short';
 pos = load('pos.mat');
 pos_structure = pos.pos;
 
-peaks = load('pos.mat');
+peaks = load('peaks.mat');
 spikes = peaks.peaks;
 
 MI = load('MI.mat');
