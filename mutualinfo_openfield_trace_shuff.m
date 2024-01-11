@@ -146,9 +146,9 @@ for i = 1:numel(fields_spikes)
 
     mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
   end % ending if numunits<=1
+end % ending   if length(peaks_time)>1
 
-
-end
+end % ending for i = 1:numel(fields_spikes)
 
 
 f = mutualinfo_struct;
