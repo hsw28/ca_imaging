@@ -2,7 +2,7 @@
 #SBATCH --account=p32072 ## YOUR ACCOUNT pXXXX or bXXXX
 #SBATCH --partition=short
 #SBATCH --nodes=1 ## Never need to change this
-#SBATCH --ntasks-per-node=4 ## only change for parfor?
+#SBATCH --ntasks=4 ## only change for parfor?
 #SBATCH --cpus-per-task=1
 #SBATCH --time=0:10:00 ## how long does this need to run (remember different partitions have restrictions on this param)
 #SBATCH --mem=16G ## how much RAM do you need per computer (this effects your FairShare score so be careful to not ask for more than you need))
