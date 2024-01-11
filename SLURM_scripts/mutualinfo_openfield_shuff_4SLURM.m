@@ -17,13 +17,13 @@ function mutualinfo_openfield_shuff_4SLURM
 
 
 
-    c = parcluster;
-    c.AdditionalProperties.WallTime = '03:00:00';
-    c.AdditionalProperties.AccountName = 'p32072';
-    c.AdditionalProperties.QueueName = 'short';
-    c.parpool(4)
-    tic;
-    fprintf('Opening the parallel pool took %g seconds.\n', toc)
+%    c = parcluster;
+%    c.AdditionalProperties.WallTime = '03:00:00';
+%    c.AdditionalProperties.AccountName = 'p32072';
+%    c.AdditionalProperties.QueueName = 'short';
+%    c.parpool(4)
+%    tic;
+%    fprintf('Opening the parallel pool took %g seconds.\n', toc)
 
 
 %file allvariables.mat should contain
@@ -41,10 +41,15 @@ spikes = peaks.peaks;
 MI = load('MI.mat');
 ca_MI = MI.MI;
 
-f = mutualinfo_openfield_shuff(spikes, pos_structure, 2, 2.5, 3, ca_MI)
-%f = mutualinfo_openfield_shuff(spikes, pos_structure, 2, 2.5, 500, ca_MI)
+f = mutualinfo_openfield_shuff(spikes, pos_structure, 2, 2.5, 500, ca_MI)
 MI_shuff = f;
-% Save the output to a .mat file
-save('mutualinfo_shuff_output.mat', 'MI_shuff');
+
+% Get the current date and time as a string
+currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
+% Create a filename with the timestamp
+filename = ['mutualinfo_shuff_output_', currentDateTime, '.mat'];
+% Save the output to the .mat file with the timestamped filename
+save(filename, 'MI_shuff');
+
 
 end

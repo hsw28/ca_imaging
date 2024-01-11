@@ -110,7 +110,8 @@ for i = 1:numel(fields_spikes)
                     end
 
                     shuf = NaN(num_times_to_run,1);
-                    parfor l = 1:num_times_to_run
+                    for l = 1:num_times_to_run
+                    %parfor l = 1:num_times_to_run
 
                           if isnan(MI(k))==0 && length(highspeedspikes)>1
 

@@ -1,29 +1,5 @@
-
 function mutualinfo_openfield_trace_shuff_4SLURM
-  cd ('/projects/p32072/data_eyeblink/rat314/slurm_variables')
-  outputFile = fopen('mutualinfo_shuff_output.log', 'w');
-  try
   maxNumCompThreads(str2num(getenv('SLURM_NPROCS')));
-
-  % Refresh MATLAB's toolbox cache
-  rehash toolboxcache;
-
-  % Custom configuration for the cluster (if required)
-  configCluster;
-
-%{
-  c = parcluster;
-  c.AdditionalProperties.AccountName = 'p32072'; % Replace with your actual account name
-  c.AdditionalProperties.WallTime = '24:00:00'; % Set to match the wall time in your SLURM script
-  c.AdditionalProperties.QueueName = 'normal';
-  c.AdditionalProperties.MemUsage = '64gb';
-
-
-  % Set the number of computational threads to the number of allocated CPUs
-  if ~isempty(getenv('SLURM_CPUS_PER_TASK'))
-      maxNumCompThreads(str2num(getenv('SLURM_CPUS_PER_TASK')));
-  end
-%}
 
 addpath(pwd);
 addpath(genpath('/home/hsw967/Programming/ca_imaging'));
@@ -41,7 +17,7 @@ addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/'))
 allvariables = load('allvariables.mat');
 calcium_traces = allvariables.all_traces;
 
-allvariables = load('pos.mat');
+pos = load('pos.mat');
 pos_structure = pos.pos;
 
 MI_trace = load('MI_trace.mat');
@@ -54,16 +30,12 @@ f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, 2, 2.5, 500,
 % Save the output to a .mat file
 MI_trace_shuff = f;
 
-try
-    save('./mutualinfo_trace_shuff_output.mat', 'MI_trace_shuff');
-catch e
-    disp('Error occurred while saving the file:');
-    disp(e.message);
-end
 
-fprintf(outputFile, 'Computation completed successfully.\n');
-catch e
-fprintf(outputFile, 'An error occurred: %s\n', e.message);
-end
- fclose(outputFile);
+% Get the current date and time as a string
+currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
+% Create a filename with the timestamp
+filename = ['mutualinfo_trace_shuff_output_', currentDateTime, '.mat'];
+% Save the output to the .mat file with the timestamped filename
+save(filename, 'MI_trace_shuff');
+
 end

@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --account=p32072 ## YOUR ACCOUNT pXXXX or bXXXX
-#SBATCH --partition=short
+#SBATCH --partition=long
 #SBATCH --nodes=1 ## Never need to change this
-#SBATCH --ntasks-per-node=4 ## Never need to change this
+#SBATCH --ntasks-per-node=1 ## only change for parfor?
 #SBATCH --cpus-per-task=1
-#SBATCH --time=03:00:00 ## how long does this need to run (remember different partitions have restrictions on this param)
+#SBATCH --time=48:00:00 ## how long does this need to run (remember different partitions have restrictions on this param)
 #SBATCH --mem=64G ## how much RAM do you need per computer (this effects your FairShare score so be careful to not ask for more than you need))
 #SBATCH --job-name="shuff_\${SLURM_ARRAY_TASK_ID}" ## use the task id in the name of the job
 #SBATCH --output=openfield_shuff.%A_%a.out ## use the jobid (A) and the specific job index (a) to name your log file
