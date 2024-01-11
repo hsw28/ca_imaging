@@ -1,25 +1,15 @@
 function mutualinfo_openfield_shuff_4SLURM
-
-
-  %maxNumCompThreads(str2num(getenv('SLURM_NPROCS'))); %%%%%trying without this
-
+  maxNumCompThreads(str2num(getenv('SLURM_NPROCS')));
 
 
     addpath(pwd);
     addpath(genpath('/home/hsw967/Programming/ca_imaging'));
     addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/'));
 
-
-
-    % open the parallel pool, recording the time it takes
-    p = parcluster('local');
-    tic;
-    parpool(p, 52); % open the pool using 28 workers
-    fprintf('Opening the parallel pool took %g seconds.\n', toc)
-
-
-
-
+c = parcluster;
+c.AdditionalProperties.WallTime = '03:00:00';
+c.AdditionalProperties.AccountName = 'p32072';
+c.AdditionalProperties.QueueName = 'short';
 
 %  pool = c.parpool(8);
 
@@ -44,5 +34,4 @@ MI_shuff = f;
 % Save the output to a .mat file
 save('mutualinfo_shuff_output.mat', 'MI_shuff');
 
-delete(gcp); % close the parallel pool
 end
