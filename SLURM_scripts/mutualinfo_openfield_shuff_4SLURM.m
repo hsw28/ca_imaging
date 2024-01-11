@@ -22,7 +22,7 @@ function mutualinfo_openfield_shuff_4SLURM
     c.AdditionalProperties.AccountName = 'p32072';
     c.AdditionalProperties.QueueName = 'short';
     tic;
-    parpool(c, 52); % open the pool using 28 workers
+    parpool(c, 4); % open the pool using 28 workers
     fprintf('Opening the parallel pool took %g seconds.\n', toc)
 
 
