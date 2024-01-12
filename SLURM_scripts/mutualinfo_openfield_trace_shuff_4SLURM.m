@@ -18,6 +18,7 @@ addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/include'))
 fprintf('loading traces')
 allvariables = load('allvariables.mat');
 calcium_traces = allvariables.all_traces;
+clearvars allvariables
 
 fprintf('loading pos')
 pos = load('pos.mat');
@@ -27,7 +28,7 @@ fprintf('loading MI')
 MI_trace = load('MI_trace.mat');
 ca_MI = MI_trace.MI_trace;
 
-fprintf('loading timestamps')  
+fprintf('loading timestamps')
 Ca_ts = load('Ca_ts.mat')
 ca_ts = Ca_ts.Ca_ts;
 
