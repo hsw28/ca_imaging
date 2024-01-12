@@ -43,7 +43,7 @@ for i = 1:numel(fields_spikes)
       maxtime = vel(2,end);
 
       numunits = size(peaks_time,1);
-      mutinfo = NaN(2,numunits);
+      mutinfo = NaN(3,numunits);
 
       fieldName_MI = fields_MI{i};
       fieldValue_MI = pos_structure.(fieldName_MI);
@@ -102,6 +102,16 @@ for i = 1:numel(fields_spikes)
                     else
                       mutinfo(2, k) = NaN;
                     end
+
+                  [c index] = (min(abs(MI(k)-shuf)));
+                  if isnan(index)==0
+                    rank = index./length(shuf)
+                    mutinfo(3, k) = rank;
+                  else
+                    mutinfo(3,k) = NaN;
+                  end
+
+
 
               end
 

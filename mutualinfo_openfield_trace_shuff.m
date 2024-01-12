@@ -91,7 +91,7 @@ for i = 1:numel(fields_spikes)
       all_highspeedspikes = peaks_time(:,validHighVelIndices);
 
       numunits = size(peaks_time,1);
-      mutinfo = NaN(2,numunits);
+      mutinfo = NaN(3,numunits);
 
 
       if numunits<=1
@@ -139,6 +139,14 @@ for i = 1:numel(fields_spikes)
                         mutinfo(2, k) = shuf(topMI1);
                       else
                         mutinfo(2, k) = NaN;
+                      end
+
+                      [c index] = (min(abs(MI(k)-shuf)));
+                      if isnan(index)==0
+                        rank = index./length(shuf)
+                        mutinfo(3, k) = rank;
+                      else
+                        mutinfo(3,k) = NaN;
                       end
 
                   end %ending the for loop for units
