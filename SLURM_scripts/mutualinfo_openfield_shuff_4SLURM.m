@@ -16,6 +16,8 @@ function mutualinfo_openfield_shuff_4SLURM
   %MI_trace
   %peaks
   %pos
+
+
 pos = load('pos.mat');
 pos_structure = pos.pos;
 
