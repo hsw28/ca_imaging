@@ -1,5 +1,6 @@
-function f = mutualinfo_CSUS(spike_structure, CSUS_structure, times_that_align_with_CS_US, do_you_want_CSUS_or_CSUSnone, how_many_divisions)
+function f = mutualinfo_CSUS(spike_structure, CSUS_structure, do_you_want_CSUS_or_CSUSnone, how_many_divisions)
 %finds 'mutual info' for CS/US/ non CS/US
+%CSUS_structure should come from BULKconverttoframe.m
 %do_you_want_CSUS_or_CSUSnone: 1 for only cs us, 0 for cs us none
 %how many divisions you wanted-- for ex,
     % do_you_want_CSUS_or_CSUSnone = 1
@@ -11,7 +12,6 @@ function f = mutualinfo_CSUS(spike_structure, CSUS_structure, times_that_align_w
 divisions = how_many_divisions;
 fields_spikes = fieldnames(spike_structure);
 fields_CSUS = fieldnames(CSUS_structure);
-fields_align = fieldnames(times_that_align_with_CS_US);
 
 if numel(fields_spikes) ~= numel(fields_CSUS)
   error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
@@ -24,7 +24,7 @@ for i = 1:numel(fields_spikes)
       peaks_time = fieldValue_spikes;
 
       index = strfind(fieldName_spikes, '_');
-      spikes_date = fieldName_spikes(index(2)+1:end)
+      spikes_date = fieldName_spikes(index(2)+1:end);
 
       fieldName_CSUS = fields_CSUS{i};
       fieldValue_CSUS = CSUS_structure.(fieldName_CSUS);
@@ -33,19 +33,20 @@ for i = 1:numel(fields_spikes)
       index = strfind(fieldName_spikes, '_');
       CSUS_date = fieldName_spikes(index(2)+1:end)
 
-      fiendname_TS = fields_align{i};
-      time = times_that_align_with_CS_US.(fiendname_TS);
-
       mutinfo = NaN(size(peaks_time,1),1);
 
       numunits = size(peaks_time,1);
+
+      time = CSUS(2,:);
+      CSUS = CSUS(1,:);
 
       occ_in_CS_US = zeros(1,10);
       occ_intertrial = zeros(1,1);
       if do_you_want_CSUS_or_CSUSnone==1
         numbering = 10./divisions;
         previousz = 0;
-        for z=0:numbering:divisions
+        for z=0:numbering:10 %%%%%%fix
+
             if z==0
               occ_intertrial = length(find(CSUS ==0));
             else
@@ -70,13 +71,15 @@ for i = 1:numel(fields_spikes)
           warning('you have no spikes')
       else
           wanted = find(CSUS > 0);
+          for k=1:size(peaks_time,1)
+
           currspikes = peaks_time(k,:);
 
           set(0,'DefaultFigureVisible', 'off');
           spikes_in_CS_US = zeros(1,10);
           spikes_intertrial = zeros(1,1);
             if length(currspikes)>0  %finding how many spikes in each time bin
-                for q =1:10
+                for q =1:length(currspikes)
                   [c index] = (min(abs(currspikes(q)-time))); %
                   spikebin = CSUS(index);
                       if spikebin == 0
@@ -91,6 +94,7 @@ for i = 1:numel(fields_spikes)
             else
               mutinfo(k) = NaN;
             end
+          end
       end
 
       mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
