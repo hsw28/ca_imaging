@@ -95,13 +95,12 @@ for i = 1:numel(fields_spikes)
 
 
       if numunits<=1
-        mutinfo = NaN;
         warning('you have no cells and no spikes')
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
       else
           for k=1:numunits
                     currspikes = peaks_time(k,:);
-                    if isnan(MI)==1
+                    if isnan(MI(k))==1
                       mutinfo(1, k) = NaN;
                       mutinfo(2, k) = NaN;
                       continue
@@ -143,7 +142,7 @@ for i = 1:numel(fields_spikes)
 
                       [c index] = (min(abs(MI(k)-shuf)));
                       if isnan(index)==0
-                        rank = index./length(shuf)
+                        rank = index./length(shuf);
                         mutinfo(3, k) = rank;
                       else
                         mutinfo(3,k) = NaN;
