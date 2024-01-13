@@ -64,10 +64,10 @@ for i = 1:numel(fields_spikes)
                   highspeedspikes = [];
                 end
 
-                for i=1:length(currspikes) %finding if in good vel
-                    [minValue,closestIndex] = min(abs(currspikes(i)-goodtime));
+                for ii=1:length(currspikes) %finding if in good vel
+                    [minValue,closestIndex] = min(abs(currspikes(ii)-goodtime));
                     if minValue <= 1 %if spike is within 1 second of moving. no idea if good time
-                      highspeedspikes(end+1) = currspikes(i);
+                      highspeedspikes(end+1) = currspikes(ii);
                     end
                 end
 
@@ -127,7 +127,6 @@ MI_shuff = mutualinfo_struct;
 % Get the current date and time as a string
 currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
 % Create a filename with the timestamp
-filename = ['MI_shuff', currentDateTime, '.mat'];
 % Save the output to the .mat file with the timestamped filename
 save(filename, 'MI_shuff');
 

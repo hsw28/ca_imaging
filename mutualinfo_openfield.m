@@ -55,11 +55,11 @@ for k=1:numunits
   [c indexmax] = (min(abs(peaks_time(k,:)-maxtime))); %
   currspikes = peaks_time(k,indexmin:indexmax);
 
-  for i=1:length(currspikes) %finding if in good vel
-    [minValue,closestIndex] = min(abs(currspikes(i)-goodtime));
+  for ii=1:length(currspikes) %finding if in good vel
+    [minValue,closestIndex] = min(abs(currspikes(ii)-goodtime));
 
     if minValue <= 1 %if spike is within 1 second of moving. no idea if good time
-      highspeedspikes(end+1) = currspikes(i);
+      highspeedspikes(end+1) = currspikes(ii);
     end;
   end
 

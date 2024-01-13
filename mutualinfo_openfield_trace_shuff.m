@@ -79,8 +79,8 @@ for i = 1:numel(fields_spikes)
       lowVelIndices = find(velocities < velThreshold);
       % Filter out high velocity indices that are too close to low velocities
       validHighVelIndices = [];
-      for i = 1:length(highVelIndices)
-          highVelTime = times(highVelIndices(i));
+      for ii = 1:length(highVelIndices)
+          highVelTime = times(highVelIndices(ii));
           % Find the closest low velocity time
           [~, closestLowVelIndex] = min(abs(highVelTime - times(lowVelIndices)));
           closestLowVelTime = times(lowVelIndices(closestLowVelIndex));

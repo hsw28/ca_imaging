@@ -29,9 +29,9 @@ c.AdditionalProperties.EmailAddress = 'hsw@northwestern.edu';
 
 % Finally we will submit the MATLAB script quest_parallel_example to SLURM such that MATLAB
 % will request enough resources to run a parallel pool of size 52 (i.e. parallelize over 52 CPUs).,
-addpath(pwd)
-addpath(genpath('/home/hsw967/Programming/ca_imaging'))
+addpath(pwd);
+addpath(genpath('/home/hsw967/Programming/ca_imaging'));
 addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/'));
 addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/include'));
-fprintf('starting the job')
+fprintf('starting the job');
 job = c.batch('mutualinfo_openfield_shuff_4SLURM', 'Pool', 4, 'CurrentFolder', '.');
