@@ -89,36 +89,20 @@ if structure_size_gb > 4
     % Save the output to a .mat file
     MI_trace_shuff = f1;
 
-    % Get the current date and time as a string
-    currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
-    % Create a filename with the timestamp
-    filename = ['mutualinfo_trace_shuff_output1_', currentDateTime, '.mat'];
-    % Save the output to the .mat file with the timestamped filename
-    save(filename, 'MI_trace_shuff1');
 
 
     f2 = mutualinfo_openfield_trace_shuff(calcium_traces1, pos_structure1, 2, 2.5, 500, ca_MI1, ca_ts1);
     % Save the output to a .mat file
     MI_trace_shuff = f2;
 
-    % Get the current date and time as a string
-    currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
-    % Create a filename with the timestamp
-    filename = ['mutualinfo_trace_shuff_output2_', currentDateTime, '.mat'];
-    % Save the output to the .mat file with the timestamped filename
-    save(filename, 'MI_trace_shuff');
+
   else
 
     f1 = mutualinfo_openfield_trace_shuff(calcium_traces1, pos_structure1, 2, 2.5, 500, ca_MI1, ca_ts1);
     % Save the output to a .mat file
     MI_trace_shuff = f1;
 
-    % Get the current date and time as a string
-    currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
-    % Create a filename with the timestamp
-    filename = ['mutualinfo_trace_shuff_output_', currentDateTime, '.mat'];
-    % Save the output to the .mat file with the timestamped filename
-    save(filename, 'MI_trace_shuff');
+
 end
 
 

@@ -33,14 +33,7 @@ clearvars allvariables
 
 f = mutualinfo_CSUS_shuff(calcium_traces, CSUS_id, 1, 2, 500, ca_MI)
 
-MI_shuff = f;
 
-% Get the current date and time as a string
-currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
-% Create a filename with the timestamp
-filename = ['mutualinfo_shuff_output_', currentDateTime, '.mat'];
-% Save the output to the .mat file with the timestamped filename
-save(filename, 'MI_shuff');
 
 
 end
