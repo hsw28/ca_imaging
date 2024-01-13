@@ -119,16 +119,14 @@ for i = 1:numel(fields_spikes)
     end
   end
 
+  MI_shuff = mutualinfo_struct;
 
+  % Get the current date and time as a string
+  currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
+  % Create a filename with the timestamp
+  % Save the output to the .mat file with the timestamped filename
+  save(filename, 'MI_shuff');
+
+
+  f = mutualinfo_struct;
 end
-
-MI_shuff = mutualinfo_struct;
-
-% Get the current date and time as a string
-currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
-% Create a filename with the timestamp
-% Save the output to the .mat file with the timestamped filename
-save(filename, 'MI_shuff');
-
-
-f = mutualinfo_struct;
