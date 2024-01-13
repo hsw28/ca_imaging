@@ -87,7 +87,7 @@ for i = 1:numel(fields_spikes)
                       else
                         spikes_in_CS_US(spikebin) = spikes_in_CS_US(spikebin)+1;
                       end
-                    end
+                  end
               occprob = occ_in_CS_US.*(1/7.5);
               spikeprob =  spikes_in_CS_US;
               mutinfo(k) = mutualinfo([spikeprob', occprob']); %is this oriented the right way

@@ -37,8 +37,6 @@ for i = 1:numel(fields_spikes)
       index = strfind(fieldName_spikes, '_');
       CSUS_date = fieldName_spikes(index(2)+1:end)
 
-      mutinfo = NaN(size(peaks_time,1),1);
-
       numunits = size(peaks_time,1);
 
       time = CSUS(2,:);
@@ -71,9 +69,9 @@ for i = 1:numel(fields_spikes)
       end
 
       mutinfo = NaN(3,numunits);
-      if numunits<=1
+      if numunits<=1 | length(unique(CSUS))<3
           mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
-          warning('you have no cells and no spikes')
+          warning('you have no cells or no spikes or no CS/US')
       else
           for k=1:size(peaks_time,1)
               currspikes = peaks_time(k,:);
@@ -83,18 +81,21 @@ for i = 1:numel(fields_spikes)
                   mutinfo(3, k) = NaN;
                   continue
               end
-              wanted = find(CSUS > 0);
-              spikes_in_CS_US = zeros(1,10);
-              spikes_intertrial = zeros(1,1);
+
+
               set(0,'DefaultFigureVisible', 'off');
               shuf = NaN(num_times_to_run,1);
-              for l = 1:num_times_to_run
-                shufff = wanted(randperm(length(wanted)));
-                CSUS(wanted) = CSUS(shufff);
-                    if length(currspikes)>0  %finding how many spikes in each time bin
+              if length(currspikes)>0  %finding how many spikes in each time bin
+                parfor l = 1:num_times_to_run
+                  spikes_in_CS_US = zeros(1,10);
+                  spikes_intertrial = zeros(1,1);
+                    wanted = find(CSUS > 0);
+                    shuffCSUS = CSUS;
+                    shufff = wanted(randperm(length(wanted)));
+                    shuffCSUS(wanted) = CSUS(shufff);
                                 for q =1:length(currspikes)
                                 [c index] = (min(abs(currspikes(q)-time))); %
-                                spikebin = CSUS(index);
+                                spikebin = shuffCSUS(index);
                                                   if spikebin == 0
                                                     spikes_intertrial = spikes_intertrial+1;
                                                   else
@@ -104,32 +105,38 @@ for i = 1:numel(fields_spikes)
                           occprob = occ_in_CS_US.*(1/7.5);
                           spikeprob =  spikes_in_CS_US;
                           shuf(l) = mutualinfo([spikeprob', occprob']); %is this oriented the right way
-                      else
-                          shuf(l) = NaN;
                       end
-                end % l = 1:num_times_to_run
 
-                topMI5 = floor(num_times_to_run*.95);
-                topMI1 = floor(num_times_to_run*.99);
-                shuf = sort(shuf);
-                if isnan(topMI5)==0
-                  mutinfo(1, k) = shuf(topMI5);
-                else
-                  mutinfo(1, k) = NaN;
-                end
-                if isnan(topMI1)==0
-                  mutinfo(2, k) = shuf(topMI1);
-                else
-                  mutinfo(2, k) = NaN;
-                end
+                      topMI5 = floor(num_times_to_run*.95);
+                      topMI1 = floor(num_times_to_run*.99);
+                      shuf = sort(shuf);
+                      if isnan(topMI5)==0
+                        mutinfo(1, k) = shuf(topMI5);
+                      else
+                        mutinfo(1, k) = NaN;
+                      end
+                      if isnan(topMI1)==0
+                        mutinfo(2, k) = shuf(topMI1);
+                      else
+                        mutinfo(2, k) = NaN;
+                      end
 
-                [c index] = (min(abs(MI(k)-shuf)));
-                if isnan(index)==0
-                  rank = index./length(shuf);
-                  mutinfo(3, k) = rank;
-                else
-                  mutinfo(3,k) = NaN;
-                end
+                      [c index] = (min(abs(MI(k)-shuf)));
+                      if isnan(index)==0
+                        rank = index./length(shuf);
+                        mutinfo(3, k) = rank;
+                      else
+                        mutinfo(3,k) = NaN;
+                      end
+
+                  else
+                          mutinfo(1,k) = NaN;
+                          mutinfo(2,k) = NaN;
+                          mutinfo(3,k) = NaN;
+                  end
+
+
+
 
             end %for k=1:size(peaks_time,1)
         end %if numunits<=1

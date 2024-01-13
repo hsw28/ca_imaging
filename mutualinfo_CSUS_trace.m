@@ -36,7 +36,6 @@ for i = 1:numel(fields_spikes)
 
       mutinfo = NaN(size(peaks_time,1),1);
 
-      numunits = size(peaks_time,1);
 
       time = CSUS(2,:);
       CSUS = CSUS(1,:);
@@ -46,7 +45,7 @@ for i = 1:numel(fields_spikes)
       if do_you_want_CSUS_or_CSUSnone==1
         numbering = 10./divisions;
         previousz = 0;
-        for z=0:numbering:10 %%%%%%fix
+        for z=0:numbering:10
 
             if z==0
               occ_intertrial = length(find(CSUS ==0));
@@ -59,7 +58,6 @@ for i = 1:numel(fields_spikes)
               previousz = z;
             end
           end
-
       elseif do_you_want_CSUS_or_CSUSnone==0
           error(' have not written this code yet') %%%%%%%%%%%%%%%%%%%%%%%%
           %should be easy to impliment, already tagging all those times with 0s and counting them
@@ -67,35 +65,40 @@ for i = 1:numel(fields_spikes)
           %probably want the latter so need to tag them, prob want to do that outside this code
       end
 
-      if numunits<=1
+
+      if length(peaks_time)<3 | length(unique(CSUS))<3
           mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
           warning('you have no spikes')
       else
-          wanted = find(CSUS > 0);
+        for k=1:size(peaks_time,1)
           currspikes = peaks_time(k,:);
 
-          if length(currspikes)>0  %finding how many spikes in each time bin
-            occ_in_CS_US = Nan(length(unique(CSUS))-1,1);
-            spikes_in_CS_US = NaN(length(unique(CSUS))-1,1);
-            for q=0:numbering:10
-                  if q == 0 %%%%%%%%%%ADD THIS LATER
-                    continue
-                  else
-                    wantedtimes = find(CSUS == q);
-                    trace_mean = nanmean(currspikes(wantedtimes));
-                    occ_in_CS_US(q) = length(wantedtimes);
-                    spikes_in_CS_US(q) = trace_mean;
-                  end
-              occprob = occ_in_CS_US.*(1/7.5);
-              spikeprob =  spikes_in_CS_US;
-              mutinfo(k) = mutualinfo([spikeprob', occprob']); %is this oriented the right way
-              end
-            else
-              mutinfo(k) = NaN;
+              if length(currspikes)>0  %finding how many spikes in each time bin
+                occ_in_CS_US = NaN(length(unique(CSUS))-1,1);
+                spikes_in_CS_US = NaN(length(unique(CSUS))-1,1);
+                      for q=0:numbering:10
+
+                            if q == 0 %%%%%%%%%%ADD THIS LATER
+                              index=1;
+                              continue
+                            else
+                              wantedtimes = find(CSUS == q);
+                              wantedtimes = wantedtimes(find(wantedtimes<=length(currspikes)));
+                              trace_mean = nanmean(currspikes(wantedtimes));
+                              occ_in_CS_US(index) = length(wantedtimes);
+                              spikes_in_CS_US(index) = trace_mean;
+                              index = index+1;
+                            end
+                      end
+                      occprob = occ_in_CS_US.*(1/7.5);
+                      spikeprob =  spikes_in_CS_US;
+                      mutinfo(k) = mutualinfo([spikeprob, occprob]); %is this oriented the right way
+                else
+                  mutinfo(k) = NaN;
+                end
+
             end
           end
-      end
-
       mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
       end
 
