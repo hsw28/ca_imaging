@@ -1,4 +1,4 @@
-function mutualinfoCSUS_struct = mutualinfo_CSUS_shuff(spike_structure, CSUS_structure, do_you_want_CSUS_or_CSUSnone, how_many_divisions, num_times_to_run, MI_CSUS)
+function mutualinfo_struct = mutualinfo_CSUS_shuff(spike_structure, CSUS_structure, do_you_want_CSUS_or_CSUSnone, how_many_divisions, num_times_to_run, MI_CSUS)
 %finds 'mutual info' for CS/US/ non CS/US
 %CSUS_structure should come from BULKconverttoframe.m
 %do_you_want_CSUS_or_CSUSnone: 1 for only cs us, 0 for cs us none
