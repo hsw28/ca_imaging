@@ -3,6 +3,11 @@ function f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, vel
 
 
 tic
+cct = (class(calcium_traces) == 'struct')
+if cct(1) == 0
+  allvariables = load('allvariables2.mat');
+  calcium_traces = allvariables.all_traces;
+end
 
 
 spike_structure = calcium_traces;
