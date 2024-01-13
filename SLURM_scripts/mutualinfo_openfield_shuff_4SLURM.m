@@ -17,13 +17,15 @@ function mutualinfo_openfield_shuff_4SLURM
   %peaks
   %pos
 
-
+fprintf('loading pos')
 pos = load('pos.mat');
 pos_structure = pos.pos;
 
+fprintf('loading peaks')
 peaks = load('peaks.mat');
 spikes = peaks.peaks;
 
+fprintf('loading MI')
 MI = load('MI.mat');
 ca_MI = MI.MI;
 
