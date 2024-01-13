@@ -4,7 +4,7 @@ c = parcluster;
 %% Required arguments in order to submit MATLAB job
 
 % Specify the walltime (e.g. 4 hours)
-c.AdditionalProperties.WallTime = '48:00:00';
+c.AdditionalProperties.WallTime = '36:00:00';
 
 % Specify an account to use for MATLAB jobs (e.g. pXXXX, bXXXX, etc)
 c.AdditionalProperties.AccountName = 'p32072';
