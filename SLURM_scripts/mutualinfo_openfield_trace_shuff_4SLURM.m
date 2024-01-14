@@ -37,6 +37,8 @@ ca_ts = Ca_ts.Ca_ts;
 structure_info = whos('calcium_traces');
 structure_size_gb = structure_info.bytes / (1024^3);  % Convert to GB
 % Check if the structure size exceeds 4 GB
+
+%{
 if structure_size_gb > 4
     % Determine the number of fields in the structure
     num_fields = numel(fieldnames(calcium_traces));
@@ -97,13 +99,13 @@ if structure_size_gb > 4
 
 
   else
-
-    f1 = mutualinfo_openfield_trace_shuff(calcium_traces1, pos_structure1, 2, 2.5, 500, ca_MI1, ca_ts1);
+%}
+    f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, 2, 2.5, 500, ca_MI, ca_ts);
     % Save the output to a .mat file
-    MI_trace_shuff = f1;
+    MI_trace_shuff = f;
 
 
-end
+%end
 
 
 
