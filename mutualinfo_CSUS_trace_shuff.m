@@ -148,7 +148,7 @@ for i = 1:numel(fields_spikes)
       % Get the current date and time as a string
       currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
       % Create a filename with the timestamp
-      filename = ['MI_CSUS_trace_shuff_', currentDateTime, '.mat'];
+      filename = ['results_MI_CSUS_trace_shuff_', currentDateTime, '.mat'];
       % Save the output to the .mat file with the timestamped filename
       save(filename, 'MI_CSUS_trace_shuff');
 

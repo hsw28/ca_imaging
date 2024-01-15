@@ -18,8 +18,10 @@ function mutualinfoCSUS_trace_shuff_4SLURM
   %pos
 
 
-peaks = load('peaks.mat');
-spikes = peaks.peaks;
+  fprintf('loading traces')
+  allvariables = load('allvariables.mat');
+  calcium_traces = allvariables.all_traces;
+  clearvars allvariables
 
 MI = load('MI_CSUS.mat');
 ca_MI = MI.MI_CSUS2_trace;
