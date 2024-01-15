@@ -44,12 +44,13 @@ for i = 1:numel(fields_spikes)
 
       occ_in_CS_US = zeros(1,10);
       occ_intertrial = zeros(1,1);
-      if do_you_want_CSUS_or_CSUSnone==1
+      occ_pretrial = zeros(1,1);
+
         numbering = 10./divisions;
         previousz = 0;
-        for z=0:numbering:10 %%%%%%fix
-
+          for z=0:numbering:10
             if z==0
+              occ_pretrial = length(find(CSUS ==-1));
               occ_intertrial = length(find(CSUS ==0));
             else
               wanted1 = find(CSUS > previousz);
@@ -61,12 +62,6 @@ for i = 1:numel(fields_spikes)
             end
           end
 
-      elseif do_you_want_CSUS_or_CSUSnone==0
-          error(' have not written this code yet') %%%%%%%%%%%%%%%%%%%%%%%%
-          %should be easy to impliment, already tagging all those times with 0s and counting them
-          %just need to decide if i want all the times or just a little before cs/us
-          %probably want the latter so need to tag them, prob want to do that outside this code
-      end
 
       mutinfo = NaN(3,numunits);
       if numunits<=1 | length(unique(CSUS))<3
@@ -89,22 +84,44 @@ for i = 1:numel(fields_spikes)
                 parfor l = 1:num_times_to_run
                   spikes_in_CS_US = zeros(1,10);
                   spikes_intertrial = zeros(1,1);
+                  spikes_pretial = zeros(1,1);
+
+                  if do_you_want_CSUS_or_CSUSnone == 1
                     wanted = find(CSUS > 0);
                     shuffCSUS = CSUS;
                     shufff = wanted(randperm(length(wanted)));
                     shuffCSUS(wanted) = CSUS(shufff);
+                  else
+                    wanted = find(CSUS > 0 | CSUS == -1);
+                    shuffCSUS = CSUS;
+                    shufff = wanted(randperm(length(wanted)));
+                    shuffCSUS(wanted) = CSUS(shufff);
+                  end
+
                                 for q =1:length(currspikes)
                                 [c index] = (min(abs(currspikes(q)-time))); %
                                 spikebin = shuffCSUS(index);
-                                                  if spikebin == 0
-                                                    spikes_intertrial = spikes_intertrial+1;
-                                                  else
-                                                    spikes_in_CS_US(spikebin) = spikes_in_CS_US(spikebin)+1;
-                                                  end
+                                        if spikebin == 0
+                                          spikes_intertrial = spikes_intertrial+1;
+                                        elseif spikebin == -1
+                                          spikes_pretial = spikes_pretial+1;
+                                        else
+                                          spikes_in_CS_US(spikebin) = spikes_in_CS_US(spikebin)+1;
+                                        end
                                   end
-                          occprob = occ_in_CS_US.*(1/7.5);
-                          spikeprob =  spikes_in_CS_US;
-                          shuf(l) = mutualinfo([spikeprob', occprob']); %is this oriented the right way
+                              if do_you_want_CSUS_or_CSUSnone == 0
+                                    pretrial_occprob = occ_pretrial*(1/7.5);
+                                    spikes_occprob = occ_in_CS_US.*(1/7.5);
+                                    occprob = [pretrial_occprob, spikes_occprob];
+                                    occprob = occprob./nansum(occprob);
+                                    spikeprob =  [spikes_pretial, spikes_in_CS_US];
+                                    shuf(l) = mutualinfo([spikeprob', occprob']); %is this oriented the right way
+                              else
+                                    occprob = occ_in_CS_US.*(1/7.5);
+                                    occprob = occprob./nansum(occprob);
+                                    spikeprob =  [spikes_pretial];
+                                    shuf(l) = mutualinfo([spikeprob', occprob']); %is this oriented the right way
+                              end
                       end
 
                       topMI5 = floor(num_times_to_run*.95);

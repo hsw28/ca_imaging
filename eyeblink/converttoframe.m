@@ -40,7 +40,7 @@ for k=1:length(US_timestoconvert)
 
     %allframes(US_frame-5:US_frame-1)=10;
     %allframes(US_frame+0:US_frame+4)=20;
-
+    allframes(US_frame-10:US_frame-6)=[-1,-1,-1,-1,-1];
     allframes(US_frame-5:US_frame-1)=[1,2,3,4,5];
     allframes(US_frame+0:US_frame+4)=[6,7,8,9,10];
 

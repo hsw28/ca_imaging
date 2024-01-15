@@ -42,13 +42,14 @@ for i = 1:numel(fields_spikes)
 
       occ_in_CS_US = zeros(1,10);
       occ_intertrial = zeros(1,1);
-      if do_you_want_CSUS_or_CSUSnone==1
+      occ_pretrial = zeros(1,1);
+
         numbering = 10./divisions;
         previousz = 0;
         for z=0:numbering:10
-
-            if z==0
-              occ_intertrial = length(find(CSUS ==0));
+          if z==0
+            occ_pretrial = length(find(CSUS ==-1));
+            occ_intertrial = length(find(CSUS ==0));
             else
               wanted1 = find(CSUS > previousz);
               wanted2 = find(CSUS <= z);
@@ -58,12 +59,6 @@ for i = 1:numel(fields_spikes)
               previousz = z;
             end
           end
-      elseif do_you_want_CSUS_or_CSUSnone==0
-          error(' have not written this code yet') %%%%%%%%%%%%%%%%%%%%%%%%
-          %should be easy to impliment, already tagging all those times with 0s and counting them
-          %just need to decide if i want all the times or just a little before cs/us
-          %probably want the latter so need to tag them, prob want to do that outside this code
-      end
 
 
       if length(peaks_time)<3 | length(unique(CSUS))<3
@@ -73,14 +68,20 @@ for i = 1:numel(fields_spikes)
         for k=1:size(peaks_time,1)
           currspikes = peaks_time(k,:);
 
+
               if length(currspikes)>0  %finding how many spikes in each time bin
                 occ_in_CS_US = NaN(length(unique(CSUS))-1,1);
                 spikes_in_CS_US = NaN(length(unique(CSUS))-1,1);
-                      for q=0:numbering:10
+                spikes_pretrial = zeros(1,1);
+                occ_pretrial = zeros(1,1);
 
+                      for q=0:numbering:10
                             if q == 0 %%%%%%%%%%ADD THIS LATER
+                              wanted = (find(CSUS == -1));
+                              occ_pretrial = length(wanted);
+                              spikes_pretrial = nanmean(currspikes(wanted));
                               index=1;
-                              continue
+
                             else
                               wantedtimes = find(CSUS == q);
                               wantedtimes = wantedtimes(find(wantedtimes<=length(currspikes)));
@@ -90,9 +91,19 @@ for i = 1:numel(fields_spikes)
                               index = index+1;
                             end
                       end
-                      occprob = occ_in_CS_US.*(1/7.5);
-                      spikeprob =  spikes_in_CS_US;
-                      mutinfo(k) = mutualinfo([spikeprob, occprob]); %is this oriented the right way
+                      if do_you_want_CSUS_or_CSUSnone == 0
+                            pretrial_occprob = occ_pretrial*(1/7.5);
+                            spikes_occprob = occ_in_CS_US.*(1/7.5);
+                            occprob = [pretrial_occprob, spikes_occprob'];
+                            occprob = occprob./nansum(occprob);
+                            spikeprob =  [spikes_pretrial, spikes_in_CS_US'];
+                            mutinfo(k) = mutualinfo([spikeprob', occprob']); %is this oriented the right way
+                      else
+                            occprob = occ_in_CS_US.*(1/7.5);
+                            occprob = occprob./nansum(occprob);
+                            spikeprob =  [spikes_pretial];
+                            mutinfo(k) = mutualinfo([spikeprob', occprob']); %is this oriented the right way
+                      end
                 else
                   mutinfo(k) = NaN;
                 end

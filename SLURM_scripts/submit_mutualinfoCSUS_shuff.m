@@ -15,7 +15,7 @@ c.AdditionalProperties.QueueName = 'normal';
 %% optional arguments but worth considering
 
 % Specify memory to use for MATLAB jobs, per core (default: 4gb)
-c.AdditionalProperties.MemUsage = '12gb';
+c.AdditionalProperties.MemUsage = '4gb';
 
 % Specify number of nodes to use
 c.AdditionalProperties.Nodes = 1;

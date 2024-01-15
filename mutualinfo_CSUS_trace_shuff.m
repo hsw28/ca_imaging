@@ -1,7 +1,7 @@
 function f = mutualinfo_CSUS_trace(spike_structure, CSUS_structure, do_you_want_CSUS_or_CSUSnone, how_many_divisions, num_times_to_run, MI_CSUS)
 %finds 'mutual info' for CS/US/ non CS/US
 %CSUS_structure should come from BULKconverttoframe.m
-%do_you_want_CSUS_or_CSUSnone: 1 for only cs us, 0 for cs us none
+%do_you_want_CSUS_or_CSUSnone: 1 for only cs us, 0 for cs us pretrial
 %how many divisions you wanted-- for ex,
     % do_you_want_CSUS_or_CSUSnone = 1
     % how_many_divisions = 2 will just split between cs and us
@@ -44,13 +44,14 @@ for i = 1:numel(fields_spikes)
       CSUS = CSUS(1,:);
 
       occ_in_CS_US = zeros(1,10);
+      occ_pretrial = zeros(1,1);
       occ_intertrial = zeros(1,1);
-      if do_you_want_CSUS_or_CSUSnone==1
+
         numbering = 10./divisions;
         previousz = 0;
         for z=0:numbering:10
-
             if z==0
+              occ_pretrial = length(find(CSUS ==-1));
               occ_intertrial = length(find(CSUS ==0));
             else
               wanted1 = find(CSUS > previousz);
@@ -61,12 +62,7 @@ for i = 1:numel(fields_spikes)
               previousz = z;
             end
           end
-      elseif do_you_want_CSUS_or_CSUSnone==0
-          error(' have not written this code yet') %%%%%%%%%%%%%%%%%%%%%%%%
-          %should be easy to impliment, already tagging all those times with 0s and counting them
-          %just need to decide if i want all the times or just a little before cs/us
-          %probably want the latter so need to tag them, prob want to do that outside this code
-      end
+
 
 
       if length(peaks_time)<3 | length(unique(CSUS))<3
@@ -80,19 +76,31 @@ for i = 1:numel(fields_spikes)
               if length(currspikes)>0 &&  isnan(MI(k))==0 %finding how many spikes in each time bin
                 shuf = NaN(num_times_to_run,1);
                 for d = 1:num_times_to_run
-                          wantedindex = find(CSUS>0);
-                          wanted = currspikes(wantedindex);
-                          shuff = currspikes;
-                          shuff(wantedindex) = wanted(randperm(length(wanted)));
+                          if do_you_want_CSUS_or_CSUSnone == 1
+                            wantedindex = find(CSUS>0);
+                          else
+                            wantedindex = find(CSUS>0 | CSUS == -1);
+                          end
+                            wanted = currspikes(wantedindex);
+                            shuff = currspikes;
+                            shuff(wantedindex) = wanted(randperm(length(wanted)));
+
                           uni = unique(CSUS);
                           occ_in_CS_US = NaN(length(uni)-1,1);
                           spikes_in_CS_US = NaN(length(uni)-1,1);
+
+                          occ_pretrial = zeros(1,1);
+                          spikes_pretrial = NaN(1,1);
+
                           index=1;
                                 for q=0:numbering:10
-                                      if q == 0 %%%%%%%%%%ADD THIS LATER
-                                        continue
-                                      else
+                                      if q == 0
+                                        wanted= (find(CSUS == -1));
+                                        occ_pretrial = length(wanted);
+                                        spikes_pretrial = nanmean(currspikes(wanted));
+                                        index=1;
 
+                                      else
                                         wantedtimes = find(CSUS == q);
                                         wantedtimes = wantedtimes(find(wantedtimes<=length(currspikes)));
                                         trace_mean = nanmean(shuff(wantedtimes));
@@ -102,10 +110,23 @@ for i = 1:numel(fields_spikes)
                                       end
                                 end
 
-                                occprob = occ_in_CS_US.*(1/7.5);
-                                spikeprob =  spikes_in_CS_US;
-                                compMI = mutualinfo([spikeprob, occprob]);
-                                shuf(d) = compMI; %is this oriented the right way
+
+                                if do_you_want_CSUS_or_CSUSnone == 0
+                                      pretrial_occprob = occ_pretrial*(1/7.5);
+                                      spikes_occprob = occ_in_CS_US.*(1/7.5);
+                                      occprob = [pretrial_occprob, spikes_occprob'];
+                                      occprob = occprob./nansum(occprob);
+                                      spikeprob =  [spikes_pretrial, spikes_in_CS_US'];
+                                      shuf(d) = mutualinfo([spikeprob', occprob']); %is this oriented the right way
+                                else
+                                  occprob = occ_in_CS_US.*(1/7.5);
+                                  occprob = occprob./nansum(occprob);
+                                  spikeprob =  spikes_in_CS_US;
+                                  compMI = mutualinfo([spikeprob, occprob]);
+                                  shuf(d) = compMI; %is this oriented the right way
+                                end
+
+
                     end
                     topMI5 = floor(num_times_to_run*.95);;
                     topMI1 = floor(num_times_to_run*.99);
