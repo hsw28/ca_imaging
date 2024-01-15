@@ -11,7 +11,7 @@ c.AdditionalProperties.WallTime = '48:00:00';
 c.AdditionalProperties.AccountName = 'p32072';
 
 % Specify a queue/partition to use for MATLAB jobs (e.g. short, normal, long)
-c.AdditionalProperties.QueueName = 'normal';
+c.AdditionalProperties.QueueName = 'long';
 
 %% optional arguments but worth considering
 
@@ -23,6 +23,9 @@ c.AdditionalProperties.Nodes = 1;
 
 % Specify e-mail address to receive notifications about your job
 c.AdditionalProperties.EmailAddress = 'hsw@northwestern.edu';
+
+% Require exclusive node
+c.AdditionalProperties.RequireExclusiveNode = false;
 
 % The script that you want to run through SLURM needs to be in the MATLAB PATH
 % Here we assume that quest_parallel_example.m lives in the same folder as submit_matlab_job.m
