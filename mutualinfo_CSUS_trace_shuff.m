@@ -43,6 +43,12 @@ for i = 1:numel(fields_spikes)
       time = CSUS(2,:);
       CSUS = CSUS(1,:);
 
+      if size(peaks_time,2)>length(CSUS)
+        peaks_time = peaks_time(:,1:length(CSUS));
+      else
+        CSUS = CSUS(1:size(peaks_time,2));
+      end
+
       occ_in_CS_US = zeros(1,10);
       occ_pretrial = zeros(1,1);
       occ_intertrial = zeros(1,1);
@@ -73,7 +79,7 @@ for i = 1:numel(fields_spikes)
         for k=1:size(peaks_time,1)
           currspikes = peaks_time(k,:);
 
-              if length(currspikes)>0 &&  isnan(MI(k))==0 %finding how many spikes in each time bin
+              if length(currspikes)>0 &&  isnan(MI(k))==0 && length(unique(CSUS)>=3) %finding how many spikes in each time bin
                 shuf = NaN(num_times_to_run,1);
                 for d = 1:num_times_to_run
                           if do_you_want_CSUS_or_CSUSnone == 1

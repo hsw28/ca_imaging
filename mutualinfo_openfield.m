@@ -27,10 +27,17 @@ for i = 1:numel(fields_spikes)
       fieldValue_pos = pos_structure.(fieldName_pos);
       pos = fieldValue_pos;
 
+
       index = strfind(fieldName_spikes, '_');
       pos_date = fieldName_spikes(index(2)+1:end)
 
       mutinfo = NaN(size(peaks_time,1),1);
+
+      tm = pos(:, 1);
+      biggest = max(peaks_time(:));
+      [minValue,closestIndex] = min(abs(biggest-tm));
+      pos = (1:closestIndex, :);
+
 
 velthreshold = 2;
 vel = ca_velocity(pos);
@@ -41,6 +48,7 @@ goodpos = pos(goodvel,:);
 
 mintime = vel(2,1);
 maxtime = vel(2,end);
+tm = vel(2,:);
 
 numunits = size(peaks_time,1);
 
@@ -54,6 +62,9 @@ for k=1:numunits
   [c indexmin] = (min(abs(peaks_time(k,:)-mintime))); %
   [c indexmax] = (min(abs(peaks_time(k,:)-maxtime))); %
   currspikes = peaks_time(k,indexmin:indexmax);
+
+
+
 
   for ii=1:length(currspikes) %finding if in good vel
     [minValue,closestIndex] = min(abs(currspikes(ii)-goodtime));

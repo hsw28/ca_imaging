@@ -64,6 +64,8 @@ for i = 1:numel(fields_spikes)
         pos = pos(1:length(peaks_time),:);
       end
 
+
+
       velthreshold = 2;
       vel = ca_velocity(pos);
       times = vel(2,:);

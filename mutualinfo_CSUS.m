@@ -40,6 +40,16 @@ for i = 1:numel(fields_spikes)
       time = CSUS(2,:);
       CSUS = CSUS(1,:);
 
+      biggest = max(peaks_time(:));
+      [minValue,closestIndex] = min(abs(biggest-CSUS));
+      CSUS = CSUS(1:closestIndex)
+
+      biggest = max(time);
+      [I,J] = find(peaks_time>biggest);
+      peaks_time(I,J) = NaN;
+
+
+
       occ_in_CS_US = zeros(1,10);
       occ_intertrial = zeros(1,1);
       occ_pretrial = zeros(1,1);
@@ -73,8 +83,11 @@ for i = 1:numel(fields_spikes)
           spikes_in_CS_US = zeros(1,10);
           spikes_intertrial = zeros(1,1);
           spikes_pretial = zeros(1,1);
-            if length(currspikes)>0  %finding how many spikes in each time bin
+            if length(currspikes)>0  && length(unique(CSUS)>=3) %finding how many spikes in each time bin
                 for q =1:length(currspikes)
+                  if isnan(currspikes(q))==1
+                    continue
+                  end
                   [c index] = (min(abs(currspikes(q)-time))); %
                   spikebin = CSUS(index);
                       if spikebin == 0
