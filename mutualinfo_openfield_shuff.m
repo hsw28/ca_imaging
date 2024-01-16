@@ -11,10 +11,10 @@ fields_MI = fieldnames(pos_structure);
 fields_cats = fieldnames(CA_timestamps);
 
 if numel(fields_spikes) ~= numel(fields_pos)
-  %error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
+  error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
 end
 
-
+fprintf('starting loop')
 for i = 1:numel(fields_spikes)
       fieldName_spikes = fields_spikes{i};
       fieldValue_spikes = spike_structure.(fieldName_spikes);
@@ -69,11 +69,14 @@ for i = 1:numel(fields_spikes)
       fieldValue_MI = pos_structure.(fieldName_MI);
       MI = fieldValue_MI;
 
+      fprintf('done loading')
+
       if numunits<=1
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
         warning('you have no spikes')
       else
           for k=1:numunits
+                fprintf('going through spikes')
 
                 currspikes = peaks_time(k,:);
                 [c indexmin] = (min(abs(peaks_time(k,:)-mintime))); %
@@ -99,6 +102,7 @@ for i = 1:numel(fields_spikes)
 
                 shuf = NaN(num_times_to_run,1);
                 %for l = 1:num_times_to_run
+                fprintf('starting parfor loop')
                 parfor l = 1:num_times_to_run
                       %fprintf('survived the great parfor loop trauma of jan 10')
                       if isnan(MI(k))==0 && length(highspeedspikes)>1
