@@ -25,7 +25,7 @@ function mutualinfoCSUS_trace_shuff_4SLURM
 
 MI = load('MI_CSUS.mat');
 ca_MI = MI.MI_CSUS2_trace;
-ca_MI = MI.MI_CSUS2_traces_pretrial;
+ca_MI = MI.MI_CSUS2_trace_pretrial;
 
 CSUS_id = load('CSUS_id.mat')
 CSUS_id = CSUS_id.CSUS_id;

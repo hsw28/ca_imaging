@@ -26,8 +26,8 @@ peaks = load('peaks.mat');
 spikes = peaks.peaks;
 
 fprintf('loading MI')
-MI = load('MI.mat');
-ca_MI = MI.MI;
+MI_trace = load('MI_CSUS.mat');
+ca_MI = MI_trace.MI;
 
 fprintf('loading timestamps')
 Ca_ts = load('Ca_ts.mat')
