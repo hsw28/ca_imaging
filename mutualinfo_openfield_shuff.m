@@ -32,7 +32,7 @@ for i = 1:numel(fields_spikes)
       tm = pos(:, 1);
       biggest = max(peaks_time(:));
       [minValue,closestIndex] = min(abs(biggest-tm));
-      pos = (1:closestIndex, :);
+      pos = pos(1:closestIndex, :);
 
       index = strfind(fieldName_spikes, '_');
       pos_date = fieldName_spikes(index(2)+1:end)
@@ -65,7 +65,7 @@ for i = 1:numel(fields_spikes)
                 [c indexmin] = (min(abs(peaks_time(k,:)-mintime))); %
                 [c indexmax] = (min(abs(peaks_time(k,:)-maxtime))); %
                 currspikes = peaks_time(k,indexmin:indexmax);
-                
+
                 if isnan(MI(k))==1
                   mutinfo(1, k) = NaN;
                   mutinfo(2, k) = NaN;

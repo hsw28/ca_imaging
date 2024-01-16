@@ -42,7 +42,8 @@ for i = 1:numel(fields_spikes)
 
       biggest = max(peaks_time(:));
       [minValue,closestIndex] = min(abs(biggest-CSUS));
-      CSUS = CSUS(1:closestIndex)
+      CSUS = CSUS(1:closestIndex);
+      time = time(1:closestIndex);
 
       biggest = max(time);
       [I,J] = find(peaks_time>biggest);

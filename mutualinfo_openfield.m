@@ -29,14 +29,14 @@ for i = 1:numel(fields_spikes)
 
 
       index = strfind(fieldName_spikes, '_');
-      pos_date = fieldName_spikes(index(2)+1:end)
+      pos_date = fieldName_spikes(index(2)+1:end);
 
       mutinfo = NaN(size(peaks_time,1),1);
 
       tm = pos(:, 1);
       biggest = max(peaks_time(:));
       [minValue,closestIndex] = min(abs(biggest-tm));
-      pos = (1:closestIndex, :);
+      pos = pos(1:closestIndex, :);
 
 
 velthreshold = 2;

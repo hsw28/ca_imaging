@@ -53,7 +53,6 @@ for i = 1:numel(fields_spikes)
 
       if length(pos)./length(peaks_time) > 1.3
         pos = convertpostoframe(pos, curr_CA_timestamps);
-        length(pos)
         fprintf('converting')
       end
 
