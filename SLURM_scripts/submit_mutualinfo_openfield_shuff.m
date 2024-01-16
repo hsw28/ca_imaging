@@ -1,6 +1,6 @@
 % Get a handle to the cluster
 c = parcluster;
-fprintf('cluster is opened')
+fprintf('opening cluster')
 
 %% Required arguments in order to submit MATLAB job
 

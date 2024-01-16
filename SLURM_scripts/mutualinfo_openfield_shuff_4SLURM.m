@@ -16,6 +16,7 @@ function mutualinfo_openfield_shuff_4SLURM
   %MI_trace
   %peaks
   %pos
+  %Ca_ts
 
 fprintf('loading pos')
 pos = load('pos.mat');

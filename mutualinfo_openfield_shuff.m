@@ -2,11 +2,9 @@ function f = mutualinfo_openfield_shuff(spike_structure, pos_structure, velthres
 %finds mutual info for a bunch of cells
 %little did I know i already had code for this: ca_mutualinfo_openfield.m
 
-tic
 
 
-
-
+fprintf('starting task')
 fields_spikes = fieldnames(spike_structure);
 fields_pos = fieldnames(pos_structure);
 fields_MI = fieldnames(pos_structure);
