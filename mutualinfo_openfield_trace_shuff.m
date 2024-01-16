@@ -127,7 +127,13 @@ for i = 1:numel(fields_spikes)
 
                             shufff = highspeedspikes(randperm(length(highspeedspikes)))
                             [trace_mean occprob] = CA_normalizePosData_trace(shufff, goodpos, dim, 1.000);
-                            shuf(l) = mutualinfo([trace_mean', occprob']);
+                            if (size(trace_mean,1)) < (size(trace_mean,2))
+                              trace_mean = trace_mean';
+                            end
+                            if (size(occprob,1)) < (size(occprob,2))
+                              occprob = occprob';
+                            end
+                            shuf(l) = mutualinfo([trace_mean, occprob]);
 
                           else
                             shuf(l) = NaN;

@@ -110,12 +110,24 @@ for i = 1:numel(fields_spikes)
                             occprob = [pretrial_occprob, spikes_occprob'];
                             occprob = occprob./nansum(occprob);
                             spikeprob =  [spikes_pretrial, spikes_in_CS_US'];
-                            mutinfo(k) = mutualinfo([spikeprob', occprob']); %is this oriented the right way
+                            if (size(spikeprob,1)) < (size(spikeprob,2))
+                              spikeprob = spikeprob';
+                            end
+                            if (size(occprob,1)) < (size(occprob,2))
+                              occprob = occprob';
+                            end
+                            mutinfo(k) = mutualinfo([spikeprob, occprob]); %is this oriented the right way
                       else
                             occprob = occ_in_CS_US.*(1/7.5);
                             occprob = occprob./nansum(occprob);
                             spikeprob =  [spikes_pretial];
-                            mutinfo(k) = mutualinfo([spikeprob', occprob']); %is this oriented the right way
+                            if (size(spikeprob,1)) < (size(spikeprob,2))
+                              spikeprob = spikeprob';
+                            end
+                            if (size(occprob,1)) < (size(occprob,2))
+                              occprob = occprob';
+                            end
+                            mutinfo(k) = mutualinfo([spikeprob, occprob]); %is this oriented the right way
                       end
                 else
                   mutinfo(k) = NaN;

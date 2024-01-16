@@ -111,7 +111,14 @@ for i = 1:numel(fields_spikes)
 
                         [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(shufff,goodpos,dim, 1.000);
 
-                        shuf(l) = mutualinfo([spikeprob', occprob']);
+                        if (size(spikeprob,1)) < (size(spikeprob,2))
+                          spikeprob = spikeprob';
+                        end
+                        if (size(occprob,1)) < (size(occprob,2))
+                          occprob = occprob';
+                        end
+
+                        shuf(l) = mutualinfo([spikeprob, occprob]);
                       else
                         shuf(l) = NaN;
                       end

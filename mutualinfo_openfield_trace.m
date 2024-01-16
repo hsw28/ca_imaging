@@ -102,7 +102,15 @@ for i = 1:numel(fields_spikes)
           set(0,'DefaultFigureVisible', 'off');
             if length(highspeedspikes)>0
               [trace_mean occprob] = CA_normalizePosData_trace(highspeedspikes, goodpos, dim, 1.000);
-              mutinfo(k) = mutualinfo([trace_mean', occprob']);
+
+                if (size(trace_mean,1)) < (size(trace_mean,2))
+                  trace_mean = trace_mean';
+                end
+                if (size(occprob,1)) < (size(occprob,2))
+                  occprob = occprob';
+                end
+
+              mutinfo(k) = mutualinfo([trace_mean, occprob]);
             else
               mutinfo(k) = NaN;
             end
