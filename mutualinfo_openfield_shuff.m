@@ -13,7 +13,7 @@ fields_MI = fieldnames(pos_structure);
 fields_cats = fieldnames(CA_timestamps);
 
 if numel(fields_spikes) ~= numel(fields_pos)
-  error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
+  %error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
 end
 
 
