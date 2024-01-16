@@ -1,4 +1,4 @@
-function f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, velthreshold, dim, num_times_to_run, ca_MI, CA_timestamps)
+function f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, velthreshold, dim, CA_timestamps, num_times_to_run, ca_MI)
 %finds mutual info for a bunch of cells
 
 
@@ -51,9 +51,8 @@ for i = 1:numel(fields_spikes)
 
 
 
-      if length(pos)./length(peaks_time) > 1.3
+      if (pos(1,1)-pos(end,1))./length(pos) < 1
         pos = convertpostoframe(pos, curr_CA_timestamps);
-        fprintf('converting')
       end
 
 

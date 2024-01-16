@@ -100,7 +100,7 @@ if structure_size_gb > 4
 
   else
 %}
-    f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, 2, 2.5, 500, ca_MI, ca_ts);
+    f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, 2, 2.5, ca_ts, 500, ca_MI);
     % Save the output to a .mat file
     MI_trace_shuff = f;
 

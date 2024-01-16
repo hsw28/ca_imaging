@@ -42,13 +42,8 @@ for i = 1:numel(fields_spikes)
 
       mutinfo = NaN(size(peaks_time,1),1);
 
-%length(peaks_time)
-%length(curr_CA_timestamps)
-%length(pos)
-%(peaks_time(2:10))
-%curr_CA_timestamps(1:10)
-%(pos(1:10,1))
-      if length(pos)./length(peaks_time) > 1.3
+
+      if (pos(1,1)-pos(end,1))./length(pos) < 1
         pos = convertpostoframe(pos, curr_CA_timestamps);
       end
 

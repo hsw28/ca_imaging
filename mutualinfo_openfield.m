@@ -1,4 +1,4 @@
-function f = mutualinfo_openfield(spike_structure, pos_structure, velthreshold, dim)
+function f = mutualinfo_openfield(spike_structure, pos_structure, velthreshold, dim, CA_timestamps)
 %finds mutual info for a bunch of cells
 %little did I know i already had code for this: ca_mutualinfo_openfield.m
 
@@ -9,6 +9,7 @@ tic
 
 fields_spikes = fieldnames(spike_structure);
 fields_pos = fieldnames(pos_structure);
+fields_cats = fieldnames(CA_timestamps);
 
 if numel(fields_spikes) ~= numel(fields_pos)
   error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
@@ -27,6 +28,12 @@ for i = 1:numel(fields_spikes)
       fieldValue_pos = pos_structure.(fieldName_pos);
       pos = fieldValue_pos;
 
+      fieldName_cats = fields_cats{i};
+      curr_CA_timestamps = CA_timestamps.(fieldName_cats);
+
+      if (pos(1,1)-pos(end,1))./length(pos) < 1
+        pos = convertpostoframe(pos, curr_CA_timestamps);
+      end
 
       index = strfind(fieldName_spikes, '_');
       pos_date = fieldName_spikes(index(2)+1:end);

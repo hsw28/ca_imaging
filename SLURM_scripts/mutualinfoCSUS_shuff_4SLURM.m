@@ -27,6 +27,7 @@ ca_MI = MI.MI_CSUS2;
 CSUS_id = load('CSUS_id.mat')
 CSUS_id = CSUS_id.CSUS_id;
 
+
 f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 1, 2, 500, ca_MI)
 
 MI_shuff = f;
