@@ -21,6 +21,7 @@ for i = 1:numel(fields_spikes)
       fieldValue_spikes = spike_structure.(fieldName_spikes);
       peaks_time = fieldValue_spikes;
 
+
       index = strfind(fieldName_spikes, '_');
       spikes_date = fieldName_spikes(index(2)+1:end)
 
@@ -31,12 +32,19 @@ for i = 1:numel(fields_spikes)
       fieldName_cats = fields_cats{i};
       curr_CA_timestamps = CA_timestamps.(fieldName_cats);
 
-      if (pos(1,1)-pos(end,1))./length(pos) < 1
-        pos = convertpostoframe(pos, curr_CA_timestamps);
-      end
+
 
       index = strfind(fieldName_spikes, '_');
       pos_date = fieldName_spikes(index(2)+1:end);
+
+      if length(peaks_time) <5
+        mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+        continue
+      end
+
+      if (pos(1,1)-pos(end,1))./length(pos) < 1
+        pos = convertpostoframe(pos, curr_CA_timestamps);
+      end
 
       mutinfo = NaN(size(peaks_time,1),1);
 
@@ -52,6 +60,7 @@ vel = ca_velocity(pos);
 goodvel = find(vel(1,:)>=velthreshold);
 goodtime = pos(goodvel, 1);
 goodpos = pos(goodvel,:);
+
 
 mintime = vel(2,1);
 maxtime = vel(2,end);

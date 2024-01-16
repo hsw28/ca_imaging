@@ -36,6 +36,11 @@ for i = 1:numel(fields_spikes)
 
       mutinfo = NaN(size(peaks_time,1),1);
 
+      if length(peaks_time) <5
+        mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+        continue
+      end
+
 
       time = CSUS(2,:);
       CSUS = CSUS(1,:);

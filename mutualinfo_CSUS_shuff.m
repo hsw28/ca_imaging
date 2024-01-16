@@ -37,6 +37,11 @@ for i = 1:numel(fields_spikes)
       index = strfind(fieldName_spikes, '_');
       CSUS_date = fieldName_spikes(index(2)+1:end)
 
+      if length(peaks_time) <5
+        mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+        continue
+      end
+
       numunits = size(peaks_time,1);
 
       time = CSUS(2,:);
