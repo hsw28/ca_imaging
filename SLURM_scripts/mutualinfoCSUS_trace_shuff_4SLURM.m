@@ -31,7 +31,7 @@ CSUS = load('CSUS_id.mat')
 CSUS_id = CSUS.CSUS_id;
 
 allvariables = load('allvariables.mat');
-calcium_traces = allvariables.all_traces;
+calcium_traces = allvariables.Ca_traces;
 clearvars allvariables
 
 f = mutualinfo_CSUS_shuff(calcium_traces, CSUS_id, 0, 2, 500, ca_MI)

@@ -10,8 +10,7 @@ fields_spikes = fieldnames(spike_structure);
 fprintf('loading pos')
 fields_pos = fieldnames(pos_structure);
 fprintf('loading MI')
-class(ca_MI)
-fields_MI = fieldnames(ca_MI)
+fields_MI = fieldnames(ca_MI);
 fprintf('loading TS')
 fields_cats = fieldnames(CA_timestamps);
 fprintf('all loaded')
@@ -22,6 +21,11 @@ end
 
 fprintf('starting loop')
 for i = 1:numel(fields_spikes)
+
+      fieldName_MI = fields_MI{i};
+      fieldValue_MI = ca_MI.(fieldName_MI);
+      MI = fieldValue_MI;
+
       fieldName_spikes = fields_spikes{i};
       fieldValue_spikes = spike_structure.(fieldName_spikes);
       peaks_time = fieldValue_spikes;
@@ -71,9 +75,6 @@ for i = 1:numel(fields_spikes)
       numunits = size(peaks_time,1);
       mutinfo = NaN(3,numunits);
 
-      fieldName_MI = fields_MI{i};
-      fieldValue_MI = pos_structure.(fieldName_MI);
-      MI = fieldValue_MI;
 
       fprintf('done loading')
 

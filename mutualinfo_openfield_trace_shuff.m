@@ -2,8 +2,8 @@ function f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, vel
 %finds mutual info for a bunch of cells
 
 
-fprintf('starting function')
-cct = (class(calcium_traces) == 'struct')
+fprintf('starting function');
+cct = (class(calcium_traces) == 'struct');
 if cct(1) == 0
   allvariables = load('allvariables2.mat');
   calcium_traces = allvariables.all_traces;
