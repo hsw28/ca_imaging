@@ -17,7 +17,7 @@ addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/include'))
 
 fprintf('loading traces')
 allvariables = load('allvariables.mat');
-calcium_traces = allvariables.all_traces;
+calcium_traces = allvariables.Ca_traces;
 clearvars allvariables
 
 fprintf('loading pos')

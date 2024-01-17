@@ -5,10 +5,15 @@ function f = mutualinfo_openfield_shuff(spike_structure, pos_structure, velthres
 
 
 fprintf('starting task')
+fprintf('loading spikes')
 fields_spikes = fieldnames(spike_structure);
+fprintf('loading pos')
 fields_pos = fieldnames(pos_structure);
-fields_MI = fieldnames(pos_structure);
+fprintf('loading MI')
+fields_MI = fieldnames(ca_MI);
+fprintf('loading TS')
 fields_cats = fieldnames(CA_timestamps);
+fprintf('all loaded')
 
 if numel(fields_spikes) ~= numel(fields_pos)
   error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')

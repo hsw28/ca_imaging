@@ -68,9 +68,15 @@ for i = 1:numel(fields_US)
                 %allframes(US_frame+0:US_frame+4)=20;
 
                 if US_frame-5>0 && US_frame+4<=length(allframes)
-                  allframes(US_frame-10:US_frame-6)=[-1,-1,-1,-1,-1];
-                  allframes(US_frame-5:US_frame-1)=[1,2,3,4,5];
-                  allframes(US_frame+0:US_frame+4)=[6,7,8,9,10];
+                  if US_frame-10>1
+                    allframes(US_frame-10:US_frame-6)=[-1,-1,-1,-1,-1];
+                    allframes(US_frame-5:US_frame-1)=[1,2,3,4,5];
+                    allframes(US_frame+0:US_frame+4)=[6,7,8,9,10];
+                  else
+                    allframes(1:US_frame-6)=ones(length(allframes(1:US_frame-6)),1);
+                    allframes(US_frame-5:US_frame-1)=[1,2,3,4,5];
+                    allframes(US_frame+0:US_frame+4)=[6,7,8,9,10];
+                  end
                 elseif US_frame-5<=0
                   startpoint = 5+(US_frame-5);
                   allframes(1:startpoint) = [5-startpoint+1:1:5];

@@ -64,6 +64,7 @@ for i = 1:numel(fields_spikes)
       times = vel(2,:);
       velocities = vel(1,:);
 
+      fprintf('got velocities')
       %want highspeedspikes
       % Thresholds
       velThreshold = 2; % cm/s
@@ -90,10 +91,13 @@ for i = 1:numel(fields_spikes)
       goodpos = pos(validHighVelIndices,:);
       all_highspeedspikes = peaks_time(:,validHighVelIndices);
 
+  fprintf('starting units')
       numunits = size(peaks_time,1);
       if numunits<=1
         mutinfo = NaN;
         warning('you have no cells and no spikes')
+        mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+        continue
       else
           for k=1:numunits
           highspeedspikes = all_highspeedspikes(k,:);

@@ -31,6 +31,6 @@ function fixed_US_times = fixUS(starttime_raw_struct, US_times_struct)
 
     US_times_struct.(fieldName_US) = US;
   end
-  fixed_US_times =   US_times_struct;
+  fixed_US_times =  US_times_struct;
   fprintf('USs fixed')
 end

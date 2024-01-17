@@ -20,7 +20,7 @@ function mutualinfoCSUS_trace_shuff_4SLURM
 
   fprintf('loading traces')
   allvariables = load('allvariables.mat');
-  calcium_traces = allvariables.all_traces;
+  calcium_traces = allvariables.Ca_traces;
   clearvars allvariables
 
 MI = load('MI_CSUS.mat');
