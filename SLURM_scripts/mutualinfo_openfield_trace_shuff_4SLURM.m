@@ -25,8 +25,8 @@ pos = load('pos.mat');
 pos_structure = pos.pos;
 
 fprintf('loading MI')
-MI_trace = load('MI_CSUS.mat');
-ca_MI = MI_trace.MI_trace;
+MI = load('MI_CSUS.mat');
+ca_MI = MI.MI_trace;
 
 fprintf('loading timestamps')
 Ca_ts = load('Ca_ts.mat')

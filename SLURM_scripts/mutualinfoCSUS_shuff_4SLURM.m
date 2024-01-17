@@ -25,8 +25,8 @@ MI = load('MI_CSUS.mat');
 ca_MI = MI.MI_CSUS2;
 ca_MI = MI.MI_CSUS2_pretrial;
 
-CSUS_id = load('CSUS_id.mat')
-CSUS_id = CSUS_id.CSUS_id;
+CSUS = load('CSUS_id.mat')
+CSUS_id = CSUS.CSUS_id;
 
 
 
