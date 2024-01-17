@@ -10,7 +10,8 @@ fields_spikes = fieldnames(spike_structure);
 fprintf('loading pos')
 fields_pos = fieldnames(pos_structure);
 fprintf('loading MI')
-fields_MI = fieldnames(ca_MI);
+class(ca_MI)
+fields_MI = fieldnames(ca_MI)
 fprintf('loading TS')
 fields_cats = fieldnames(CA_timestamps);
 fprintf('all loaded')
