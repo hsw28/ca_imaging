@@ -2,7 +2,7 @@ function f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, vel
 %finds mutual info for a bunch of cells
 
 
-tic
+fprintf('starting function')
 cct = (class(calcium_traces) == 'struct')
 if cct(1) == 0
   allvariables = load('allvariables2.mat');
@@ -22,7 +22,7 @@ if numel(fields_spikes) ~= numel(fields_pos)
   warning('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
 end
 
-
+fprintf('going through days')
 for i = 1:numel(fields_spikes)
       fieldName_spikes = fields_spikes{i};
       fieldValue_spikes = spike_structure.(fieldName_spikes);

@@ -9,17 +9,19 @@ function f = mutualinfo_CSUS_trace(spike_structure, CSUS_structure, do_you_want_
 %right now because im lazy how_many_divisions must be a factor of 10
 
 
+fprintf('starting function')
 divisions = how_many_divisions;
 fields_spikes = fieldnames(spike_structure);
 fields_CSUS = fieldnames(CSUS_structure);
 fields_MI = fieldnames(MI_CSUS);
           set(0,'DefaultFigureVisible', 'off');
 
+fprintf('error message')
 if numel(fields_spikes) ~= numel(fields_CSUS)
   error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
 end
 
-
+fprintf('going through days')
 for i = 1:numel(fields_spikes)
       fieldName_spikes = fields_spikes{i};
       fieldValue_spikes = spike_structure.(fieldName_spikes);
@@ -60,6 +62,8 @@ for i = 1:numel(fields_spikes)
 
         numbering = 10./divisions;
         previousz = 0;
+
+        fprintf('assigning IDs')
         for z=0:numbering:10
             if z==0
               occ_pretrial = length(find(CSUS ==-1));
@@ -75,7 +79,7 @@ for i = 1:numel(fields_spikes)
           end
 
 
-
+        fprintf('going through spikes')
       if length(peaks_time)<3 | length(unique(CSUS))<3
           mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
           warning('you have no spikes')
@@ -86,7 +90,8 @@ for i = 1:numel(fields_spikes)
 
               if length(currspikes)>0 &&  isnan(MI(k))==0 && length(unique(CSUS)>=3) %finding how many spikes in each time bin
                 shuf = NaN(num_times_to_run,1);
-                for d = 1:num_times_to_run
+                fprintf('starting parfor')
+                parfor d = 1:num_times_to_run
                           if do_you_want_CSUS_or_CSUSnone == 1
                             wantedindex = find(CSUS>0);
                           else
