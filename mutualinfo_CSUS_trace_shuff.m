@@ -194,6 +194,7 @@ for i = 1:numel(fields_spikes)
 
       end
 
+      fprintf('saving')
       MI_CSUS_trace_shuff = mutualinfo_struct;
       % Get the current date and time as a string
       currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
@@ -204,3 +205,5 @@ for i = 1:numel(fields_spikes)
 
 
       f = MI_CSUS_trace_shuff;
+
+    end

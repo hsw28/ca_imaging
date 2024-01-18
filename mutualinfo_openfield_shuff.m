@@ -4,8 +4,7 @@ function f = mutualinfo_openfield_shuff(spike_structure, pos_structure, velthres
 
 
 
-fprintf('running mutualinfo_openfield_shuff')
-
+fprintf('running mutualinfo_CSUS_trace_shuff')
 fprintf('starting task')
 fprintf('loading spikes')
 fields_spikes = fieldnames(spike_structure);
@@ -172,14 +171,16 @@ for i = 1:numel(fields_spikes)
   end
 
   MI_shuff = mutualinfo_struct;
-
+  fprintf('saving')
   MI_trace_shuff = mutualinfo_struct;
- % Get the current date and time as a string
- currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
- % Create a filename with the timestamp
- filename = ['results_MI_shuff', currentDateTime, '.mat'];
- % Save the output to the .mat file with the timestamped filename
- save(filename, 'results_MI_shuff');
+  % Get the current date and time as a string
+  currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
+  % Create a filename with the timestamp
+  filename = ['results_MI_shuff', currentDateTime, '.mat'];
+  % Save the output to the .mat file with the timestamped filename
+  save(filename, 'results_MI_shuff');
 
   f = mutualinfo_struct;
+   
+
 end

@@ -174,9 +174,12 @@ for i = 1:numel(fields_spikes)
   end % ending if numunits<=1
 end % ending   if length(peaks_time)>1
 
+
 end % ending for i = 1:numel(fields_spikes)
 
- MI_trace_shuff = mutualinfo_struct;
+
+fprintf('saving')
+MI_trace_shuff = mutualinfo_struct;
 % Get the current date and time as a string
 currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
 % Create a filename with the timestamp
@@ -186,3 +189,4 @@ save(filename, 'results_MI_trace_shuff');
 
 
 f = mutualinfo_struct;
+end

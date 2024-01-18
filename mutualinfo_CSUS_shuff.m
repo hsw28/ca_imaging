@@ -192,7 +192,7 @@ for i = 1:numel(fields_spikes)
             mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
     end
 
-
+fprintf('saving')
       MI_CSUS_shuff = mutualinfo_struct;
 
       % Get the current date and time as a string
@@ -203,3 +203,5 @@ for i = 1:numel(fields_spikes)
       save(filename, 'MI_CSUS_shuff');
 
       f = MI_CSUS_shuff;
+
+    end
