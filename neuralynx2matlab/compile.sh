@@ -13,10 +13,11 @@ PLATFORM="64MAC"     #should be 32PC, 64PC, 32MAC or 64MAC
 
 #== paths to matlab
 #defaults for MAC
-#INCLMATLAB="/Applications/MATLAB_R2018b.app/extern/include/"
-#BINMATLAB="/Applications/MATLAB_R2018b.app/bin/"
-#INCLMATLAB="/Applications/MATLAB_R2018b.app/extern/include/"
-#BINMATLAB="/Applications/MATLAB_R2018b.app/bin/"
+INCLMATLAB="/Applications/MATLAB_R2018b.app/extern/include/"
+BINMATLAB="/Applications/MATLAB_R2018b.app/bin/"
+INCLMATLAB="/Applications/MATLAB_R2018b.app/extern/include/"
+INCLMATLAB="/Users/Hannah/Programming/ca_imaging/neuralynx2matlab"
+BINMATLAB="/Applications/MATLAB_R2018b.app/bin/"
 
 #defaults for Linux
 #INCLMATLAB="/opt/MATLAB/R2014b/extern/include/"

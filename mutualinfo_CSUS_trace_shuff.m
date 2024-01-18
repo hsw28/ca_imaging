@@ -1,4 +1,4 @@
-function f = mutualinfo_CSUS_trace(spike_structure, CSUS_structure, do_you_want_CSUS_or_CSUSnone, how_many_divisions, num_times_to_run, MI_CSUS)
+function f = mutualinfo_CSUS_trace_shuff(spike_structure, CSUS_structure, do_you_want_CSUS_or_CSUSnone, how_many_divisions, num_times_to_run, MI_CSUS)
 %finds 'mutual info' for CS/US/ non CS/US
 %CSUS_structure should come from BULKconverttoframe.m
 %do_you_want_CSUS_or_CSUSnone: 1 for only cs us, 0 for cs us pretrial
@@ -9,7 +9,8 @@ function f = mutualinfo_CSUS_trace(spike_structure, CSUS_structure, do_you_want_
 %right now because im lazy how_many_divisions must be a factor of 10
 
 
-fprintf('starting function')
+fprintf('running mutualinfo_CSUS_trace_shuff')
+
 divisions = how_many_divisions;
 fields_spikes = fieldnames(spike_structure);
 fields_CSUS = fieldnames(CSUS_structure);

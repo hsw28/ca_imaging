@@ -2,6 +2,8 @@ function f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, vel
 %finds mutual info for a bunch of cells
 
 
+fprintf('running mutualinfo_openfield_trace_shuff')
+
 fprintf('starting function');
 cct = (class(calcium_traces) == 'struct');
 if cct(1) == 0

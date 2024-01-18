@@ -4,13 +4,22 @@ function f = mutualinfo_openfield_shuff(spike_structure, pos_structure, velthres
 
 
 
+fprintf('running mutualinfo_openfield_shuff')
+
 fprintf('starting task')
 fprintf('loading spikes')
 fields_spikes = fieldnames(spike_structure);
 fprintf('loading pos')
 fields_pos = fieldnames(pos_structure);
+try
 fprintf('loading MI')
+size(ca_MI)
+class(ca_MI)
 fields_MI = fieldnames(ca_MI);
+catch
+  fprintf('issue loading, what it is nobody knows')
+  error('problem loading')
+end
 fprintf('loading TS')
 fields_cats = fieldnames(CA_timestamps);
 fprintf('all loaded')

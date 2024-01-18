@@ -8,6 +8,8 @@ function mutualinfo_struct = mutualinfo_CSUS_shuff(spike_structure, CSUS_structu
                         %= 10 will split CS and US each into 5
 %right now because im lazy how_many_divisions must be a factor of 10
 
+
+fprintf('running mutualinfo_CSUS_shuff')
 divisions = how_many_divisions;
 fields_spikes = fieldnames(spike_structure);
 fields_CSUS = fieldnames(CSUS_structure);
