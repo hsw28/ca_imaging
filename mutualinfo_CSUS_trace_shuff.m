@@ -81,7 +81,7 @@ for i = 1:numel(fields_spikes)
 
 
         fprintf('going through spikes')
-      if length(peaks_time)<3 | length(unique(CSUS))<3
+      if length(peaks_time)<3 || length(unique(CSUS))<3
           mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
           warning('you have no spikes')
       else

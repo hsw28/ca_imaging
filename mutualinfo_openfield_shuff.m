@@ -91,7 +91,6 @@ for i = 1:numel(fields_spikes)
         warning('you have no spikes')
       else
           for k=1:numunits
-                fprintf('going through spikes')
 
                 currspikes = peaks_time(k,:);
                 [c indexmin] = (min(abs(peaks_time(k,:)-mintime))); %
@@ -181,6 +180,6 @@ for i = 1:numel(fields_spikes)
   save(filename, 'results_MI_shuff');
 
   f = mutualinfo_struct;
-   
+
 
 end

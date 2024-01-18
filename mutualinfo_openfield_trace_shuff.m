@@ -47,7 +47,6 @@ for i = 1:numel(fields_spikes)
       pos = fieldValue_pos;
 
       index = strfind(fieldName_spikes, '_');
-      pos_date = fieldName_spikes(index(2)+1:end)
 
       if length(peaks_time) <5
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
@@ -95,7 +94,7 @@ for i = 1:numel(fields_spikes)
 
           % Check if the high velocity time is more than 1 second away from the closest low velocity time
           if abs(highVelTime - closestLowVelTime) > timeThreshold
-              validHighVelIndices = [validHighVelIndices, highVelIndices(i)];
+              validHighVelIndices = [validHighVelIndices, highVelIndices(ii)];
           end
       end
 

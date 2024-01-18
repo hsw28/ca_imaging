@@ -8,7 +8,7 @@ function f = mutualinfo_openfield_trace(spike_structure, pos_structure, velthres
 tic
 
 
-
+          set(0,'DefaultFigureVisible', 'off');
 
 fields_spikes = fieldnames(spike_structure);
 fields_pos = fieldnames(pos_structure);
@@ -24,7 +24,7 @@ for i = 1:numel(fields_spikes)
       fieldName_spikes = fields_spikes{i}
       fieldValue_spikes = spike_structure.(fieldName_spikes);
       peaks_time = fieldValue_spikes;
-        if length(peaks_time)>1
+      if length(peaks_time)>1
 
 
       fieldName_cats = fields_cats{i};
@@ -38,12 +38,11 @@ for i = 1:numel(fields_spikes)
       pos = fieldValue_pos;
 
       index = strfind(fieldName_spikes, '_');
-      pos_date = fieldName_spikes(index(2)+1:end);
       if length(peaks_time) <5
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+        fprintf('fewer than five spikes')
         continue
       end
-
 
       mutinfo = NaN(size(peaks_time,1),1);
 
@@ -53,11 +52,16 @@ for i = 1:numel(fields_spikes)
       end
 
 
+
+
+
       if length(peaks_time)>length(pos)
         peaks_time = peaks_time(1:length(pos));
       elseif length(peaks_time)<length(pos)
         pos = pos(1:length(peaks_time),:);
       end
+
+
 
       velthreshold = 2;
       vel = ca_velocity(pos);
@@ -71,10 +75,13 @@ for i = 1:numel(fields_spikes)
       timeThreshold = 1; % second
       % Find indices where velocity is greater than the threshold
       highVelIndices = find(velocities >= velThreshold);
+
       % Find indices where velocity is less than or equal to the threshold
       lowVelIndices = find(velocities < velThreshold);
       % Filter out high velocity indices that are too close to low velocities
       validHighVelIndices = [];
+
+
       for ii = 1:length(highVelIndices)
           highVelTime = times(highVelIndices(ii));
           % Find the closest low velocity time
@@ -83,12 +90,13 @@ for i = 1:numel(fields_spikes)
 
           % Check if the high velocity time is more than 1 second away from the closest low velocity time
           if abs(highVelTime - closestLowVelTime) > timeThreshold
-              validHighVelIndices = [validHighVelIndices, highVelIndices(i)];
+              validHighVelIndices = [validHighVelIndices, highVelIndices(ii)];
           end
       end
 
-      goodtime = pos(validHighVelIndices, 1);
+
       goodpos = pos(validHighVelIndices,:);
+
       all_highspeedspikes = peaks_time(:,validHighVelIndices);
 
   fprintf('starting units')
@@ -100,11 +108,14 @@ for i = 1:numel(fields_spikes)
         continue
       else
           for k=1:numunits
+
           highspeedspikes = all_highspeedspikes(k,:);
 
 
-          set(0,'DefaultFigureVisible', 'off');
+
             if length(highspeedspikes)>0
+
+
               [trace_mean occprob] = CA_normalizePosData_trace(highspeedspikes, goodpos, dim, 1.000);
 
                 if (size(trace_mean,1)) < (size(trace_mean,2))
@@ -117,6 +128,7 @@ for i = 1:numel(fields_spikes)
               mutinfo(k) = mutualinfo([trace_mean, occprob]);
             else
               mutinfo(k) = NaN;
+              fprintf('not enough high speed spikes')
             end
           end
       end

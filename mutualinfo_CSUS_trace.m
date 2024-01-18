@@ -8,6 +8,7 @@ function f = mutualinfo_CSUS_trace(spike_structure, CSUS_structure, do_you_want_
                         %= 10 will split CS and US each into 5
 %right now because im lazy how_many_divisions must be a factor of 10
 
+fprintf('running mutualinfo_CSUS_trace')
 
 divisions = how_many_divisions;
 fields_spikes = fieldnames(spike_structure);
@@ -72,7 +73,7 @@ for i = 1:numel(fields_spikes)
           end
 
 
-      if length(peaks_time)<3 | length(unique(CSUS))<3
+      if length(peaks_time)<3 || length(unique(CSUS))<3
           mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
           warning('you have no spikes')
       else

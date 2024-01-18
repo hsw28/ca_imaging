@@ -80,7 +80,7 @@ for i = 1:numel(fields_spikes)
 
 
       mutinfo = NaN(3,numunits);
-      if numunits<=1 | length(unique(CSUS))<3
+      if numunits<=1 || length(unique(CSUS))<3
           mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
           warning('you have no cells or no spikes or no CS/US')
       else
