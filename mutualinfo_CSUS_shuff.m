@@ -201,7 +201,8 @@ fprintf('saving')
       filename = ['results_MI_CSUS_shuff_', currentDateTime, '.mat'];
       % Save the output to the .mat file with the timestamped filename
       save(filename, 'MI_CSUS_shuff');
-
+      fprintf('save finished')
+      
       f = MI_CSUS_shuff;
 
     end

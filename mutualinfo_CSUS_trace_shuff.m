@@ -202,6 +202,7 @@ for i = 1:numel(fields_spikes)
       filename = ['results_MI_CSUS_trace_shuff_', currentDateTime, '.mat'];
       % Save the output to the .mat file with the timestamped filename
       save(filename, 'MI_CSUS_trace_shuff');
+      fprintf('save finished')
 
 
       f = MI_CSUS_trace_shuff;

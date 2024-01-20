@@ -116,7 +116,6 @@ for i = 1:numel(fields_spikes)
 
                 shuf = NaN(num_times_to_run,1);
                 %for l = 1:num_times_to_run
-                fprintf('starting parfor loop')
                 parfor l = 1:num_times_to_run
                       %fprintf('survived the great parfor loop trauma of jan 10')
                       if isnan(MI(k))==0 && length(highspeedspikes)>1
@@ -178,6 +177,7 @@ for i = 1:numel(fields_spikes)
   filename = ['results_MI_shuff', currentDateTime, '.mat'];
   % Save the output to the .mat file with the timestamped filename
   save(filename, 'results_MI_shuff');
+  fprintf('save finished')
 
   f = mutualinfo_struct;
 

@@ -185,6 +185,7 @@ currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
 filename = ['results_MI_trace_shuff', currentDateTime, '.mat'];
 % Save the output to the .mat file with the timestamped filename
 save(filename, 'results_MI_trace_shuff');
+fprintf('save finished')
 
 
 f = mutualinfo_struct;
