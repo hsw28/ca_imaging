@@ -22,7 +22,7 @@ peaks = load('peaks.mat');
 spikes = peaks.peaks;
 
 MI = load('MI_CSUS.mat');
-ca_MI = MI.MI_CSUS2;
+%ca_MI = MI.MI_CSUS2;
 ca_MI = MI.MI_CSUS2_pretrial;
 
 CSUS = load('CSUS_id.mat')
