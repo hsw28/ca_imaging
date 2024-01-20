@@ -50,7 +50,7 @@ for i = 1:numel(fields_spikes)
       CSUS = CSUS(1:closestIndex);
       time = time(1:closestIndex);
 
-      biggest = max(time)
+
       [I,J] = find(peaks_time>biggest);
       peaks_time(I,J) = NaN;
 
@@ -85,7 +85,6 @@ for i = 1:numel(fields_spikes)
           for k=1:size(peaks_time,1)
 
           currspikes = peaks_time(k,:);
-          currspikes = peaks_time(k,1:130)
 
 
           set(0,'DefaultFigureVisible', 'off');
