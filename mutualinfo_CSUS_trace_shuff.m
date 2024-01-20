@@ -91,7 +91,6 @@ for i = 1:numel(fields_spikes)
 
               if length(currspikes)>0 &&  isnan(MI(k))==0 && length(unique(CSUS)>=3) %finding how many spikes in each time bin
                 shuf = NaN(num_times_to_run,1);
-                fprintf('starting parfor')
                 parfor d = 1:num_times_to_run
                           if do_you_want_CSUS_or_CSUSnone == 1
                             wantedindex = find(CSUS>0);

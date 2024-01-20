@@ -45,12 +45,12 @@ for i = 1:numel(fields_spikes)
       time = CSUS(2,:);
       CSUS = CSUS(1,:);
 
-      biggest = max(peaks_time(:));
-      [minValue,closestIndex] = min(abs(biggest-CSUS));
+      biggest = max([peaks_time(:)]);
+      [minValue,closestIndex] = min(abs(biggest-time));
       CSUS = CSUS(1:closestIndex);
       time = time(1:closestIndex);
 
-      biggest = max(time);
+      biggest = max(time)
       [I,J] = find(peaks_time>biggest);
       peaks_time(I,J) = NaN;
 
@@ -80,10 +80,13 @@ for i = 1:numel(fields_spikes)
           mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
           warning('you have no spikes')
       else
+
           wanted = find(CSUS > 0);
           for k=1:size(peaks_time,1)
 
           currspikes = peaks_time(k,:);
+          currspikes = peaks_time(k,1:130)
+
 
           set(0,'DefaultFigureVisible', 'off');
           spikes_in_CS_US = zeros(1,10);

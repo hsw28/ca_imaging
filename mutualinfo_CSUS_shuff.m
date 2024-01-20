@@ -49,12 +49,12 @@ for i = 1:numel(fields_spikes)
       time = CSUS(2,:);
       CSUS = CSUS(1,:);
 
-      biggest = max(peaks_time(:));
-      [minValue,closestIndex] = min(abs(biggest-CSUS));
+      biggest = max([peaks_time(:)]);
+      [minValue,closestIndex] = min(abs(biggest-time));
       CSUS = CSUS(1:closestIndex);
       time = time(1:closestIndex);
 
-      biggest = max(time);
+      biggest = max(time)
       [I,J] = find(peaks_time>biggest);
       peaks_time(I,J) = NaN;
 
@@ -202,7 +202,7 @@ fprintf('saving')
       % Save the output to the .mat file with the timestamped filename
       save(filename, 'MI_CSUS_shuff');
       fprintf('save finished')
-      
+
       f = MI_CSUS_shuff;
 
     end
