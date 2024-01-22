@@ -168,6 +168,8 @@ for i = 1:numel(fields_spikes)
     end
   end
 
+
+filesize = mutualinfo_struct.bytes      
   MI_shuff = mutualinfo_struct;
   fprintf('saving')
   MI_trace_shuff = mutualinfo_struct;
@@ -177,10 +179,6 @@ for i = 1:numel(fields_spikes)
   filename = ['results_MI_shuff', currentDateTime, '.mat'];
   fprintf('Save the output to the .mat file with the timestamped filename'
   save(filename, 'results_MI_shuff');
-<<<<<<< HEAD
-  fprintf('save finished')
-=======
     print('save is a success')
->>>>>>> dbe1c68 (WHY ISNT THIS SAVING)
 
   f = mutualinfo_struct
