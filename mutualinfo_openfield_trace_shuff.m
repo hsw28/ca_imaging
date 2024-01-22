@@ -176,20 +176,17 @@ end % ending   if length(peaks_time)>1
 
 end % ending for i = 1:numel(fields_spikes)
 
-filesize = mutualinfo_struct.bytes     
+filesize = mutualinfo_struct.bytes
 fprintf('saving')
 MI_trace_shuff = mutualinfo_struct;
 fprintf('Get the current date and time as a string')
 currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
-fprintf('Create a filename with the timestamp'
+fprintf('Create a filename with the timestamp')
 filename = ['results_MI_trace_shuff_', currentDateTime, '.mat'];
-fprintf('Save the output to the .mat file with the timestamped filename'
+fprintf('Save the output to the .mat file with the timestamped filename')
 save(filename, 'results_MI_trace_shuff');
-<<<<<<< HEAD
-fprintf('save finished')
-=======
 print('save is a success')
->>>>>>> dbe1c68 (WHY ISNT THIS SAVING)
+
 
 
 f = mutualinfo_struct

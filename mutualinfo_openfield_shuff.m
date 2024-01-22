@@ -169,15 +169,15 @@ for i = 1:numel(fields_spikes)
   end
 
 
-filesize = mutualinfo_struct.bytes      
+filesize = mutualinfo_struct.bytes
   MI_shuff = mutualinfo_struct;
   fprintf('saving')
   MI_trace_shuff = mutualinfo_struct;
   fprintf('Get the current date and time as a string')
   currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
-  fprintf('Create a filename with the timestamp'
+  fprintf('Create a filename with the timestamp')
   filename = ['results_MI_shuff', currentDateTime, '.mat'];
-  fprintf('Save the output to the .mat file with the timestamped filename'
+  fprintf('Save the output to the .mat file with the timestamped filename')
   save(filename, 'results_MI_shuff');
     print('save is a success')
 
