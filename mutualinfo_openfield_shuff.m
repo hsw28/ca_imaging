@@ -50,7 +50,7 @@ for i = 1:numel(fields_spikes)
 
 
 
-
+      fprintf('trimming date')
       tm = pos(:, 1);
       biggest = max(peaks_time(:));
       [minValue,closestIndex] = min(abs(biggest-tm));
@@ -70,7 +70,7 @@ for i = 1:numel(fields_spikes)
             end
 
 
-
+      fprintf('trimming velocity')
       vel = ca_velocity(pos);
       %vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30.0005); %originally had this at 30, trying with 15 now
       goodvel = find(vel(1,:)>=velthreshold);
@@ -90,6 +90,7 @@ for i = 1:numel(fields_spikes)
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
         warning('you have no spikes')
       else
+          fprintf('about to go through units')
           for k=1:numunits
 
                 currspikes = peaks_time(k,:);
@@ -163,13 +164,12 @@ for i = 1:numel(fields_spikes)
 
 
               end
-
+    fprintf('assigning MI')
     mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
     end
   end
 
 
-filesize = mutualinfo_struct.bytes
   MI_shuff = mutualinfo_struct;
   fprintf('saving')
   MI_trace_shuff = mutualinfo_struct;

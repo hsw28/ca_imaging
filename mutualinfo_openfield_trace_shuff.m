@@ -176,7 +176,7 @@ end % ending   if length(peaks_time)>1
 
 end % ending for i = 1:numel(fields_spikes)
 
-filesize = mutualinfo_struct.bytes
+
 fprintf('saving')
 MI_trace_shuff = mutualinfo_struct;
 fprintf('Get the current date and time as a string')
