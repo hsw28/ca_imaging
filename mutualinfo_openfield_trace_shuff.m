@@ -178,7 +178,7 @@ end % ending for i = 1:numel(fields_spikes)
 
 
 fprintf('saving')
-MI_trace_shuff = mutualinfo_struct;
+results_MI_trace_shuff = mutualinfo_struct;
 fprintf('Get the current date and time as a string')
 currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
 fprintf('Create a filename with the timestamp')

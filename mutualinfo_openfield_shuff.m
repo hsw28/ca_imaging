@@ -170,7 +170,7 @@ for i = 1:numel(fields_spikes)
   end
 
 
-  MI_shuff = mutualinfo_struct;
+  results_MI_shuff = mutualinfo_struct;
   fprintf('saving')
   MI_trace_shuff = mutualinfo_struct;
   fprintf('Get the current date and time as a string')

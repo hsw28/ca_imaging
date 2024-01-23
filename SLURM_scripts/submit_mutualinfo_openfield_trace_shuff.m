@@ -4,8 +4,7 @@ c = parcluster;
 %% Required arguments in order to submit MATLAB job
 
 % Specify the walltime (e.g. 4 hours)
-%%%c.AdditionalProperties.WallTime = '24:00:00';
-c.AdditionalProperties.WallTime = '1:00:00';
+c.AdditionalProperties.WallTime = '24:00:00';
 
 % Specify an account to use for MATLAB jobs (e.g. pXXXX, bXXXX, etc)
 c.AdditionalProperties.AccountName = 'p32072';
@@ -16,7 +15,7 @@ c.AdditionalProperties.QueueName = 'normal';
 %% optional arguments but worth considering
 
 % Specify memory to use for MATLAB jobs, per core (default: 4gb)
-c.AdditionalProperties.MemUsage = '6gb';
+c.AdditionalProperties.MemUsage = '4gb';
 
 % Specify number of nodes to use
 c.AdditionalProperties.Nodes = 1;
@@ -31,4 +30,4 @@ addpath(pwd)
 addpath(genpath('/home/hsw967/Programming/ca_imaging'))
 addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/'));
 addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/include'));
-job = c.batch('mutualinfo_openfield_trace_shuff_4SLURM', 'Pool', 8, 'CurrentFolder', '.');
+job = c.batch('mutualinfo_openfield_trace_shuff_4SLURM', 'Pool', 12, 'CurrentFolder', '.');
