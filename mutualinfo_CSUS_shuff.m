@@ -193,20 +193,15 @@ for i = 1:numel(fields_spikes)
     end
 
       fprintf('saving')
-      MI_CSUS_shuff = mutualinfo_struct;
+      MI_CSUS5_shuff = mutualinfo_struct;
 
       % Get the current date and time as a string
       currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
       % Create a filename with the timestamp
-      filename = ['results_MI_CSUS_shuff_', currentDateTime, '.mat'];
+      filename = ['results_MI_CSUS5_shuff_', currentDateTime, '.mat'];
       % Save the output to the .mat file with the timestamped filename
-
-      try
-        save(filename, 'MI_CSUS_shuff');
+        save(filename, 'MI_CSUS5_shuff');
         fprintf('File saved successfully as %s\n', filename);
-      catch exception
-          fprintf('Error saving file: %s\n', exception.message);
-      end
 
       f = MI_CSUS_shuff;
 
