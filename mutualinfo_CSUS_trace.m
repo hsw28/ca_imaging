@@ -137,7 +137,6 @@ for i = 1:numel(fields_spikes)
 
             end
           end
-          mutinfo(1:10)
       mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
       end
 
