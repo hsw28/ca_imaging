@@ -48,35 +48,14 @@ MI = load('MI_CSUS.mat');
 
 
 %%%%%BELOW IS FOR CSUS WITH 5 DIVISIONS AND PRETRIAL%%%%%%%%
-%{
 ca_MI = MI.MI_CSUS5_pretrial;
 f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 0, 5, 500, ca_MI)
 
 
-fprintf('saving')
-MI_CSUS5_pretrial_shuff = f;
-% Get the current date and time as a string
-currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
-% Create a filename with the timestamp
-filename = ['results_MI_CSUS5_pretrial_shuff_', currentDateTime, '.mat'];
-% Save the output to the .mat file with the timestamped filename
-save(filename, 'MI_CSUS5_pretrial_shuff');
-fprintf('File saved successfully as %s\n', filename);
-%}
-
 %%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS AND NO PRETRIAL%%%%%%%
-ca_MI = MI.MI_CSUS2;
-f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 1, 2, 500, ca_MI)
+%ca_MI = MI.MI_CSUS2;
+% = mutualinfo_CSUS_shuff(spikes, CSUS_id, 1, 2, 500, ca_MI)
 
-fprintf('saving')
-MI_CSUS2_shuff = f;
-% Get the current date and time as a string
-currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
-% Create a filename with the timestamp
-filename = ['results_MI_CSUS_shuff_', currentDateTime, '.mat'];
-% Save the output to the .mat file with the timestamped filename
-save(filename, 'MI_CSUS2_shuff');
-fprintf('File saved successfully as %s\n', filename);
 
 
 end

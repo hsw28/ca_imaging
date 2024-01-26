@@ -194,6 +194,34 @@ for i = 1:numel(fields_spikes)
 
 
 
-      f = MI_CSUS_trace_shuff;
+      f = mutualinfo_struct;
+
+
+      MI_CSUS_trace_shuff = f;
+
+      % Determine the suffix based on do_you_want_CSUS_or_CSUSnone
+      if do_you_want_CSUS_or_CSUSnone == 1
+          suffix = '';
+      elseif do_you_want_CSUS_or_CSUSnone == 0
+          suffix = 'pretrial';
+      end
+
+
+      % Create the dynamic variable name
+      variableName = sprintf('MI_CSUS%d_%s_trace_shuff', how_many_divisions, suffix);
+
+      % Assign the structure to the new variable name
+      eval([variableName ' = MI_CSUS_trace_shuff;']);
+
+      % Get the current date and time as a string
+      currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
+
+      % Create a filename with the timestamp
+      filename = sprintf('results_%s_%s.mat', variableName, currentDateTime);
+
+      % Save the output to the .mat file with the timestamped filename
+      save(filename, variableName);
+      fprintf('File saved successfully as %s\n', filename);
+
 
     end
