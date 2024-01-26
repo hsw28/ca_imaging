@@ -89,7 +89,7 @@ for i = 1:numel(fields_spikes)
         for k=1:size(peaks_time,1)
           currspikes = peaks_time(k,:);
 
-              if length(currspikes)>0 &&  isnan(MI(k))==0 && length(unique(CSUS)>=3) %finding how many spikes in each time bin
+              if length(currspikes)>0 &&  isnan(MI(k))==0 && length(unique(CSUS))>=3 %finding how many spikes in each time bin
                 shuf = NaN(num_times_to_run,1);
                 parfor d = 1:num_times_to_run
                           if do_you_want_CSUS_or_CSUSnone == 1
@@ -115,7 +115,6 @@ for i = 1:numel(fields_spikes)
                                         occ_pretrial = length(wanted);
                                         spikes_pretrial = nanmean(currspikes(wanted));
                                         index=1;
-
                                       else
                                         wantedtimes = find(CSUS == q);
                                         wantedtimes = wantedtimes(find(wantedtimes<=length(currspikes)));

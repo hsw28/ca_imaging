@@ -91,7 +91,7 @@ for i = 1:numel(fields_spikes)
           spikes_in_CS_US = zeros(1,10);
           spikes_intertrial = zeros(1,1);
           spikes_pretial = zeros(1,1);
-            if length(currspikes)>0  && length(unique(CSUS)>=3) %finding how many spikes in each time bin
+            if length(currspikes)>0  && length(unique(CSUS))>=3 %finding how many spikes in each time bin
                 for q =1:length(currspikes)
                   if isnan(currspikes(q))==1
                     continue
@@ -122,7 +122,7 @@ for i = 1:numel(fields_spikes)
               else
                 occprob = occ_in_CS_US.*(1/7.5);
                 occprob = occprob./nansum(occprob);
-                spikeprob =  [spikes_pretial];
+                spikeprob =  [spikes_in_CS_US];
                 if (size(spikeprob,1)) < (size(spikeprob,2))
                   spikeprob = spikeprob';
                 end

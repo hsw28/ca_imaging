@@ -144,7 +144,7 @@ for i = 1:numel(fields_spikes)
                               else
                                     occprob = occ_in_CS_US.*(1/7.5);
                                     occprob = occprob./nansum(occprob);
-                                    spikeprob =  [spikes_pretial];
+                                    spikeprob =  [spikes_in_CS_US];
                                     if (size(spikeprob,1)) < (size(spikeprob,2))
                                       spikeprob = spikeprob';
                                     end
