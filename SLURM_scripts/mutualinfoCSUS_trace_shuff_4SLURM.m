@@ -56,13 +56,16 @@ MI = load('MI_CSUS.mat');
 
 
 %%%%%BELOW IS FOR CSUS WITH 5 DIVISIONS AND PRETRIAL%%%%%%%%
-ca_MI = MI.MI_CSUS5_trace_pretrial;
-f = mutualinfo_CSUS_trace_shuff(calcium_traces, CSUS_id, 0, 5, 500, ca_MI)
+%ca_MI = MI.MI_CSUS5_trace_pretrial;
+%f = mutualinfo_CSUS_trace_shuff(calcium_traces, CSUS_id, 0, 5, 500, ca_MI)
 
+%%%%%BELOW IS FOR CSUS WITH 5 DIVISIONS NO PRETRIAL%%%%%%%%
+ca_MI = MI.MI_CSUS5_trace;
+f = mutualinfo_CSUS_trace_shuff(calcium_traces, CSUS_id, 1, 5, 500, ca_MI)
 
 %%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS NO PRETRIAL%%%%%%%%
-%ca_MI = MI.MI_CSUS2_trace;
-%f = mutualinfo_CSUS_trace_shuff(calcium_traces, CSUS_id, 1, 2, 500, ca_MI)
+ca_MI = MI.MI_CSUS2_trace;
+f = mutualinfo_CSUS_trace_shuff(calcium_traces, CSUS_id, 1, 2, 500, ca_MI)
 
 
 end
