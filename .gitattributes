@@ -1,1 +1,2 @@
 *.ipynb export-ignore
+*.ipynb -linguist-detectable

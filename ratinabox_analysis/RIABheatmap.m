@@ -32,7 +32,7 @@ figure;
 %surf(ECGrid, PCGrid, heightValues, colorValues, 'EdgeColor', 'interp');
 %hold on
 
-surf(ECGrid, PCGrid, heightValues, colorValues, 'EdgeColor', 'black', 'FaceColor','flat', 'FaceLighting', 'gouraud');
+surf(ECGrid, PCGrid, heightValues, colorValues, 'EdgeColor', 'black', 'FaceColor','flat', 'FaceLighting', 'gouraud', 'FaceAlpha', 0.8, 'EdgeAlpha', .8);
 %surf(ECGrid, PCGrid, colorValues, heightValues, 'EdgeColor', 'black', 'FaceColor','flat', 'FaceLighting', 'gouraud');
 
 
@@ -42,9 +42,9 @@ ylabel('% Place Cells (PC)');
 xlabel('% Eyeblink Cells (EC)');
 zlabel('Mean Place Decoding Error (meters)');
 colorbar
-caxis([.55 .95])
+%caxis([.55 .95])
 hC = colorbar;
-zlim([.15 .19])
+%zlim([.15 .19])
 LabelText = 'Color represents the Eyeblink Decoding Accuracy in Env B when trained on env A'
 ylabel(hC,LabelText,'FontSize',12)
 
