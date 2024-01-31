@@ -1,9 +1,9 @@
-function f = mutualinfo_CSUS_trace_shuff(spike_structure, CSUS_structure, do_you_want_CSUS_or_CSUSnone, how_many_divisions, num_times_to_run, MI_CSUS)
+function f = mutualinfo_CSUS_trace_shuff(spike_structure, CSUS_structure, do_you_want_pretrial, how_many_divisions, num_times_to_run, MI_CSUS)
 %finds 'mutual info' for CS/US/ non CS/US
 %CSUS_structure should come from BULKconverttoframe.m
-%do_you_want_CSUS_or_CSUSnone: 1 for only cs us, 0 for cs us pretrial
+%do_you_want_pretrial: 0 for only cs us, 1 for cs us pretrial
 %how many divisions you wanted-- for ex,
-    % do_you_want_CSUS_or_CSUSnone = 1
+    % do_you_want_pretrial = 1
     % how_many_divisions = 2 will just split between cs and us
                         %= 10 will split CS and US each into 5
 %right now because im lazy how_many_divisions must be a factor of 10
@@ -92,7 +92,7 @@ for i = 1:numel(fields_spikes)
               if length(currspikes)>0 &&  isnan(MI(k))==0 && length(unique(CSUS))>=3 %finding how many spikes in each time bin
                 shuf = NaN(num_times_to_run,1);
                 parfor d = 1:num_times_to_run
-                          if do_you_want_CSUS_or_CSUSnone == 1
+                          if do_you_want_pretrial == 0
                             wantedindex = find(CSUS>0);
                           else
                             wantedindex = find(CSUS>0 | CSUS == -1);
@@ -126,7 +126,7 @@ for i = 1:numel(fields_spikes)
                                 end
 
 
-                                if do_you_want_CSUS_or_CSUSnone == 0
+                                if do_you_want_pretrial == 1
                                       pretrial_occprob = occ_pretrial*(1/7.5);
                                       spikes_occprob = occ_in_CS_US.*(1/7.5);
                                       occprob = [pretrial_occprob, spikes_occprob'];
@@ -199,10 +199,10 @@ for i = 1:numel(fields_spikes)
 
       MI_CSUS_trace_shuff = f;
 
-      % Determine the suffix based on do_you_want_CSUS_or_CSUSnone
-      if do_you_want_CSUS_or_CSUSnone == 1
+      % Determine the suffix based on do_you_want_pretrial
+      if do_you_want_pretrial == 0
           suffix = '';
-      elseif do_you_want_CSUS_or_CSUSnone == 0
+      elseif do_you_want_pretrial == 1
           suffix = 'pretrial';
       end
 

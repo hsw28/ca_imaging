@@ -1,9 +1,9 @@
-function f = mutualinfo_CSUS_trace(spike_structure, CSUS_structure, do_you_want_CSUS_or_CSUSnone, how_many_divisions)
+function f = mutualinfo_CSUS_trace(spike_structure, CSUS_structure, do_you_want_pretrial, how_many_divisions)
 %finds 'mutual info' for CS/US/ non CS/US
 %CSUS_structure should come from BULKconverttoframe.m
-%do_you_want_CSUS_or_CSUSnone: 1 for only cs us, 0 for cs us none
+%do_you_want_pretrial: 0 for only cs us, 1 for cs us pretrial
 %how many divisions you wanted-- for ex,
-    % do_you_want_CSUS_or_CSUSnone = 1
+    % do_you_want_pretrial = 1
     % how_many_divisions = 2 will just split between cs and us
                         %= 10 will split CS and US each into 5
 %right now because im lazy how_many_divisions must be a factor of 10
@@ -105,7 +105,7 @@ for i = 1:numel(fields_spikes)
                               index = index+1;
                             end
                       end
-                      if do_you_want_CSUS_or_CSUSnone == 0
+                      if do_you_want_pretrial == 1
                             pretrial_occprob = occ_pretrial*(1/7.5);
                             spikes_occprob = occ_in_CS_US.*(1/7.5);
                             occprob = [pretrial_occprob, spikes_occprob'];

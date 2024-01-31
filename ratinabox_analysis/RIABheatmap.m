@@ -49,4 +49,32 @@ LabelText = 'Color represents the Eyeblink Decoding Accuracy in Env B when train
 ylabel(hC,LabelText,'FontSize',12)
 
 colormap parula; % Colormap
-end
+
+
+%%%line graphs
+
+% Assume EC, PC, heightValues, and colorValues are already defined.
+
+% Create a meshgrid for your inputs
+[ECGrid, PCGrid] = meshgrid(EC, PC);
+
+% Create a new figure
+figure;
+
+% Subplot for the first output variable (heightValues)
+% Assuming your contour plots are set up
+subplot(1, 2, 1);
+contourf(ECGrid, PCGrid, heightValues, 16);
+colorbar;
+ylabel('% Place Cells (PC)');
+xlabel('% Eyeblink Cells (EC)');
+title('Mean Place Decoding Error (meters)');
+colormap(viridis); % Applies the colormap to the entire figure
+
+subplot(1, 2, 2);
+contourf(ECGrid, PCGrid, 1-colorValues, 16);
+colorbar;
+title('Eyeblink Decoding Error (%)');
+ylabel('% Place Cells (PC)');
+xlabel('% Eyeblink Cells (EC)');
+colormap(viridis); % Applies the colormap to the entire figure
