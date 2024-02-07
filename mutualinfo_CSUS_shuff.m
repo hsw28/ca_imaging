@@ -1,4 +1,4 @@
-function mutualinfo_struct = mutualinfo_CSUS_shuff(spike_structure, CSUS_structure, do_you_want_pretrial, how_many_divisions, num_times_to_run, MI_CSUS)
+function [mutualinfo_struct, shuf_all] = mutualinfo_CSUS_shuff(spike_structure, CSUS_structure, do_you_want_pretrial, how_many_divisions, num_times_to_run, MI_CSUS)
 %finds 'mutual info' for CS/US/ non CS/US
 %CSUS_structure should come from BULKconverttoframe.m
 %do_you_want_pretrial: 0 for only cs us, 1 for cs us pretrial
@@ -19,7 +19,7 @@ if numel(fields_spikes) ~= numel(fields_CSUS)
   error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
 end
 
-
+shuf_all = [];
 for i = 1:numel(fields_spikes)
       fieldName_spikes = fields_spikes{i};
       fieldValue_spikes = spike_structure.(fieldName_spikes);
@@ -84,19 +84,19 @@ for i = 1:numel(fields_spikes)
           mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
           warning('you have no cells or no spikes or no CS/US')
       else
-          for k=1:size(peaks_time,1)
-              currspikes = peaks_time(k,:);
-              if isnan(MI(k))==1
-                  mutinfo(1, k) = NaN;
-                  mutinfo(2, k) = NaN;
-                  mutinfo(3, k) = NaN;
-                  continue
-              end
+        for k=1:size(peaks_time,1) %selecting cell
+                currspikes = peaks_time(k,:);
+                if isnan(MI(k))==1
+                    mutinfo(1, k) = NaN;
+                    mutinfo(2, k) = NaN;
+                    mutinfo(3, k) = NaN;
+                    continue
+                end
 
 
               set(0,'DefaultFigureVisible', 'off');
               shuf = NaN(num_times_to_run,1);
-              if length(currspikes)>0  %finding how many spikes in each time bin
+            if length(currspikes)>0  %finding how many spikes in each time bin
                 parfor l = 1:num_times_to_run
                   spikes_in_CS_US = zeros(1,10);
                   spikes_intertrial = zeros(1,1);
@@ -184,10 +184,12 @@ for i = 1:numel(fields_spikes)
                   end
 
 
-
+            shuf_all = [shuf_all, shuf];
 
             end %for k=1:size(peaks_time,1)
+
         end %if numunits<=1
+
 
             mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
     end
