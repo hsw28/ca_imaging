@@ -12,6 +12,7 @@ if size(timestamps,2)==3
   timestamps = timestamps(:,2);
 end
 
+
 if timestamps(5)>2
 timestamps = timestamps./1000;
 end

@@ -30,20 +30,22 @@ int GeneralOperations::GetInputParameters(const mxArray *prhs[], int nlhs, CStri
 
 	//get parameter 3, our header selection variable
 	double temp = mxGetScalar(prhs[InputParamExtractHeader]);
-	if( 1 == temp ) { 
-		headerSelected = TRUE; 
+	if( 1 == temp ) {
+		headerSelected = TRUE;
 		expectedOutputArgs++;
 	}
 
 	//make sure we have a valid number of output args
 	if( nlhs != expectedOutputArgs ) {
+		mexPrintf("Actual number of output arguments (nlhs): %d\n", nlhs);
+		mexPrintf("Expected number of output arguments (expectedOutputArgs): %d\n", expectedOutputArgs);
 		mexPrintf("Invalid Number Of Output Arguments. Please See Help File For Examples.\n");
 		return(Nlx2MatError);
 	}
 
 	//get parameter 4, extraction mode
 	extractionMode = (int)(mxGetScalar(prhs[InputParamExtractionMode]));
-	if( (extractionMode < ExtractionModeAll) || (extractionMode > ExtractionModeTsList) ){ 
+	if( (extractionMode < ExtractionModeAll) || (extractionMode > ExtractionModeTsList) ){
 		mexPrintf("Invalid Extraction Mode Value. Please See Help File For Examples.\n");
 		return(Nlx2MatError);
 	}
@@ -57,45 +59,45 @@ int GeneralOperations::GetInputParameters(const mxArray *prhs[], int nlhs, CStri
 
 //******************************************************************************************************************************************************
 //******************************************************************************************************************************************************
-int GeneralOperations::GetInputString(CString& inputStr, const mxArray *prhs[], int prhsIndex) 
+int GeneralOperations::GetInputString(CString& inputStr, const mxArray *prhs[], int prhsIndex)
 {
 	//check index for args array
-	if( prhsIndex < 0 ) { 
+	if( prhsIndex < 0 ) {
 		mexPrintf("\tInvalid Index for Input Arguments Array In GetInputString().\n");
-		return(Nlx2MatError); 
+		return(Nlx2MatError);
 	}
 
    //Input must be a string, and a row vector.
     if( !mxIsChar(prhs[prhsIndex]) ) {
 		mexPrintf("\tInvalid Argument In GetInputString(), Input Argument Must Be A String.\n");
-		return(Nlx2MatError); 
+		return(Nlx2MatError);
 	} else if( !mxGetM(prhs[prhsIndex]) ) {
 		mexPrintf("\tInvalid Argument In GetInputString(), Input Argument Must Be A Row Vector.\n");
-		return(Nlx2MatError); 
+		return(Nlx2MatError);
 	}
-    
+
     //Get the length of the input string.
     int strLength = ( mxGetM(prhs[prhsIndex]) * mxGetN(prhs[prhsIndex]) ) + 1;
-	if( strLength <= 1 ) { 
+	if( strLength <= 1 ) {
 		mexPrintf("\tError Retrieving String Length In GetInputString(), cannot retrieve Input String.\n");
-		return(Nlx2MatError); 
+		return(Nlx2MatError);
 	}
 	if( strLength > MaxStringLength ) {
 		mexPrintf("\tError Retrieving String Length In GetInputString(), String Length Is Too Large.\n");
-		return(Nlx2MatError); 
+		return(Nlx2MatError);
 	}
 
 	char* buffer = new char[strLength];
 	if( NULL == buffer ) {
 		mexPrintf("\tError Allocating Memory For Input String In GetInputString(), Input String Pointer Is Null.\n");
-		return(Nlx2MatError); 
+		return(Nlx2MatError);
 	}
 	memset( buffer, 0, sizeof(char)*strLength );
 
     //Copy the string data from prhs[0] into a C string input_ buf. If the string array contains several rows, they are copied, one column at a time, into one long string array.
     if(mxGetString( prhs[prhsIndex], buffer, strLength) != 0) {
 		mexPrintf("\tError Retrieving String In GetInpuString().\n");
-		return(Nlx2MatError); 
+		return(Nlx2MatError);
 	}
 
 	inputStr = buffer;
@@ -108,26 +110,26 @@ int GeneralOperations::GetInputString(CString& inputStr, const mxArray *prhs[], 
 int GeneralOperations::GetFieldSelections(const mxArray *prhs[], int prhsIndex, BOOL* fieldSelections, const int numFields, int& numFieldsSelected)
 {
 	//error check input params
-	if( prhsIndex < 0 ) { 
+	if( prhsIndex < 0 ) {
 		mexPrintf("\tInvalid Index for Input Arguments Array In GetFieldSelections().\n");
-		return(Nlx2MatError); 
+		return(Nlx2MatError);
 	}
 	if( NULL == fieldSelections ) {
 		mexPrintf("\tPointer To Field Selections Array Is Null In GetFieldSelections().\n");
-		return(Nlx2MatError); 
+		return(Nlx2MatError);
 	}
 
 	//type check field parameter and extract
 	if( !mxIsNumeric(prhs[prhsIndex]) ) {
 		mexPrintf("\tInvalid Type Array In GetFieldSelections(), Type Must Be Numeric.\n");
-		return(Nlx2MatError); 
-	} 
+		return(Nlx2MatError);
+	}
 
 	//get a pointer to the input array
 	double* inputArray = mxGetPr(prhs[prhsIndex]);
 	if( NULL == inputArray ) {
 		mexPrintf("\tError Retrieving Pointer To Field Array In GetFieldSelections().\n");
-		return(Nlx2MatError); 
+		return(Nlx2MatError);
 	}
 
 	//check if array size matches the number of fields we are expecting
@@ -140,7 +142,7 @@ int GeneralOperations::GetFieldSelections(const mxArray *prhs[], int prhsIndex, 
 
 
 		mexPrintf("\tInvalic Size Of Input Array Calculated In GetFieldSelections().\n");
-		return(Nlx2MatError); 
+		return(Nlx2MatError);
 	}
 
 	//extract data from input array into our array
@@ -160,28 +162,28 @@ int GeneralOperations::GetFieldSelections(const mxArray *prhs[], int prhsIndex, 
 int GeneralOperations::GetModeParameters(const mxArray *prhs[], int prhsIndex, double* &modeParameters, int& numModeParameters)
 {
 	//error check input params
-	if( prhsIndex < 0 ) { 
+	if( prhsIndex < 0 ) {
 		mexPrintf("\tInvalid Index for Input Arguments Array In GetModeParameters().\n");
-		return(Nlx2MatError); 
+		return(Nlx2MatError);
 	}
 
 	//type check field parameter and extract
 	if( !mxIsNumeric(prhs[prhsIndex]) ) {
 		mexPrintf("\tInvalid Type Array In GetModeParameters(), Type Must Be Numeric.\n");
-		return(Nlx2MatError); 
-	} 
+		return(Nlx2MatError);
+	}
 
 	//get a pointer to the input array
 	modeParameters = mxGetPr(prhs[prhsIndex]);
 	if( NULL == modeParameters ) {
 		mexPrintf("\tError Retrieving Pointer To Mode Parameters Array In GetModeParameters().\n");
-		return(Nlx2MatError); 
+		return(Nlx2MatError);
 	}
 
 	numModeParameters = mxGetM(prhs[prhsIndex]) * mxGetN(prhs[prhsIndex]);
 	if( numModeParameters <= 0 ) {
 		mexPrintf("\tInvalic Size Of Mode Input Array Calculated In GetModeParameters().\n");
-		return(Nlx2MatError); 
+		return(Nlx2MatError);
 	}
 
 	return(Nlx2MatOK);
@@ -204,11 +206,11 @@ int GeneralOperations::LoadHeader(mxArray *plhs[],	int plhsIndex, char* headerBu
 		}
 	}
 	numCellsNeeded++;
-	
+
 	//Create and assign header variable in matlab
 	mxArray *cellArrayPtr = mxCreateCellMatrix( numCellsNeeded, 1 );
 	plhs[plhsIndex] = cellArrayPtr;
-	
+
 	//Loop to fill CellArray from string buffer that was filled from file read
 	char lineBuffer[MaxHeaderLine];			//Temp string variable to hold data before being put into cell array, used for header
 	int headerIndex = 0;				//Used to parse the Nlx header
@@ -221,7 +223,7 @@ int GeneralOperations::LoadHeader(mxArray *plhs[],	int plhsIndex, char* headerBu
 			lineBuffer[tempIndex] = headerBuffer[headerIndex];
 			headerIndex++;
 			tempIndex++;
-			//chech to see if we are at the end of a line or the end of our buffer 
+			//chech to see if we are at the end of a line or the end of our buffer
 			if( ( headerBuffer[headerIndex-1] == '\n') || ( tempIndex >= MaxHeaderLine ) ) {
 				lineBuffer[tempIndex-2] = 0;
 				// Enter string into cell
@@ -247,7 +249,7 @@ int GeneralOperations::GetInputParametersMat2Nlx(const mxArray *prhs[], int nrhs
 
 	//get parameter 3, extraction mode
 	extractionMode = (int)(mxGetScalar(prhs[Mat2NlxInputParamExtractionMode]));
-	if( (extractionMode < ExtractionModeAll) || (extractionMode > ExtractionModeTsList) ){ 
+	if( (extractionMode < ExtractionModeAll) || (extractionMode > ExtractionModeTsList) ){
 		mexPrintf("Invalid Extraction Mode Value. Please See Help File For Examples.\n");
 		return(Nlx2MatError);
 	}
@@ -259,7 +261,7 @@ int GeneralOperations::GetInputParametersMat2Nlx(const mxArray *prhs[], int nrhs
 
 	//get parameter 5, num records
 	expectedNumRecords = (int)(mxGetScalar(prhs[Mat2NlxInputParamExpectedNumRecs]));
-	if( expectedNumRecords < 1) { 
+	if( expectedNumRecords < 1) {
 		mexPrintf("Invalid Number Of Records To Write. Please See Help File For Examples.\n");
 		return(Nlx2MatError);
 	}
@@ -283,13 +285,13 @@ int GeneralOperations::GetInputNumericArrayPtr(const mxArray *prhs[], int nrhs, 
 
 	if( prhsIndex >= nrhs ) {
 		mexErrMsgTxt("Error, Invalid Index In GetInputNumericArrayPtr(), When Attempting To Retrieve Numeric Array From Matlab");
-		return(Nlx2MatError); 
+		return(Nlx2MatError);
 	}
 
 	inputArray = mxGetPr( prhs[prhsIndex] );
 	if( NULL == inputArray ) {
 		mexErrMsgTxt("Error, Null Pointer Returned In GetInputNumericArrayPtr(), When Attempting To Retrieve Numeric Array From Matlab");
-		return(Nlx2MatError); 
+		return(Nlx2MatError);
 	}
 
 	if( mxGetM(prhs[prhsIndex]) != expectedM ) {
@@ -302,7 +304,7 @@ int GeneralOperations::GetInputNumericArrayPtr(const mxArray *prhs[], int nrhs, 
 
 
 
-		return(Nlx2MatError); 
+		return(Nlx2MatError);
 	}
 
 	if( mxGetN(prhs[prhsIndex]) != expectedN ) {
@@ -314,7 +316,7 @@ int GeneralOperations::GetInputNumericArrayPtr(const mxArray *prhs[], int nrhs, 
 		mexErrMsgTxt("X Error, Invalid Dimension For Input Array In GetInputNumericArrayPtr(), Please Check Input Parameters.");
 
 
-return(Nlx2MatError); 
+return(Nlx2MatError);
 	}
 
 	return(Nlx2MatOK);
@@ -324,10 +326,10 @@ return(Nlx2MatError);
 int GeneralOperations::OpenFileMat2Nlx( std::fstream &fileHandle, BOOL appendToFile, CString filename, int fileTypeExpected)
 {
 	//Open file for writing
-	if( appendToFile ) { 
+	if( appendToFile ) {
 		//if ( fileHandle.Open( filename, CFile::modeWrite | CFile::modeNoTruncate | CFile::modeCreate ) == 0) {
 			mexErrMsgTxt("Append is not supported");
-			return(Nlx2MatError); 
+			return(Nlx2MatError);
 		//}
 
 /*		ULONGLONG  fileLength = fileHandle.GetLength();
@@ -342,18 +344,18 @@ int GeneralOperations::OpenFileMat2Nlx( std::fstream &fileHandle, BOOL appendToF
 			if( fileType != fileTypeExpected ) {
 				mexErrMsgTxt("Error, File Type of Exsisting File Does Not Match Expected File Type.");
 				fileHandle.Close();
-				return(Nlx2MatError); 
+				return(Nlx2MatError);
 			}
 		}
 */
 		//fileHandle.SeekToEnd();
 	} else {
-		
+
 		fileHandle.open( filename, std::fstream::out | std::fstream::binary | std::fstream::app  );
 		if ( !fileHandle.is_open() ) {
 		//if ( fileHandle.Open( filename, CFile::modeWrite | CFile::modeCreate ) == 0) {
 			mexErrMsgTxt("Error opening file for writing; Is the file/path name correct?");
-			return(Nlx2MatError); 
+			return(Nlx2MatError);
 		}
 	}
 	return(Nlx2MatOK);
@@ -448,4 +450,3 @@ int GeneralOperations::ProcessHeader(const mxArray *prhs[], int nrhs,  int prhsI
 
 	return(Nlx2MatOK);
 }
-

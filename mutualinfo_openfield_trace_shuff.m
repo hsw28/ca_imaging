@@ -1,25 +1,43 @@
-function f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, velthreshold, dim, num_times_to_run, ca_MI)
+function f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, velthreshold, dim, CA_timestamps, num_times_to_run, ca_MI)
 %finds mutual info for a bunch of cells
 
 
-tic
+fprintf('running mutualinfo_openfield_trace_shuff')
+
+fprintf('starting function');
+cct = (class(calcium_traces) == 'struct');
+if cct(1) == 0
+  allvariables = load('allvariables2.mat');
+  calcium_traces = allvariables.all_traces;
+end
 
 
 spike_structure = calcium_traces;
 
 fields_spikes = fieldnames(spike_structure);
 fields_pos = fieldnames(pos_structure);
-fields_MI = fieldnames(pos_structure);
+fields_MI = fieldnames(ca_MI);
+fields_cats = fieldnames(CA_timestamps);
+
 
 if numel(fields_spikes) ~= numel(fields_pos)
-%  error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
+  warning('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
 end
 
-
+fprintf('going through days')
 for i = 1:numel(fields_spikes)
       fieldName_spikes = fields_spikes{i};
       fieldValue_spikes = spike_structure.(fieldName_spikes);
       peaks_time = fieldValue_spikes;
+
+      fieldName_MI = fields_MI{i};
+      fieldValue_MI = ca_MI.(fieldName_MI);
+      MI = fieldValue_MI;
+
+      if length(peaks_time)>1
+
+      fieldName_cats = fields_cats{i};
+      curr_CA_timestamps = CA_timestamps.(fieldName_cats);
 
       index = strfind(fieldName_spikes, '_');
       spikes_date = fieldName_spikes(index(2)+1:end)
@@ -29,21 +47,32 @@ for i = 1:numel(fields_spikes)
       pos = fieldValue_pos;
 
       index = strfind(fieldName_spikes, '_');
-      pos_date = fieldName_spikes(index(2)+1:end)
 
-
-      if length(pos)./length(peaks_time) > 1.5
-        pos = pos(1:2:end, :);
-        pos = pos(1:length(peaks_time),:);
+      if length(peaks_time) <5
+        mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+        continue
       end
+
+
+
+
+
+
+      if (pos(1,1)-pos(end,1))./length(pos) < 1
+        pos = convertpostoframe(pos, curr_CA_timestamps);
+      end
+
 
       if length(peaks_time)>length(pos)
         peaks_time = peaks_time(1:length(pos));
+      elseif length(peaks_time)<length(pos)
+        pos = pos(1:length(peaks_time),:);
       end
+
+
 
       velthreshold = 2;
       vel = ca_velocity(pos);
-
       times = vel(2,:);
       velocities = vel(1,:);
 
@@ -57,15 +86,15 @@ for i = 1:numel(fields_spikes)
       lowVelIndices = find(velocities < velThreshold);
       % Filter out high velocity indices that are too close to low velocities
       validHighVelIndices = [];
-      for i = 1:length(highVelIndices)
-          highVelTime = times(highVelIndices(i));
+      for ii = 1:length(highVelIndices)
+          highVelTime = times(highVelIndices(ii));
           % Find the closest low velocity time
           [~, closestLowVelIndex] = min(abs(highVelTime - times(lowVelIndices)));
           closestLowVelTime = times(lowVelIndices(closestLowVelIndex));
 
           % Check if the high velocity time is more than 1 second away from the closest low velocity time
           if abs(highVelTime - closestLowVelTime) > timeThreshold
-              validHighVelIndices = [validHighVelIndices, highVelIndices(i)];
+              validHighVelIndices = [validHighVelIndices, highVelIndices(ii)];
           end
       end
 
@@ -74,61 +103,90 @@ for i = 1:numel(fields_spikes)
       all_highspeedspikes = peaks_time(:,validHighVelIndices);
 
       numunits = size(peaks_time,1);
-      mutinfo = NaN(2,numunits);
-
-      fieldName_MI = fields_MI{i};
-      fieldValue_MI = pos_structure.(fieldName_MI);
-      MI = fieldValue_MI;
-
-      for k=1:numunits
-          currspikes = peaks_time(k,:);
-          if isnan(MI)==1
-            mutinfo(1, k) = NaN;
-            mutinfo(2, k) = NaN;
-
-          else
-            highspeedspikes = all_highspeedspikes(k,:);
-          end
-
-            shuf = NaN(num_times_to_run,1);
-            parfor l = 1:num_times_to_run
-
-              if isnan(MI(k))==0 && length(highspeedspikes)>1
-
-                shufff = highspeedspikes(randperm(length(highspeedspikes)))
-                [trace_mean occprob] = CA_normalizePosData_trace(shufff, goodpos, dim, 1.000);
-                shuf(l) = mutualinfo([trace_mean', occprob']);
-
-              else
-                shuf(l) = NaN;
-              end
+      mutinfo = NaN(3,numunits);
 
 
-            end
+      if numunits<=1
+        warning('you have no cells and no spikes')
+        mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+      else
+          for k=1:numunits
+                    currspikes = peaks_time(k,:);
+                    if isnan(MI(k))==1
+                      mutinfo(1, k) = NaN;
+                      mutinfo(2, k) = NaN;
+                      continue
+                    else
+                      highspeedspikes = all_highspeedspikes(k,:);
+                    end
+
+                    shuf = NaN(num_times_to_run,1);
+                    %for l = 1:num_times_to_run
+                    parfor l = 1:num_times_to_run
+
+                          if isnan(MI(k))==0 && length(highspeedspikes)>1
+
+                            shufff = highspeedspikes(randperm(length(highspeedspikes)))
+                            [trace_mean occprob] = CA_normalizePosData_trace(shufff, goodpos, dim, 1.000);
+                            if (size(trace_mean,1)) < (size(trace_mean,2))
+                              trace_mean = trace_mean';
+                            end
+                            if (size(occprob,1)) < (size(occprob,2))
+                              occprob = occprob';
+                            end
+                            shuf(l) = mutualinfo([trace_mean, occprob]);
+
+                          else
+                            shuf(l) = NaN;
+                          end
 
 
-            topMI5 = floor(num_times_to_run*.95);
-            topMI1 = floor(num_times_to_run*.99);
-            shuf = sort(shuf);
-            if isnan(topMI5)==0
-              mutinfo(1, k) = shuf(topMI5);
-            else
-              mutinfo(1, k) = NaN;
-            end
-            if isnan(topMI1)==0
-              mutinfo(2, k) = shuf(topMI1);
-            else
-              mutinfo(2, k) = NaN;
-            end
-
-          end
-      end
+                      end
 
 
+                      topMI5 = floor(num_times_to_run*.95);
+                      topMI1 = floor(num_times_to_run*.99);
+                      shuf = sort(shuf);
+                      if isnan(topMI5)==0
+                        mutinfo(1, k) = shuf(topMI5);
+                      else
+                        mutinfo(1, k) = NaN;
+                      end
+                      if isnan(topMI1)==0
+                        mutinfo(2, k) = shuf(topMI1);
+                      else
+                        mutinfo(2, k) = NaN;
+                      end
+
+                      [c index] = (min(abs(MI(k)-shuf)));
+                      if isnan(index)==0
+                        rank = index./length(shuf);
+                        mutinfo(3, k) = rank;
+                      else
+                        mutinfo(3,k) = NaN;
+                      end
+
+                  end %ending the for loop for units
 
 
-mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
-end
+    mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
+  end % ending if numunits<=1
+end % ending   if length(peaks_time)>1
 
 
-f = mutualinfo_struct;
+end % ending for i = 1:numel(fields_spikes)
+
+
+fprintf('saving')
+results_MI_trace_shuff = mutualinfo_struct;
+fprintf('Get the current date and time as a string')
+currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
+fprintf('Create a filename with the timestamp')
+filename = ['results_MI_trace_shuff_', currentDateTime, '.mat'];
+fprintf('Save the output to the .mat file with the timestamped filename')
+save(filename, 'results_MI_trace_shuff');
+print('save is a success')
+
+
+
+f = mutualinfo_struct

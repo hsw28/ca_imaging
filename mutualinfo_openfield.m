@@ -1,4 +1,4 @@
-function f = mutualinfo_openfield(spike_structure, pos_structure, velthreshold, dim)
+function f = mutualinfo_openfield(spike_structure, pos_structure, velthreshold, dim, CA_timestamps)
 %finds mutual info for a bunch of cells
 %little did I know i already had code for this: ca_mutualinfo_openfield.m
 
@@ -9,6 +9,7 @@ tic
 
 fields_spikes = fieldnames(spike_structure);
 fields_pos = fieldnames(pos_structure);
+fields_cats = fieldnames(CA_timestamps);
 
 if numel(fields_spikes) ~= numel(fields_pos)
   error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
@@ -20,6 +21,7 @@ for i = 1:numel(fields_spikes)
       fieldValue_spikes = spike_structure.(fieldName_spikes);
       peaks_time = fieldValue_spikes;
 
+
       index = strfind(fieldName_spikes, '_');
       spikes_date = fieldName_spikes(index(2)+1:end)
 
@@ -27,10 +29,30 @@ for i = 1:numel(fields_spikes)
       fieldValue_pos = pos_structure.(fieldName_pos);
       pos = fieldValue_pos;
 
+      fieldName_cats = fields_cats{i};
+      curr_CA_timestamps = CA_timestamps.(fieldName_cats);
+
+
+
       index = strfind(fieldName_spikes, '_');
-      pos_date = fieldName_spikes(index(2)+1:end)
+      pos_date = fieldName_spikes(index(2)+1:end);
+
+      if length(peaks_time) <5
+        mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+        continue
+      end
+
+      if (pos(1,1)-pos(end,1))./length(pos) < 1
+        pos = convertpostoframe(pos, curr_CA_timestamps);
+      end
 
       mutinfo = NaN(size(peaks_time,1),1);
+
+      tm = pos(:, 1);
+      biggest = max(peaks_time(:));
+      [minValue,closestIndex] = min(abs(biggest-tm));
+      pos = pos(1:closestIndex, :);
+
 
 velthreshold = 2;
 vel = ca_velocity(pos);
@@ -39,8 +61,10 @@ goodvel = find(vel(1,:)>=velthreshold);
 goodtime = pos(goodvel, 1);
 goodpos = pos(goodvel,:);
 
+
 mintime = vel(2,1);
 maxtime = vel(2,end);
+tm = vel(2,:);
 
 numunits = size(peaks_time,1);
 
@@ -55,11 +79,14 @@ for k=1:numunits
   [c indexmax] = (min(abs(peaks_time(k,:)-maxtime))); %
   currspikes = peaks_time(k,indexmin:indexmax);
 
-  for i=1:length(currspikes) %finding if in good vel
-    [minValue,closestIndex] = min(abs(currspikes(i)-goodtime));
+
+
+
+  for ii=1:length(currspikes) %finding if in good vel
+    [minValue,closestIndex] = min(abs(currspikes(ii)-goodtime));
 
     if minValue <= 1 %if spike is within 1 second of moving. no idea if good time
-      highspeedspikes(end+1) = currspikes(i);
+      highspeedspikes(end+1) = currspikes(ii);
     end;
   end
 
@@ -70,7 +97,13 @@ for k=1:numunits
   set(0,'DefaultFigureVisible', 'off');
   if length(highspeedspikes)>0
   [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(highspeedspikes, goodpos, dim, 1.000);
-  mutinfo(k) = mutualinfo([spikeprob', occprob']);
+          if (size(spikeprob,1)) < (size(spikeprob,2))
+            spikeprob = spikeprob';
+          end
+          if (size(occprob,1)) < (size(occprob,2))
+            occprob = occprob';
+          end
+  mutinfo(k) = mutualinfo([spikeprob, occprob]);
   else
     mutinfo(k) = NaN;
   end

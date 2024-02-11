@@ -90,9 +90,34 @@ occupancy = imgaussfilt(time*tstep);
 rate = events./occupancy; %time*tstep is occupancy
 rate = (rate);
 
+filtWidth = 3;
+filtSigma = .5;
+imageFilter=fspecial('gaussian',filtWidth,filtSigma);
+
+events = (events);
+events = nanconv(events,imageFilter, 'edge', 'nanout');
+
+occupancy = (time*tstep);
+occupancy2 = occupancy;
+occupancy2(occupancy == 0)= NaN;
+occupancy2 = nanconv(occupancy2,imageFilter, 'edge', 'nanout');
+
+rate = events./occupancy2;
+occprob = occupancy2./nansum(occupancy2);
+
 
 spikeprob = events./nansum(events);
-occprob = occupancy./nansum(occupancy);
+
+
+
+
+
+
+
+
+
+
+
 
 %[x,y] = find(isinf(rate)==1);
 rate(isinf(rate)) = NaN;

@@ -12,6 +12,7 @@ function [fixed_events fixed_EMG_ts fixed_EMG fixed_US_times fixed_CS_times fixe
 %downsamples EMG
 [fixed_EMG_ts fixed_EMG] = fixEMG_times(starttime_raw, EMG_ts, EMG);
 
+%fix CS/US
 fixed_US_times = fixUS(starttime_raw, US_times)
 fixed_CS_times = fixUS(starttime_raw, CS_times)
 

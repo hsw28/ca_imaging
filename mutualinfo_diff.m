@@ -1,5 +1,6 @@
 function f = mutualinfo_diff(MIcells, MIshuffle)
 %finds place cells based on MI> shuffled MI
+% SOMEWHAT DEP, USE MI_findgood.mat
 
 diff = MIcells-MIshuffle(:,1:2);
 [x,y] = find(diff>0);
