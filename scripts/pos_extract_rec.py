@@ -2,9 +2,8 @@ import os
 import glob
 from deeplabcut import analyze_videos
 
-root_folder = r"C:\Users\HomePC\hswlab\Desktop\videos\eyeblink\031423\2023_05_25"
-config_file = r"C:\Users\HomePC\hswlab\Desktop\videos\DLC_oval\config.yaml"
-#for square: C:\Users\HomePC\hswlab\Desktop\videos\DLC_cage\config.yaml"
+root_folder = r"C:\Users\HomePC\hswlab\Desktop\videos\eyeblink\022223"
+config_file = r"C:\Users\HomePC\hswlab\Desktop\videos\DLC_cage\config.yaml"
 #for oval: "C:\Users\HomePC\hswlab\Desktop\videos\DLC_oval\config.yaml"
 
 # Find all folders named "My_WebCam" recursively within the root folder
