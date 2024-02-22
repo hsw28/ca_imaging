@@ -1,5 +1,5 @@
 $searchTerm = "My_V4_Miniscope"
-$rootDir = "C:\Users\HomePC\OneDrive - Northwestern University\Desktop\videos\eyeblink\081622"
+$rootDir = "C:\Users\HomePC\OneDrive - Northwestern University\Desktop\videos\eyeblink\031423"
 $folders = Get-ChildItem -Recurse -Directory -Path $rootDir | Where-Object { $_.FullName -match $searchTerm } | Sort-Object CreationTime
 
 foreach ($folder in $folders) {

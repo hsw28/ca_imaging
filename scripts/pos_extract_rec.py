@@ -2,7 +2,8 @@ import os
 import glob
 from deeplabcut import analyze_videos
 
-root_folder = r"C:\Users\HomePC\hswlab\Desktop\videos\eyeblink\022223"
+#root_folder = r"C:\Users\HomePC\hswlab\Desktop\videos\eyeblink\031323"
+root_folder = r"C:\Users\HomePC\OneDrive - Northwestern University\Desktop\videos\eyeblink\031323\2023_05_28\13_00_30"
 config_file = r"C:\Users\HomePC\hswlab\Desktop\videos\DLC_cage\config.yaml"
 #for oval: "C:\Users\HomePC\hswlab\Desktop\videos\DLC_oval\config.yaml"
 

@@ -37,9 +37,10 @@ function giantStructure = processFolders_CaTime(currentDir)
                 if strcmp(ca_folder_date, 'extinction')==1
                   ca_folder = (fileparts(fileparts((selected_folder))))
                   ca_folder_parts = strsplit(ca_folder, '\')
-                  ca_folder_date = ca_folder_parts{2}
+                  ca_folder_date = ca_folder_parts{end-1}
                   ca_folder_date=sprintf('exinction_%s', ca_folder_date)
                 end
+
                   giantStructure.(sprintf('CA_time_%s', ca_folder_date)) = output;
 
             else

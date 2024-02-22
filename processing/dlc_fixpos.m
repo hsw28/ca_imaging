@@ -1,17 +1,21 @@
-function f = dlc_fixpos(pos, timestamps, env_shape)
+function f = dlc_fixpos(pos, timestamps,env_shape)
 % FOR BATCH PROCESSING USE processFolders_Pos.m
 %put in 1 for rectangle, 2 for oval
 %for fixing deeplabcut positions
 %can import CSV from dlc and timestamps using: pos = readtable('file.csv');
 
 
+
 if size(pos,2)>22
-  pos = pos(3:end, 2:end);
+ % pos = pos(3:end, 2:end);
+  pos = pos(:, 2:3);
 end
-posx  = pos(:,1);
-posy = pos(:,2);
+
+posx  = pos(:,2);
+posy = pos(:,3);
 
 timestamps = timestamps(:,2);
+
 
 
 
@@ -25,6 +29,9 @@ for z=1:length(bad_light)
     posy(bad_light(z)) = NaN;
   end
 end
+
+%posx(1:5)
+%posy(1:5)
 
 
 if env_shape == 1 %sq/rectangle. this is to set the bounds but the tracking seems good without so?
@@ -71,32 +78,32 @@ if env_shape == 1 %sq/rectangle. this is to set the bounds but the tracking seem
 end
 
 
-
+pos(1:5,:)
 
 if env_shape == 2 %OVAL
-bad_left = find(pos(:,12)<.95); %bad left positions
+bad_left = find(pos(:,11)<.95); %bad left positions
 
-pos(bad_left, 10) = NaN;
 pos(bad_left, 11) = NaN;
+pos(bad_left, 12) = NaN;
 
-leftx = nanmedian(pos(:, 10));
-lefty = nanmedian(pos(:, 11));
+leftx = nanmedian(pos(:, 11));
+lefty = nanmedian(pos(:, 12));
 left = [leftx,lefty];
 
-bad_right = find(pos(:,18)<.95); %bad right positions
-pos(bad_right, 16) = NaN;
+bad_right = find(pos(:,17)<.95); %bad right positions
 pos(bad_right, 17) = NaN;
+pos(bad_right, 18) = NaN;
 
-rightx = nanmedian(pos(:, 16));
-righty = nanmedian(pos(:, 17));
+rightx = nanmedian(pos(:, 17));
+righty = nanmedian(pos(:, 18));
 right = [rightx,righty];
 
-bad_bottom = find(pos(:,15)<.95); %bad bottom positions
-pos(bad_bottom, 13) = NaN;
-pos(bad_bottom, 14) = NaN;
+bad_bottom = find(pos(:,12)<.95); %bad bottom positions
+pos(bad_bottom, 11) = NaN;
+pos(bad_bottom, 12) = NaN;
 
-topx = nanmedian(pos(:, 13));
-topy = nanmedian(pos(:, 14));
+topx = nanmedian(pos(:, 11));
+topy = nanmedian(pos(:, 12));
 top = [topx,topy];
 
 
@@ -109,12 +116,15 @@ middlex = ((rightx+leftx)./2);
 middley = (topy+bottomy)./2;
 
 
-topy = topy-50;
-bottomy = bottomy+50;
-leftx = leftx+50;
-rightx = rightx-50;
+topy = topy+50;
+bottomy = bottomy-50;
+leftx = leftx-50;
+rightx = rightx+50;
 end
 
+
+%posx(1:5)
+%posy(1:5)
 
 for k=1:length(posy) %checks for values outside arena bounds
   if ((posy(k)-topy)>0)
@@ -136,6 +146,8 @@ for k=1:length(posy) %checks for values outside arena bounds
 end
 
 
+posx(1:5)
+posy(1:5)
 
 %{
 for k=1:length(pos)
@@ -166,7 +178,7 @@ pos = [posx,posy];
 pos = inpaint_nans(pos, 2);
 
 
-
+%size(pos)
 xpos = (pos(:, 1));
 %xpos = filloutliers(xpos, 'pchip', 'movmedian',30);
 xpos =  smoothdata(xpos, 'gaussian', 15);
@@ -174,6 +186,8 @@ ypos = (pos(:, 2));
 %ypos = filloutliers(ypos, 'pchip', 'movmedian',30);
 ypos =  smoothdata(ypos, 'gaussian', 15);
 timestamps = timestamps/1000;
+%size(xpos)
+
 
 %{
 if env_shape == 1 %sq/rectangle. this is to set the bounds but the tracking seems good without so?
@@ -191,5 +205,28 @@ if env_shape == 2 %sq/rectangle. this is to set the bounds but the tracking seem
 end
 %}
 
-pos = [timestamps, xpos, ypos];
+%size(timestamps)
+if length(xpos)./length(timestamps) >1.5
+    timestamps = interp1(1:length(timestamps), timestamps, 1:.5:length(timestamps));
+end
+
+if size(xpos,1)>size(xpos,2)
+    xpos = xpos';
+    ypos = ypos';
+end
+
+if size(timestamps,1)>size(timestamps,2)
+    timestamps = timestamps';
+end
+
+
+
+if length(timestamps)<length(xpos)
+    pos = [timestamps; xpos(1:length(timestamps)); ypos(1:length(timestamps))];
+elseif length(timestamps)>length(xpos)
+    pos = [timestamps(1:length(xpos)); xpos; ypos];
+else
+    pos = [timestamps; xpos; ypos];
+end
+
 f = pos;

@@ -1,5 +1,5 @@
 # Set the root folder path where the search will start, be sure to replace online folder with hswlab
-$rootFolder = "C:\Users\HomePC\hswlab\Desktop\videos\eyeblink\022223"
+$rootFolder = "C:\Users\HomePC\hswlab\Desktop\videos\eyeblink\031323"
 $webcamFolders = Get-ChildItem -Path $rootFolder -Filter "My_WebCam" -Directory -Recurse
 
 foreach ($folder in $webcamFolders) {
