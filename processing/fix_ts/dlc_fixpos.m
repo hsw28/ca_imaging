@@ -27,7 +27,7 @@ for z=1:length(bad_light)
 end
 
 
-%edited out the below on feb 22. 2024 bc just seemed to make things confusing
+%edited out the below on feb 22, 2024 bc just seemed to make things confusing
 
 %{
 if env_shape == 1 %sq/rectangle. this is to set the bounds but the tracking seems good without so?
