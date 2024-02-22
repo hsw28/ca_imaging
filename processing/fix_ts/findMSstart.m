@@ -28,7 +28,6 @@ for i = 1:numel(fields)
           start = ttl(ts0,1);
           starttime_raw.(fieldName) = ttl(ts0,1);
         else
-
           start = ttl(ts4,1);
           starttime_raw.(fieldName) = ttl(ts4,1);
         end
@@ -37,14 +36,17 @@ for i = 1:numel(fields)
 
 
         fixedevents = ttl;
-        ts0 = sort(find(ttl(:,2)==1 | ttl(:,2)==5));
-        ts0(1)
+
+        %if triggering
+      %  ts0 = sort(find(ttl(:,2)==1 | ttl(:,2)==5));
+      %  ts0(1)
+
         starttime_raw.(fieldName) = ttl(ts0(1),1);
 
         fixedevents(:,1) = ttl(:,1)-start;
         event_files.(fieldName) = fixedevents;
 
-        
+
 end
 fixed_events = event_files;
 %fprintf('events fixed')

@@ -100,10 +100,28 @@ topMI5 = floor(num_times_to_run*.95);
 topMI1 = floor(num_times_to_run*.99);
 fwdshuf = sort(fwdshuf);
 bwdshuf = sort(bwdshuf);
+
 mutinfo(1, k) = fwdshuf(topMI5);
-mutinfo(2, k) = bwdshuf(topMI5);
-mutinfo(3, k) = fwdshuf(topMI1);
-mutinfo(4, k) = bwdshuf(topMI1);
+
+[c index] = (min(abs(ca_MI(k)-fwdshuf)));
+if isnan(index)==0
+  rank = index./num_times_to_run;
+  mutinfo(2, k) = rank;
+else
+  mutinfo(2,k) = NaN;
+end
+
+
+mutinfo(3, k) = bwdshuf(topMI5);
+
+[c index] = (min(abs(ca_MI(k)-bwdshuf)));
+if isnan(index)==0
+  rank = index./num_times_to_run;
+  mutinfo(4, k) = rank;
+else
+  mutinfo(4,k) = NaN;
+end
+
 
 
 %stddev3(1,k) = nanmean(fwdshuf)+(3*nanstd(fwdshuf));
