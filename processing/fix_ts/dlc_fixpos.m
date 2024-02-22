@@ -27,6 +27,9 @@ for z=1:length(bad_light)
 end
 
 
+%edited out the below on feb 22. 2024 bc just seemed to make things confusing
+
+%{
 if env_shape == 1 %sq/rectangle. this is to set the bounds but the tracking seems good without so?
   bad_UR = find(pos(:,12)<.95); %bad upper right positions
 
@@ -107,10 +110,10 @@ middlex = ((rightx+leftx)./2);
 middley = (topy+bottomy)./2;
 
 
-topy = topy-50;
-bottomy = bottomy+50;
-leftx = leftx+50;
-rightx = rightx-50;
+topy = topy+50;
+bottomy = bottomy-50;
+leftx = leftx-50;
+rightx = rightx+50;
 end
 
 
@@ -133,27 +136,8 @@ for k=1:length(posy) %checks for values outside arena bounds
   end
 end
 
-
-
-%{
-for k=1:length(pos)
-
-  coord  = [pos(k,1), pos(k,2); leftx,lefty];
-  dis1 = pdist(coord,'euclidean');
-  coord  = [pos(k,1), pos(k,2); rightx,righty];
-  dis2 = pdist(coord,'euclidean');
-  coord  = [pos(k,1), pos(k,2); bottomx,bottomy];
-  dis3 = pdist(coord,'euclidean');
-  coord  = [pos(k,1), pos(k,2); topx,topy];
-  dis4 = pdist(coord,'euclidean');
-  coord  = [pos(k,1), pos(k,2); middlex, middley];
-  dis5 = pdist(coord,'euclidean');
-  if dis1>100 && dis2>100 && dis3>100 && dis4>100  & dis5>100
-    pos(k, 1) = NaN;
-    pos(k, 2) = NaN;
-  end
-end
 %}
+
 
 
 
@@ -173,4 +157,7 @@ ypos = (pos(:, 2));
 ypos =  smoothdata(ypos, 'gaussian', 15);
 timestamps = timestamps/1000;
 pos = [timestamps, xpos, ypos];
+
+
+
 f = pos;

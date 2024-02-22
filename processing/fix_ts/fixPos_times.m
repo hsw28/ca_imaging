@@ -27,6 +27,7 @@ for i = 1:numel(fields)
   ypos = current_pos(:,3);
 
 
+
   if for_rec_1_for_oval_2 == 2 %oval
     xpos = xpos*.14;
     xpos = xpos-min(xpos);
@@ -38,6 +39,8 @@ for i = 1:numel(fields)
       ypos = ypos*.15;
       ypos = ypos-min(ypos);
   end
+
+
   current_pos(:,2) = xpos;
   current_pos(:,3) = ypos;
 
