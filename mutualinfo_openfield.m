@@ -5,8 +5,6 @@ function f = mutualinfo_openfield(spike_structure, pos_structure, velthreshold, 
 tic
 
 
-
-
 fields_spikes = fieldnames(spike_structure);
 fields_pos = fieldnames(pos_structure);
 fields_cats = fieldnames(CA_timestamps);
@@ -28,6 +26,10 @@ for i = 1:numel(fields_spikes)
       fieldName_pos = fields_pos{i};
       fieldValue_pos = pos_structure.(fieldName_pos);
       pos = fieldValue_pos;
+
+      if size(pos,2)>size(pos,1)
+        pos = pos';
+      end
 
       fieldName_cats = fields_cats{i};
       curr_CA_timestamps = CA_timestamps.(fieldName_cats);
@@ -56,7 +58,6 @@ for i = 1:numel(fields_spikes)
 
 velthreshold = 2;
 vel = ca_velocity(pos);
-%vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30.0005); %originally had this at 30, trying with 15 now
 goodvel = find(vel(1,:)>=velthreshold);
 goodtime = pos(goodvel, 1);
 goodpos = pos(goodvel,:);
