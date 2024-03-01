@@ -1,6 +1,8 @@
 
 function fixed_pos = fixPos_times(pos)
 
+current_pos = pos;
+
 fields = fieldnames(pos);
 for i = 1:numel(fields)
     fieldName = fields{i};
@@ -25,6 +27,7 @@ for i = 1:numel(fields)
 
   xpos = current_pos(:,2);
   ypos = current_pos(:,3);
+
 
 
 

@@ -25,6 +25,7 @@ function giantStructure = processFolders_CaTime(currentDir)
                 ca_folder = (fileparts(fileparts((selected_folder))));
                 % Split the text using '/' as the delimiter
                 ca_folder_parts = strsplit(ca_folder, '\');
+                ca_folder_parts = strsplit(ca_folder, '/');
                 % Get the last part, which contains the date
                 ca_folder_date = ca_folder_parts{end};
 
@@ -37,6 +38,7 @@ function giantStructure = processFolders_CaTime(currentDir)
                 if strcmp(ca_folder_date, 'extinction')==1
                   ca_folder = (fileparts(fileparts((selected_folder))))
                   ca_folder_parts = strsplit(ca_folder, '\')
+                  ca_folder_parts = strsplit(ca_folder, '/')
                   ca_folder_date = ca_folder_parts{end-1}
                   ca_folder_date=sprintf('exinction_%s', ca_folder_date)
                 end
