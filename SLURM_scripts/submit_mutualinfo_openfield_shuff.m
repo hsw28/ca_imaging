@@ -20,6 +20,7 @@ c.AdditionalProperties.MemUsage = '2gb';
 
 % Specify number of nodes to use
 c.AdditionalProperties.Nodes = 1;
+c.AdditionalProperties.ProcsPerNode = 8;
 
 % Specify e-mail address to receive notifications about your job
 c.AdditionalProperties.EmailAddress = 'hsw@northwestern.edu';
