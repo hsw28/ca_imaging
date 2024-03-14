@@ -5,12 +5,17 @@ function f = mutualinfo_openfield(spike_structure, pos_structure, velthreshold, 
 tic
 
 
+
 fields_spikes = fieldnames(spike_structure);
 fields_pos = fieldnames(pos_structure);
 fields_cats = fieldnames(CA_timestamps);
 
 if numel(fields_spikes) ~= numel(fields_pos)
-  error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
+  error('your spike and pos structures do not have the same number of values. you may need to pad your US structure for exploration days')
+end
+
+if numel(fields_pos) ~= numel(fields_cats)
+  error('your pos and timestamp structures do not have the same number of values. you may need to pad your US structure for exploration days')
 end
 
 
@@ -26,6 +31,10 @@ for i = 1:numel(fields_spikes)
       fieldName_pos = fields_pos{i};
       fieldValue_pos = pos_structure.(fieldName_pos);
       pos = fieldValue_pos;
+
+      if size(pos,2)>3
+        error('you are not using a fixed position')
+      end
 
       if size(pos,2)>size(pos,1)
         pos = pos';
