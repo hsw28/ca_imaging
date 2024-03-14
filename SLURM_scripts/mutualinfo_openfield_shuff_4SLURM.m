@@ -18,21 +18,13 @@ function mutualinfo_openfield_shuff_4SLURM
   %pos
   %Ca_ts
 
-fprintf('loading pos')
-pos = load('pos.mat');
-pos_structure = pos.pos;
-
-fprintf('loading peaks')
-peaks = load('peaks.mat');
-spikes = peaks.peaks;
-
-fprintf('loading MI')
-MIs = load('MI.mat');
-ca_MI = MIs.MI;
-
-fprintf('loading timestamps')
-Ca_ts = load('Ca_ts.mat')
-ca_ts = Ca_ts.Ca_ts;
+fprintf('loading variables')
+slurm_var = load('slurm_var.mat')
+pos_structure = slurm_var.pos;
+spikes = slurm_var.Ca_peaks;
+ca_MI = slurm_var.MI;
+ca_ts = slurm_var.Ca_ts;
+clearvars slurm_var
 
 f = mutualinfo_openfield_shuff(spikes, pos_structure, 2, 2.5, ca_ts, 500, ca_MI);
 

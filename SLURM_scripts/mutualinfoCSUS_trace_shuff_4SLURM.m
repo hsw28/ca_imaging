@@ -18,34 +18,30 @@ function mutualinfoCSUS_trace_shuff_4SLURM
   %pos
 
 
-  fprintf('loading traces')
-  allvariables = load('allvariables.mat');
-  calcium_traces = allvariables.Ca_traces;
-  clearvars allvariables
+
+fprintf('loading variables')
+slurm_var = load('slurm_var.mat')
+calcium_traces = slurm_var.Ca_traces;
+CSUS_id = slurm_var.CSUS_id;
 
 
-CSUS = load('CSUS_id.mat')
-CSUS_id = CSUS.CSUS_id;
-
-allvariables = load('allvariables.mat');
-calcium_traces = allvariables.Ca_traces;
-clearvars allvariables
-
-MI = load('MI_CSUS.mat');
 
 
 
 %%%%%BELOW IS FOR CSUS WITH 5 DIVISIONS AND PRETRIAL%%%%%%%%
-%ca_MI = MI.MI_CSUS5_trace_pretrial;
+%ca_MI = slurm_var.MI_CSUS5_trace_pretrial;
+%clearvars slurm_var
 %f = mutualinfo_CSUS_trace_shuff(calcium_traces, CSUS_id, 1, 5, 500, ca_MI)
 
 %%%%%BELOW IS FOR CSUS WITH 5 DIVISIONS NO PRETRIAL%%%%%%%%
-ca_MI = MI.MI_CSUS5_trace;
+ca_MI = slurm_var.MI_CSUS5_trace;
+clearvars slurm_var
 f = mutualinfo_CSUS_trace_shuff(calcium_traces, CSUS_id, 0, 5, 500, ca_MI)
 
 %%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS NO PRETRIAL%%%%%%%%
-ca_MI = MI.MI_CSUS2_trace;
-f = mutualinfo_CSUS_trace_shuff(calcium_traces, CSUS_id, 0, 2, 500, ca_MI)
+%ca_MI = slurm_var.MI_CSUS2_trace;
+%clearvars slurm_var
+%f = mutualinfo_CSUS_trace_shuff(calcium_traces, CSUS_id, 0, 2, 500, ca_MI)
 
 
 end
