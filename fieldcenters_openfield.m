@@ -1,9 +1,12 @@
-function fieldcent  = fieldcenters_openfield(peaks_time, goodcells, pos, dim, velthreshold)
-  %good cells are indices of the cells you know have fields
+function fieldcent  = fieldcenters_openfield(peaks_time, pos, dim, velthreshold, goodcells)
+  %good cells IS AN OPTIONAL INPUT and are indices of the cells you know have fields
   % field ceenters are the highest spiking point, not the geometric center
   %rates returns max rate, av rate, min rate
 
 
+  if nargin < 5
+      goodcells = (1:size(peaks_time,1)); % Example: considering all cells as good
+  end
 
   vel = ca_velocity(pos);
   goodvel = find(vel(1,:)>=velthreshold);
