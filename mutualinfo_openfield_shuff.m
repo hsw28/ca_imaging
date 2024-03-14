@@ -120,10 +120,13 @@ for i = 1:numel(fields_spikes)
                 parfor l = 1:num_times_to_run
                       %fprintf('survived the great parfor loop trauma of jan 10')
                       if isnan(MI(k))==0 && length(highspeedspikes)>1
-                        shufff = randsample(goodtime, length(highspeedspikes));
-                        shufff = sort(shufff);
 
-                        [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(shufff,goodpos,dim, 1.000);
+                        shuff_pos = goodpos;
+                        shuffled_indices = randperm(size(shuff_pos, 1));
+                        % Apply the shuffled indices to the first two columns
+                        shuff_pos(:, 1:2) = shuff_pos(shuffled_indices, 1:2);
+
+                        [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(highspeedspikes,shuff_pos,dim, 1.000);
 
                         if (size(spikeprob,1)) < (size(spikeprob,2))
                           spikeprob = spikeprob';
