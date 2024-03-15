@@ -16,7 +16,7 @@ addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/include'))
   %Ca_ts
 
 fprintf('loading variables')
-slurm_var = load('slurm_var.mat')
+load('slurm_var.mat');
 pos_structure = slurm_var.pos;
 calcium_traces = slurm_var.Ca_traces;
 ca_MI = slurm_var.MI_trace;

@@ -20,7 +20,7 @@ function mutualinfoCSUS_trace_shuff_4SLURM
 
 
 fprintf('loading variables')
-slurm_var = load('slurm_var.mat')
+load('slurm_var.mat')
 calcium_traces = slurm_var.Ca_traces;
 CSUS_id = slurm_var.CSUS_id;
 

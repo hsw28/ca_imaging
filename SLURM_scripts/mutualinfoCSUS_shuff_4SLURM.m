@@ -20,7 +20,7 @@ function mutualinfoCSUS_shuff_4SLURM
 
 
 fprintf('loading variables')
-slurm_var = load('slurm_var.mat')
+load('slurm_var.mat')
 spikes = slurm_var.Ca_peaks;
 CSUS_id = slurm_var.CSUS_id;
 

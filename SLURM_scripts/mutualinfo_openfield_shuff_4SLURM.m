@@ -19,7 +19,7 @@ function mutualinfo_openfield_shuff_4SLURM
   %Ca_ts
 
 fprintf('loading variables')
-slurm_var = load('slurm_var.mat');
+load('slurm_var.mat');
 fprintf('loading pos')
 pos_structure = slurm_var.pos;
 fprintf('loading spikes')
