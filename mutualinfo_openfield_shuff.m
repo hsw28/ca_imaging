@@ -24,6 +24,7 @@ fields_cats = fieldnames(CA_timestamps);
 fprintf('all loaded')
 
 if numel(fields_spikes) ~= numel(fields_pos)
+  fprintf('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
   error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
 end
 

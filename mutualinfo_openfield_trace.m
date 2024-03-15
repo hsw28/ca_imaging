@@ -37,6 +37,8 @@ for i = 1:numel(fields_spikes)
       fieldValue_pos = pos_structure.(fieldName_pos);
       pos = fieldValue_pos;
 
+      mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN
+
       index = strfind(fieldName_spikes, '_');
       if length(peaks_time) <5
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
@@ -96,7 +98,6 @@ for i = 1:numel(fields_spikes)
 
 
       goodpos = pos(validHighVelIndices,:);
-
       all_highspeedspikes = peaks_time(:,validHighVelIndices);
 
   fprintf('starting units')
