@@ -15,7 +15,7 @@ c.AdditionalProperties.QueueName = 'normal';
 %% optional arguments but worth considering
 
 % Specify memory to use for MATLAB jobs, per core (default: 4gb)
-c.AdditionalProperties.MemUsage = '3gb';
+c.AdditionalProperties.MemUsage = '5gb';
 
 % Specify number of nodes to use
 c.AdditionalProperties.Nodes = 1;
@@ -32,4 +32,4 @@ addpath(pwd)
 addpath(genpath('/home/hsw967/Programming/ca_imaging'))
 addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/'));
 addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/include'));
-job = c.batch('mutualinfoCSUS_shuff_4SLURM', 'Pool', 8, 'CurrentFolder', '.');
+job = c.batch('mutualinfoCSUS_shuff_4SLURM', 'Pool', 10, 'CurrentFolder', '.');
