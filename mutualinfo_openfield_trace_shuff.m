@@ -49,19 +49,15 @@ for i = 1:numel(fields_spikes)
       index = strfind(fieldName_spikes, '_');
 
       if length(peaks_time) <5
+        fprintf('no spikes, continuing')
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
         continue
       end
 
-
-
-
-
-
+      fprintf('fixing positions') %%%
       if (pos(1,1)-pos(end,1))./length(pos) < 1
         pos = convertpostoframe(pos, curr_CA_timestamps);
       end
-
 
       if length(peaks_time)>length(pos)
         peaks_time = peaks_time(1:length(pos));
@@ -69,16 +65,16 @@ for i = 1:numel(fields_spikes)
         pos = pos(1:length(peaks_time),:);
       end
 
-
-
       velthreshold = 2;
       vel = ca_velocity(pos);
       times = vel(2,:);
       velocities = vel(1,:);
 
+
+      fprintf('thresholding spikes for vel') %%%
       %want highspeedspikes
       % Thresholds
-      velThreshold = 2; % cm/s
+      velThreshold = velthreshold; % cm/s
       timeThreshold = 1; % second
       % Find indices where velocity is greater than the threshold
       highVelIndices = find(velocities >= velThreshold);
@@ -110,6 +106,7 @@ for i = 1:numel(fields_spikes)
         warning('you have no cells and no spikes')
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
       else
+        fprintf('going through units') %%%
           for k=1:numunits
                     currspikes = peaks_time(k,:);
                     if isnan(MI(k))==1
