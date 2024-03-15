@@ -4,8 +4,8 @@ function f = fielddistancebyday(alignmentdata1, alignmentdata2, center1, center2
 both = find(alignmentdata1>0 & alignmentdata2>0);
 want1 = (alignmentdata1(both));
 want2 = (alignmentdata2(both));
-center1 = center1(want1);
-center2 = center2(want2);
+center1 = center1(want1,:);
+center2 = center2(want2,:);
 
 distance = NaN(length(center1),1);
 for k=1:length(center1)

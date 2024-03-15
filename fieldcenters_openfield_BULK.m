@@ -64,7 +64,6 @@ function field_centers  = fieldcenters_openfield_BULK(peaks_time_struct, pos_str
 
             [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(highspeedspikes,goodpos,dim, 1.000);
             rate;
-            rate = smoothdata(rate, 'gaussian', dim);
             [maxval, maxindex] = max(rate(:));
             [x,y] = ind2sub(size(rate), maxindex);
             maxrate(1, k) = x*dim;
@@ -76,5 +75,5 @@ function field_centers  = fieldcenters_openfield_BULK(peaks_time_struct, pos_str
 
         end
 
-        field_centers.(sprintf('MI_%s', spikes_date)) = maxrate';
+        field_centers.(sprintf('centers_%s', spikes_date)) = maxrate';
   end

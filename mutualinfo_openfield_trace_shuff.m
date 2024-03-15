@@ -108,6 +108,7 @@ for i = 1:numel(fields_spikes)
       else
         fprintf('going through units') %%%
           for k=1:numunits
+            k
                     currspikes = peaks_time(k,:);
                     if isnan(MI(k))==1
                       mutinfo(1, k) = NaN;
@@ -146,7 +147,7 @@ for i = 1:numel(fields_spikes)
 
                       end
 
-
+                      fprintf('getting percent')
                       topMI5 = floor(num_times_to_run*.95);
                       topMI1 = floor(num_times_to_run*.99);
                       shuf = sort(shuf);
@@ -171,7 +172,7 @@ for i = 1:numel(fields_spikes)
 
                   end %ending the for loop for units
 
-
+                  fprintf('assigning MI')
     mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
   end % ending if numunits<=1
 end % ending   if length(peaks_time)>1

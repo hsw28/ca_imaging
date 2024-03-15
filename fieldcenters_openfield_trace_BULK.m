@@ -86,7 +86,6 @@ function field_centers  = fieldcenters_openfield_trace_BULK(trace_time_struct, p
 
             [trace_mean occprob] = CA_normalizePosData_trace(currspikes,goodpos,dim, 1.000);
             rate=trace_mean;
-            rate = smoothdata(rate, 'gaussian', dim);
             [maxval, maxindex] = max(rate(:));
             [x,y] = ind2sub(size(rate), maxindex);
             maxrate(1, k) = x*dim;
@@ -98,5 +97,5 @@ function field_centers  = fieldcenters_openfield_trace_BULK(trace_time_struct, p
 
         end
 
-        field_centers.(sprintf('MI_%s', spikes_date)) = maxrate';
+        field_centers.(sprintf('centers_%s', spikes_date)) = maxrate';
   end
