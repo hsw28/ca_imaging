@@ -20,8 +20,6 @@ c.AdditionalProperties.MemUsage = '4gb';
 
 % Specify number of nodes to use
 c.AdditionalProperties.Nodes = 1;
-c.AdditionalProperties.ProcsPerNode = 8;
-c.AdditionalProperties.NumWorkers = 8;
 
 % Specify e-mail address to receive notifications about your job
 c.AdditionalProperties.EmailAddress = 'hsw@northwestern.edu';
@@ -40,5 +38,5 @@ addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/'))
 addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/include'));
 fprintf('starting the job');
 
-%job = c.batch('mutualinfo_openfield_shuff_4SLURM', 'Pool', 12, 'CurrentFolder', '.');
-job = c.batch('mutualinfo_openfield_shuff_4SLURM');
+job = c.batch('mutualinfo_openfield_shuff_4SLURM', 'Pool', 9, 'CurrentFolder', '.');
+%job = c.batch('mutualinfo_openfield_shuff_4SLURM');
