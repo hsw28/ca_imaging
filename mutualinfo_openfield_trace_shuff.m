@@ -14,10 +14,10 @@ end
 
 spike_structure = calcium_traces;
 
-fields_spikes = fieldnames(spike_structure);
-fields_pos = fieldnames(pos_structure);
-fields_MI = fieldnames(ca_MI);
-fields_cats = fieldnames(CA_timestamps);
+fields_spikes = fieldnames(spike_structure)
+fields_pos = fieldnames(pos_structure)
+fields_MI = fieldnames(ca_MI)
+fields_cats = fieldnames(CA_timestamps)
 
 
 if numel(fields_spikes) ~= numel(fields_pos)
