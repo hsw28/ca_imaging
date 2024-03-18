@@ -34,6 +34,11 @@ for i = 1:numel(fields_spikes)
       fieldValue_MI = ca_MI.(fieldName_MI);
       MI = fieldValue_MI;
 
+      if all(isnan(mutinfo(1,k)))
+          fprintf('All MI are NaN');
+          mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+          continue
+      end
 
       fieldName_cats = fields_cats{i};
       curr_CA_timestamps = CA_timestamps.(fieldName_cats);
@@ -106,9 +111,6 @@ for i = 1:numel(fields_spikes)
       if (numunits)<=3 | isnan(numunits)== 1
         fprintf('you have no cells and no spikes')
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
-      elseif all(isnan(mutinfo(1,k)))
-            fprintf('All MI are NaN');
-            mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
       else
         fprintf('going through units') %%%
           for k=1:numunits
