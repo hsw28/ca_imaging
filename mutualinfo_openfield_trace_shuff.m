@@ -104,10 +104,10 @@ for i = 1:numel(fields_spikes)
 
 
       if (numunits)<=3 | isnan(numunits)== 1
-        warning('you have no cells and no spikes')
+        fprintf('you have no cells and no spikes')
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
       elseif all(isnan(mutinfo(1,k)))
-            disp('All MI are NaN');
+            fprintf('All MI are NaN');
             mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
       else
         fprintf('going through units') %%%
