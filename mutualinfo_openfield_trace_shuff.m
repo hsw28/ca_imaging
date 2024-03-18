@@ -115,10 +115,9 @@ for i = 1:numel(fields_spikes)
       else
         fprintf('going through units') %%%
           for k=1:numunits
-                    if isnan(MI(k))==1 | length(peaks_time(k,:)<1) | isnan(peaks_time(k,1)==1)
+                    if isnan(MI(k))==1
                       mutinfo(1, k) = NaN;
                       mutinfo(2, k) = NaN;
-                      fprintf('isnan triggered')
                       continue
                     else
                       fprintf('assinging high speed spikes')
