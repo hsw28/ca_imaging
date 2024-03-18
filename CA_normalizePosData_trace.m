@@ -90,12 +90,12 @@ occprob = occupancy2./nansum(occupancy2);
 
 
 
-
+colorbar = NaN;
 
 %heat map stuff
 %figure
 
-
+%{
 rate = rate./dim;
 [nr,nc] = size(rate);
 colormap('parula');
@@ -113,8 +113,9 @@ set(gca, 'ydir', 'reverse');
 if minratefive ~= maxratefive
 		set(gca, 'clim', [minratefive*1.5, maxratefive*.85]);
 end
-%}
+
 colorbar = [minratefive*1.5, maxratefive*.85];
 
 %axis([20 75, -5 50])
 %set(gca,'visible','off')
+%}
