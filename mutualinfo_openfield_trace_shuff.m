@@ -113,9 +113,13 @@ for i = 1:numel(fields_spikes)
                     if isnan(MI(k))==1
                       mutinfo(1, k) = NaN;
                       mutinfo(2, k) = NaN;
+                      fprintf('isnan triggered')
                       continue
                     else
+                      fprintf('assinging high speed spikes')
                       highspeedspikes = all_highspeedspikes(k,:);
+                      fprintf('assignment done, number of spikes is')
+                      length(highspeedspikes)
                     end
 
                     shuf = NaN(num_times_to_run,1);
