@@ -138,7 +138,7 @@ for i = 1:numel(fields_spikes)
 
                             pos_only = goodpos(:, 2:3);
                             time = goodpos(:, 1);
-                            shift = randi(length(pos_only), 1);
+                            shift = randi([8 length(pos_only)], 1);
                             if rand < 0.5
                               shift = -shift;
                             end
