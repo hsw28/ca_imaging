@@ -14,10 +14,10 @@ end
 
 spike_structure = calcium_traces;
 
-fields_spikes = fieldnames(spike_structure)
-fields_pos = fieldnames(pos_structure)
-fields_MI = fieldnames(ca_MI)
-fields_cats = fieldnames(CA_timestamps)
+fields_spikes = fieldnames(spike_structure);
+fields_pos = fieldnames(pos_structure);
+fields_MI = fieldnames(ca_MI);
+fields_cats = fieldnames(CA_timestamps);
 
 
 if numel(fields_spikes) ~= numel(fields_pos)
@@ -99,18 +99,19 @@ for i = 1:numel(fields_spikes)
       all_highspeedspikes = peaks_time(:,validHighVelIndices);
 
       numunits = size(peaks_time,1);
-      mutinfo = NaN(3,numunits);
+      mutinfo = NaN(3,numunits);s
+
 
 
       if (numunits)<=3 | isnan(numunits)== 1
         warning('you have no cells and no spikes')
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+      elseif all(isnan(mutinfo(1,k)))
+            disp('All MI are NaN');
+            mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
       else
         fprintf('going through units') %%%
           for k=1:numunits
-            k
-
-
                     if isnan(MI(k))==1 | length(peaks_time(k,:)<1) | isnan(peaks_time(k,1)==1)
                       mutinfo(1, k) = NaN;
                       mutinfo(2, k) = NaN;
