@@ -95,27 +95,26 @@ colorbar = NaN;
 %heat map stuff
 %figure
 
-%{
-rate = rate./dim;
-[nr,nc] = size(rate);
-colormap('parula');
+
+%rate = rate./dim;
+%[nr,nc] = size(rate);
+%colormap('parula');
 %lower and higher three percent of firing sets bounds
-numrate = rate(~isnan(rate));
-numrate = sort(numrate(:),'descend');
-maxratefive = min(numrate(1:ceil(length(numrate)*0.03)));
-numrate = sort(numrate(:),'ascend');
-minratefive = max(numrate(1:ceil(length(numrate)*0.03)));
+%numrate = rate(~isnan(rate));
+%numrate = sort(numrate(:),'descend');
+%maxratefive = min(numrate(1:ceil(length(numrate)*0.03)));
+%numrate = sort(numrate(:),'ascend');
+%minratefive = max(numrate(1:ceil(length(numrate)*0.03)));
 
-%{
-pcolor([rate nan(nr,1); nan(1,nc+1)]);
-shading flat;
-set(gca, 'ydir', 'reverse');
-if minratefive ~= maxratefive
-		set(gca, 'clim', [minratefive*1.5, maxratefive*.85]);
-end
 
-colorbar = [minratefive*1.5, maxratefive*.85];
+%pcolor([rate nan(nr,1); nan(1,nc+1)]);
+%shading flat;
+%set(gca, 'ydir', 'reverse');
+%if minratefive ~= maxratefive
+%		set(gca, 'clim', [minratefive*1.5, maxratefive*.85]);
+%end
+
+%colorbar = [minratefive*1.5, maxratefive*.85];
 
 %axis([20 75, -5 50])
 %set(gca,'visible','off')
-%}

@@ -24,7 +24,7 @@ if numel(fields_spikes) ~= numel(fields_pos)
   warning('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
 end
 
-fprintf('going through days')
+
 for i = 1:numel(fields_spikes)
       fieldName_spikes = fields_spikes{i};
       fieldValue_spikes = spike_structure.(fieldName_spikes);
@@ -120,10 +120,7 @@ for i = 1:numel(fields_spikes)
                       mutinfo(2, k) = NaN;
                       continue
                     else
-                      fprintf('assinging high speed spikes')
                       highspeedspikes = all_highspeedspikes(k,:);
-                      fprintf('assignment done, number of spikes is')
-                      length(highspeedspikes)
                     end
 
                     currspikes = peaks_time(k,:);
@@ -157,7 +154,7 @@ for i = 1:numel(fields_spikes)
 
                       end
 
-                      fprintf('getting percent')
+
                       topMI5 = floor(num_times_to_run*.95);
                       topMI1 = floor(num_times_to_run*.99);
                       shuf = sort(shuf);
@@ -182,7 +179,7 @@ for i = 1:numel(fields_spikes)
 
                   end %ending the for loop for units
 
-                  fprintf('assigning MI')
+                  %fprintf('assigning MI')
     mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
   end % ending if numunits<=1
 
