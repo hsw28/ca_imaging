@@ -125,7 +125,7 @@ for i = 1:numel(fields_spikes)
                         shuff_pos = goodpos;
                         shuffled_indices = randperm(size(shuff_pos, 1));
                         % Apply the shuffled indices to the first two columns
-                        shuff_pos(:, 1:2) = shuff_pos(shuffled_indices, 1:2);
+                        shuff_pos(:, 2:3) = shuff_pos(shuffled_indices, 2:3);
 
                         [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(highspeedspikes,shuff_pos,dim, 1.000);
 
