@@ -34,11 +34,6 @@ for i = 1:numel(fields_spikes)
       fieldValue_MI = ca_MI.(fieldName_MI);
       MI = fieldValue_MI;
 
-      if all(isnan(mutinfo(1,k)))
-          fprintf('All MI are NaN');
-          mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
-          continue
-      end
 
       fieldName_cats = fields_cats{i};
       curr_CA_timestamps = CA_timestamps.(fieldName_cats);
@@ -52,7 +47,13 @@ for i = 1:numel(fields_spikes)
 
       index = strfind(fieldName_spikes, '_');
 
-      if length(peaks_time)>1
+      if all(isnan(MI(1,:))) == 1
+          fprintf('All MI are NaN');
+          mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+          continue
+      end
+
+
       if length(peaks_time) <3
         fprintf('no spikes, continuing')
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
@@ -104,7 +105,7 @@ for i = 1:numel(fields_spikes)
       all_highspeedspikes = peaks_time(:,validHighVelIndices);
 
       numunits = size(peaks_time,1);
-      mutinfo = NaN(3,numunits);s
+      mutinfo = NaN(3,numunits);
 
 
 
@@ -185,7 +186,7 @@ for i = 1:numel(fields_spikes)
                   fprintf('assigning MI')
     mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
   end % ending if numunits<=1
-end % ending   if length(peaks_time)>1
+
 
 
 end % ending for i = 1:numel(fields_spikes)
