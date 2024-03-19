@@ -136,17 +136,16 @@ for i = 1:numel(fields_spikes)
                             % Apply the shuffled indices to the first two columns
                             %shuff_pos(:, 2:3) = shuff_pos(shuffled_indices, 1:2);
 
+                            % code for circular shift
                             pos_only = goodpos(:, 2:3);
                             time = goodpos(:, 1);
                             shift = randi([8 length(pos_only)], 1);
                             if rand < 0.5
                               shift = -shift;
                             end
-
-                            % Perform the circular shift
                             shiftedData = circshift(pos_only, shift);
-
                             shuff_pos = [time, shiftedData];
+                            %% end circular shift
 
                             [trace_mean occprob] = CA_normalizePosData_trace(highspeedspikes, shuff_pos, dim, 1.000);
                             if (size(trace_mean,1)) < (size(trace_mean,2))

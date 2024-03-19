@@ -122,10 +122,22 @@ for i = 1:numel(fields_spikes)
                       %fprintf('survived the great parfor loop trauma of jan 10')
                       if isnan(MI(k))==0 && length(highspeedspikes)>1
 
-                        shuff_pos = goodpos;
-                        shuffled_indices = randperm(size(shuff_pos, 1));
-                        % Apply the shuffled indices to the first two columns
-                        shuff_pos(:, 2:3) = shuff_pos(shuffled_indices, 2:3);
+                        %code for random pos shuffle
+                        %shuff_pos = goodpos;
+                        %shuffled_indices = randperm(size(shuff_pos, 1));
+                        %shuff_pos(:, 2:3) = shuff_pos(shuffled_indices, 2:3);
+                        %end random post shuffle
+
+                        % code for circular shift
+                        pos_only = goodpos(:, 2:3);
+                        time = goodpos(:, 1);
+                        shift = randi([8 length(pos_only)], 1);
+                        if rand < 0.5
+                          shift = -shift;
+                        end
+                        shiftedData = circshift(pos_only, shift);
+                        shuff_pos = [time, shiftedData];
+                        %% end circular shift
 
                         [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(highspeedspikes,shuff_pos,dim, 1.000);
 
@@ -180,9 +192,9 @@ for i = 1:numel(fields_spikes)
   fprintf('Get the current date and time as a string')
   currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
   fprintf('Create a filename with the timestamp')
-  filename = ['results_MI_shuff', currentDateTime, '.mat'];
+  filename = ['results_MI_shift', currentDateTime, '.mat'];
   fprintf('Save the output to the .mat file with the timestamped filename')
-  save(filename, 'results_MI_shuff');
-    print('save is a success')
+  save(filename, 'results_MI_shift');
+  print('save is a success')
 
   f = mutualinfo_struct
