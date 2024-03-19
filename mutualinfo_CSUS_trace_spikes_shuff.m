@@ -1,5 +1,5 @@
 function f = mutualinfo_CSUS_trace_shuff(spike_structure, CSUS_structure, do_you_want_pretrial, how_many_divisions, num_times_to_run, MI_CSUS)
-%SHUFFLES CSUS
+% SHUFFLES SPIKES
 %finds 'mutual info' for CS/US/ non CS/US
 %CSUS_structure should come from BULKconverttoframe.m
 %do_you_want_pretrial: 0 for only cs us, 1 for cs us pretrial
@@ -91,36 +91,41 @@ for i = 1:numel(fields_spikes)
           currspikes = peaks_time(k,:);
 
               if length(currspikes)>0 &&  isnan(MI(k))==0 && length(unique(CSUS))>=3 %finding how many spikes in each time bin
+                shuf = NaN(num_times_to_run,1);
                 parfor d = 1:num_times_to_run
-                    spikes_in_CS_US = zeros(1,10);
-                    spikes_intertrial = zeros(1,1);
-                    spikes_pretial = zeros(1,1);
+                          if do_you_want_pretrial == 0
+                            wantedindex = find(CSUS>0);
+                          else
+                            wantedindex = find(CSUS>0 | CSUS == -1);
+                          end
+                            wanted = currspikes(wantedindex);
+                            shuff = currspikes;
+                            shuff(wantedindex) = wanted(randperm(length(wanted)));
 
-                    if do_you_want_pretrial == 0
-                      wanted = find(CSUS > 0);
-                      shuffCSUS = CSUS;
-                      shufff = wanted(randperm(length(wanted)));
-                      shuffCSUS(wanted) = CSUS(shufff);
-                    else
-                      wanted = find(CSUS > 0 | CSUS == -1);
-                      shuffCSUS = CSUS;
-                      shufff = wanted(randperm(length(wanted)));
-                      shuffCSUS(wanted) = CSUS(shufff);
-                    end
-                    for q =1:length(currspikes)
-                      if isnan(currspikes(q))==1
-                        continue
-                      end
-                      [c index] = (min(abs(currspikes(q)-time))); %
-                      spikebin = shuffCSUS(index);
-                            if spikebin == 0
-                              spikes_intertrial = spikes_intertrial+1;
-                            elseif spikebin == -1
-                              spikes_pretial = spikes_pretial+1;
-                            else
-                              spikes_in_CS_US(spikebin) = spikes_in_CS_US(spikebin)+1;
-                            end
-                      end
+                          uni = unique(CSUS);
+                          occ_in_CS_US = NaN(length(uni)-1,1);
+                          spikes_in_CS_US = NaN(length(uni)-1,1);
+
+                          occ_pretrial = zeros(1,1);
+                          spikes_pretrial = NaN(1,1);
+
+                          index=1;
+                                for q=0:numbering:10
+                                      if q == 0
+                                        wanted= (find(CSUS == -1));
+                                        occ_pretrial = length(wanted);
+                                        spikes_pretrial = nanmean(currspikes(wanted));
+                                        index=1;
+                                      else
+                                        wantedtimes = find(CSUS == q);
+                                        wantedtimes = wantedtimes(find(wantedtimes<=length(currspikes)));
+                                        trace_mean = nanmean(shuff(wantedtimes));
+                                        occ_in_CS_US(index) = length(wantedtimes);
+                                        spikes_in_CS_US(index) = trace_mean;
+                                        index = index+1;
+                                      end
+                                end
+
 
                                 if do_you_want_pretrial == 1
                                       pretrial_occprob = occ_pretrial*(1/7.5);
@@ -148,6 +153,7 @@ for i = 1:numel(fields_spikes)
                                   compMI = mutualinfo([spikeprob, occprob]);
                                   shuf(d) = compMI; %is this oriented the right way
                                 end
+
 
                     end
                     topMI5 = floor(num_times_to_run*.95);;
@@ -212,7 +218,7 @@ for i = 1:numel(fields_spikes)
       currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
 
       % Create a filename with the timestamp
-      filename = sprintf('NEWresults_%s_%s.mat', variableName, currentDateTime);
+      filename = sprintf('results_%s_%s.mat', variableName, currentDateTime);
 
       % Save the output to the .mat file with the timestamped filename
       save(filename, variableName);
