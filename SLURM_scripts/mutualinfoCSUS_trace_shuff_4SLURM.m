@@ -34,14 +34,14 @@ CSUS_id = slurm_var.CSUS_id;
 %f = mutualinfo_CSUS_trace_shuff(calcium_traces, CSUS_id, 1, 5, 500, ca_MI)
 
 %%%%%BELOW IS FOR CSUS WITH 5 DIVISIONS NO PRETRIAL%%%%%%%%
-%ca_MI = slurm_var.MI_CSUS5_trace;
-%clearvars slurm_var
-%f = mutualinfo_CSUS_trace_shuff(calcium_traces, CSUS_id, 0, 5, 500, ca_MI)
+ca_MI = slurm_var.MI_CSUS5_trace;
+clearvars slurm_var
+f = mutualinfo_CSUS_trace_shuff(calcium_traces, CSUS_id, 0, 5, 500, ca_MI)
 
 %%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS NO PRETRIAL%%%%%%%%
-ca_MI = slurm_var.MI_CSUS2_trace;
-clearvars slurm_var
-f = mutualinfo_CSUS_trace_shuff(calcium_traces, CSUS_id, 0, 2, 500, ca_MI)
+%ca_MI = slurm_var.MI_CSUS2_trace;
+%clearvars slurm_var
+%f = mutualinfo_CSUS_trace_shuff(calcium_traces, CSUS_id, 0, 2, 500, ca_MI)
 
 
 end
