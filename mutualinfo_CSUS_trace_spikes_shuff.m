@@ -1,4 +1,4 @@
-function f = mutualinfo_CSUS_trace_shuff(spike_structure, CSUS_structure, do_you_want_pretrial, how_many_divisions, num_times_to_run, MI_CSUS)
+function f = mutualinfo_CSUS_trace_spike_shuff(spike_structure, CSUS_structure, do_you_want_pretrial, how_many_divisions, num_times_to_run, MI_CSUS)
 % SHUFFLES SPIKES
 %finds 'mutual info' for CS/US/ non CS/US
 %CSUS_structure should come from BULKconverttoframe.m

@@ -91,132 +91,142 @@ for i = 1:numel(fields_spikes)
           currspikes = peaks_time(k,:);
 
               if length(currspikes)>0 &&  isnan(MI(k))==0 && length(unique(CSUS))>=3 %finding how many spikes in each time bin
+
+
                 parfor d = 1:num_times_to_run
-                    spikes_in_CS_US = zeros(1,10);
-                    spikes_intertrial = zeros(1,1);
-                    spikes_pretial = zeros(1,1);
+                  if do_you_want_pretrial == 0
+                    wantedindex = find(CSUS>0);
+                    shuffCSUS = CSUS;
+                    shufff = wantedindex(randperm(length(wantedindex)));
+                    shuffCSUS(wantedindex) = CSUS(shufff);
+                  else
+                    wantedindex = find(CSUS>0 | CSUS == -1);
+                    shuffCSUS = CSUS;
+                    shufff = wantedindex(randperm(length(wantedindex)));
+                    shuffCSUS(wantedindex) = CSUS(shufff);
+                  end
 
-                    if do_you_want_pretrial == 0
-                      wanted = find(CSUS > 0);
-                      shuffCSUS = CSUS;
-                      shufff = wanted(randperm(length(wanted)));
-                      shuffCSUS(wanted) = CSUS(shufff);
-                    else
-                      wanted = find(CSUS > 0 | CSUS == -1);
-                      shuffCSUS = CSUS;
-                      shufff = wanted(randperm(length(wanted)));
-                      shuffCSUS(wanted) = CSUS(shufff);
-                    end
-                    for q =1:length(currspikes)
-                      if isnan(currspikes(q))==1
-                        continue
-                      end
-                      [c index] = (min(abs(currspikes(q)-time))); %
-                      spikebin = shuffCSUS(index);
-                            if spikebin == 0
-                              spikes_intertrial = spikes_intertrial+1;
-                            elseif spikebin == -1
-                              spikes_pretial = spikes_pretial+1;
-                            else
-                              spikes_in_CS_US(spikebin) = spikes_in_CS_US(spikebin)+1;
-                            end
-                      end
+                  wanted = currspikes(wantedindex);
 
-                                if do_you_want_pretrial == 1
-                                      pretrial_occprob = occ_pretrial*(1/7.5);
-                                      spikes_occprob = occ_in_CS_US.*(1/7.5);
-                                      occprob = [pretrial_occprob, spikes_occprob'];
-                                      occprob = occprob./nansum(occprob);
-                                      spikeprob =  [spikes_pretrial, spikes_in_CS_US'];
-                                      if (size(spikeprob,1)) < (size(spikeprob,2))
-                                        spikeprob = spikeprob';
-                                      end
-                                      if (size(occprob,1)) < (size(occprob,2))
-                                        occprob = occprob';
-                                      end
-                                      shuf(d) = mutualinfo([spikeprob, occprob]); %is this oriented the right way
-                                else
-                                  occprob = occ_in_CS_US.*(1/7.5);
-                                  occprob = occprob./nansum(occprob);
-                                  spikeprob =  spikes_in_CS_US;
-                                  if (size(spikeprob,1)) < (size(spikeprob,2))
-                                    spikeprob = spikeprob';
-                                  end
-                                  if (size(occprob,1)) < (size(occprob,2))
-                                    occprob = occprob';
-                                  end
-                                  compMI = mutualinfo([spikeprob, occprob]);
-                                  shuf(d) = compMI; %is this oriented the right way
-                                end
+                  uni = unique(CSUS);
+                  occ_in_CS_US = NaN(length(uni)-1,1);
+                  spikes_in_CS_US = NaN(length(uni)-1,1);
 
-                    end
-                    topMI5 = floor(num_times_to_run*.95);;
-                    topMI1 = floor(num_times_to_run*.99);
-                    shuf = sort(shuf);
-                    if isnan(topMI5)==0
-                      mutinfo(1, k) = shuf(topMI5);
-                    else
-                      mutinfo(1, k) = NaN;
-                    end
-                    if isnan(topMI1)==0
-                      mutinfo(2, k) = shuf(topMI1);
-                    else
-                      mutinfo(2, k) = NaN;
-                    end
+                  occ_pretrial = zeros(1,1);
+                  spikes_pretrial = NaN(1,1);
 
-                    [c index] = (min(abs(MI(k)-shuf)));
-                    if isnan(index)==0
-                      rank = index./length(shuf);
-                      mutinfo(3, k) = rank;
-                    else
-                      mutinfo(3,k) = NaN;
+                  index=1;
+                  for q=0:numbering:10
+                        if q == 0
+                          wanted= (find(shuffCSUS == -1));
+                          occ_pretrial = length(wanted);
+                          spikes_pretrial = nanmean(currspikes(wanted));
+                          index=1;
+                        else
+                          wantedtimes = find(shuffCSUS == q);
+                          wantedtimes = wantedtimes(find(wantedtimes<=length(currspikes)));
+                          trace_mean = nanmean(currspikes(wantedtimes));
+                          occ_in_CS_US(index) = length(wantedtimes);
+                          spikes_in_CS_US(index) = trace_mean;
+                          index = index+1;
+                        end
+                  end
+                  if do_you_want_pretrial == 1
+                        pretrial_occprob = occ_pretrial*(1/7.5);
+                        spikes_occprob = occ_in_CS_US.*(1/7.5);
+                        occprob = [pretrial_occprob, spikes_occprob'];
+                        occprob = occprob./nansum(occprob);
+                        spikeprob =  [spikes_pretrial, spikes_in_CS_US'];
+                        if (size(spikeprob,1)) < (size(spikeprob,2))
+                          spikeprob = spikeprob';
+                        end
+                        if (size(occprob,1)) < (size(occprob,2))
+                          occprob = occprob';
+                        end
+                        shuf(d) = mutualinfo([spikeprob, occprob]); %is this oriented the right way
+                  else
+                    occprob = occ_in_CS_US.*(1/7.5);
+                    occprob = occprob./nansum(occprob);
+                    spikeprob =  spikes_in_CS_US;
+                    if (size(spikeprob,1)) < (size(spikeprob,2))
+                      spikeprob = spikeprob';
                     end
+                    if (size(occprob,1)) < (size(occprob,2))
+                      occprob = occprob';
+                    end
+                    compMI = mutualinfo([spikeprob, occprob]);
+                    shuf(d) = compMI; %is this oriented the right way
+                  end
+
+
+                end
+                topMI5 = floor(num_times_to_run*.95);;
+                topMI1 = floor(num_times_to_run*.99);
+                shuf = sort(shuf);
+                if isnan(topMI5)==0
+                mutinfo(1, k) = shuf(topMI5);
+                else
+                mutinfo(1, k) = NaN;
+                end
+                if isnan(topMI1)==0
+                mutinfo(2, k) = shuf(topMI1);
+                else
+                mutinfo(2, k) = NaN;
+                end
+
+                [c index] = (min(abs(MI(k)-shuf)));
+                if isnan(index)==0
+                rank = index./length(shuf);
+                mutinfo(3, k) = rank;
+                else
+                mutinfo(3,k) = NaN;
+                end
 
                 else
-                  fprintf('throw')
-                  mutinfo(1,k) = NaN;
-                  mutinfo(2,k) = NaN;
-                  mutinfo(3,k) = NaN;
+                fprintf('throw')
+                mutinfo(1,k) = NaN;
+                mutinfo(2,k) = NaN;
+                mutinfo(3,k) = NaN;
                 end
 
 
-            end
-            mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
+                end
+                mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
 
-          end
+                end
 
-      end
-
-
-
-      f = mutualinfo_struct;
+                end
 
 
-      MI_CSUS_trace_shuff = f;
 
-      % Determine the suffix based on do_you_want_pretrial
-      if do_you_want_pretrial == 0
-          suffix = '';
-      elseif do_you_want_pretrial == 1
-          suffix = 'pretrial';
-      end
+                f = mutualinfo_struct;
 
 
-      % Create the dynamic variable name
-      variableName = sprintf('MI_CSUS%d_%s_trace_shuff', how_many_divisions, suffix);
+                MI_CSUS_trace_shuff = f;
 
-      % Assign the structure to the new variable name
-      eval([variableName ' = MI_CSUS_trace_shuff;']);
-
-      % Get the current date and time as a string
-      currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
-
-      % Create a filename with the timestamp
-      filename = sprintf('NEWresults_%s_%s.mat', variableName, currentDateTime);
-
-      % Save the output to the .mat file with the timestamped filename
-      save(filename, variableName);
-      fprintf('File saved successfully as %s\n', filename);
+                % Determine the suffix based on do_you_want_pretrial
+                if do_you_want_pretrial == 0
+                suffix = '';
+                elseif do_you_want_pretrial == 1
+                suffix = 'pretrial';
+                end
 
 
-    end
+                % Create the dynamic variable name
+                variableName = sprintf('MI_CSUS%d_%s_trace_shuff', how_many_divisions, suffix);
+
+                % Assign the structure to the new variable name
+                eval([variableName ' = MI_CSUS_trace_shuff;']);
+
+                % Get the current date and time as a string
+                currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
+
+                % Create a filename with the timestamp
+                filename = sprintf('results_%s_%s.mat', variableName, currentDateTime);
+
+                % Save the output to the .mat file with the timestamped filename
+                save(filename, variableName);
+                fprintf('File saved successfully as %s\n', filename);
+
+
+                end
