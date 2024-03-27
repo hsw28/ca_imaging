@@ -15,6 +15,7 @@ function f = highvelspikes(spike_structure, pos_structure, velthreshold, dim, CA
 
 
   for i = 1:numel(fields_spikes)
+
         fieldName_spikes = fields_spikes{i};
         fieldValue_spikes = spike_structure.(fieldName_spikes);
         peaks_time = fieldValue_spikes;
@@ -71,6 +72,7 @@ function f = highvelspikes(spike_structure, pos_structure, velthreshold, dim, CA
 
   numunits = size(peaks_time,1);
 
+  HSS = NaN(numunits, 1);
   if numunits<=1
     highspeedspikes_struct.(sprintf('MI_%s', spikes_date)) = NaN;
     warning('you have no spikes')
@@ -86,7 +88,7 @@ function f = highvelspikes(spike_structure, pos_structure, velthreshold, dim, CA
     for ii=1:length(currspikes) %finding if in good vel
       [minValue,closestIndex] = min(abs(currspikes(ii)-goodtime));
 
-      if minValue <= 1 %if spike is within 1 second of moving. no idea if good time
+      if minValue <= 1/7.5 %if spike is within 1 second of moving. no idea if good time
         highspeedspikes(end+1) = currspikes(ii);
       end;
     end

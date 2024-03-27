@@ -51,6 +51,7 @@ end
 	%tstep = 1/15;
 
 
+
 	for i = 1:xbins
     	for j = 1:ybins
         	A1 = posData(:,2)>((i-1)*xstep) & posData(:,2)<=(i*xstep); %finds all rows that are in the current x axis bin
@@ -84,11 +85,8 @@ for i = 1:xbins
 end
 
 
-
-%events = imgaussfilt(events);
-occupancy = imgaussfilt(time*tstep);
-rate = events./occupancy; %time*tstep is occupancy
-rate = (rate);
+events = (events);
+occupancy = (time*tstep);
 
 filtWidth = 3;
 filtSigma = .5;
@@ -103,13 +101,9 @@ occupancy2(occupancy == 0)= NaN;
 occupancy2 = nanconv(occupancy2,imageFilter, 'edge', 'nanout');
 
 rate = events./occupancy2;
+
 occprob = occupancy2./nansum(occupancy2);
-
-
 spikeprob = events./nansum(events);
-
-
-
 
 
 

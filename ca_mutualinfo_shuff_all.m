@@ -27,7 +27,7 @@ for k=1:numunits
   for i=1:length(shuff) %finding if in good vel
     [minValue,closestIndex] = min(abs(shuff(i)-goodtime));
 
-    if minValue <= 1 %if spike is within 1 second of moving. no idea if good time
+    if minValue <= 1/7.5 %if spike is within 1 second of moving. no idea if good time
       highspeedspikes(end+1) = shuff(i);
     end;
   end

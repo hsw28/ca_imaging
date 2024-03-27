@@ -37,9 +37,9 @@ for i = 1:numel(fields)
     ypos = ypos*.15;
     ypos = ypos-min(ypos);
   else
-      xpos = xpos*.19;
+      xpos = xpos*.13;
       xpos = xpos-min(xpos);
-      ypos = ypos*.15;
+      ypos = ypos*.16;
       ypos = ypos-min(ypos);
   end
 
@@ -50,7 +50,7 @@ for i = 1:numel(fields)
 pos.(fieldName) = current_pos;
 end
 
-fixed_pos = pos;
+fixed_pos = pos; new(3:end,2)
 
 
 

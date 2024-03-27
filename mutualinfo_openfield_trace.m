@@ -65,16 +65,15 @@ for i = 1:numel(fields_spikes)
 
 
 
-      velthreshold = 2;
+
       vel = ca_velocity(pos);
       times = vel(2,:);
       velocities = vel(1,:);
 
       fprintf('got velocities')
       %want highspeedspikes
-      % Thresholds
-      velThreshold = 2; % cm/s
-      timeThreshold = 1; % second
+
+      timeThreshold = 1/7.5; % second
       % Find indices where velocity is greater than the threshold
       highVelIndices = find(velocities >= velThreshold);
 

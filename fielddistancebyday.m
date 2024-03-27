@@ -1,5 +1,17 @@
-function f = fielddistancebyday(alignmentdata1, alignmentdata2, center1, center2)
+function f = fielddistancebyday(alignmentdata1, alignmentdata2, center1, center2, goodcells1, goodcells2)
+
+%function f = fielddistancebyday(alignmentdata1, alignmentdata2, center1, center2, goodcells1, goodcells2)
 % takes alignment data and finds the different in fields by individual day
+
+
+if nargin < 5
+    goodcells1 = [1:length(center1)]; % Example: considering all cells as good
+    goodcells2 = [1:length(center2)];
+end
+
+center1(~goodcells1) = NaN;
+center1(~goodcells2) = NaN;
+
 
 both = find(alignmentdata1>0 & alignmentdata2>0);
 want1 = (alignmentdata1(both));

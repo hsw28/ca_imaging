@@ -54,7 +54,7 @@ function field_centers  = fieldcenters_openfield_trace_BULK(trace_time_struct, p
         % Filter out high velocity indices that are too close to low velocities
         validHighVelIndices = [];
 
-        timeThreshold = 1;
+        timeThreshold = 1/7.5;
         for ii = 1:length(highVelIndices)
             highVelTime = times(highVelIndices(ii));
             % Find the closest low velocity time

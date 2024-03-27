@@ -1,4 +1,4 @@
-function [trace_mean occprob] = CA_normalizePosData_trace(trace_data,posData,dim, varargin)
+function [trace_mean_rate trace_mean occprob] = CA_normalizePosData_trace(trace_data,posData,dim, varargin)
 %TO DO: add figure saving
 
 %%%%same as normalizePosData but finds trace average for location instead of spike rate
@@ -68,7 +68,7 @@ end
 %occprob = occupancy./nansum(occupancy);
 
 filtWidth = 3;
-filtSigma = .5;
+filtSigma = 2.5;
 imageFilter=fspecial('gaussian',filtWidth,filtSigma);
 
 trace_mean = (events);
@@ -80,6 +80,7 @@ occupancy2(occupancy == 0) = NaN;
 occupancy2 = nanconv(occupancy2,imageFilter, 'edge', 'nanout');
 occprob = occupancy2./nansum(occupancy2);
 
+trace_mean_rate = trace_mean./occupancy2;
 
 %occprob = occupancy./nansum(occupancy);
 

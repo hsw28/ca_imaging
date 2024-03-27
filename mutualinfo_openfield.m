@@ -65,7 +65,7 @@ for i = 1:numel(fields_spikes)
       pos = pos(1:closestIndex, :);
 
 
-velthreshold = 2;
+
 vel = ca_velocity(pos);
 goodvel = find(vel(1,:)>=velthreshold);
 goodtime = pos(goodvel, 1);
@@ -95,7 +95,7 @@ for k=1:numunits
   for ii=1:length(currspikes) %finding if in good vel
     [minValue,closestIndex] = min(abs(currspikes(ii)-goodtime));
 
-    if minValue <= 1 %if spike is within 1 second of moving. no idea if good time
+    if minValue <= 1/7.5 %if spike is within 1 second of moving. no idea if good time
       highspeedspikes(end+1) = currspikes(ii);
     end;
   end
