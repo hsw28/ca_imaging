@@ -18,7 +18,7 @@ function f = ca_maxrate(spike_times, pos, dim)
     for i=1:length(spike_times(k,:)) %finding if in good vel
       [minValue,closestIndex] = min(abs(spike_times(k,i)-goodtime));
 
-      if minValue <= 1/7.5 %if spike is within 1 second of moving. no idea if good time
+      if minValue <= 1/15 %if spike is within 1 second of moving. no idea if good time
         highspeedspikes(end+1) = spike_times(k,i);
       end;
     end

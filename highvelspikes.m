@@ -88,7 +88,7 @@ function f = highvelspikes(spike_structure, pos_structure, velthreshold, dim, CA
     for ii=1:length(currspikes) %finding if in good vel
       [minValue,closestIndex] = min(abs(currspikes(ii)-goodtime));
 
-      if minValue <= 1/7.5 %if spike is within 1 second of moving. no idea if good time
+      if minValue <= 1/15 %if spike is within 1 second of moving. no idea if good time
         highspeedspikes(end+1) = currspikes(ii);
       end;
     end

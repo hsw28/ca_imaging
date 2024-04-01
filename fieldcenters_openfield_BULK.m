@@ -25,6 +25,8 @@ function field_centers  = fieldcenters_openfield_BULK(peaks_time_struct, pos_str
         fieldValue_pos = pos_struct.(fieldName_pos);
         pos = fieldValue_pos;
 
+        pos = smoothpos(pos);
+
         vel = ca_velocity(pos);
         goodvel = find(vel(1,:)>=velthreshold);
         goodtime = pos(goodvel, 1);
@@ -46,7 +48,7 @@ function field_centers  = fieldcenters_openfield_BULK(peaks_time_struct, pos_str
 
           for i=1:length(currspikes) %finding if in good vel
             [minValue,closestIndex] = min(abs(currspikes(i)-goodtime));
-            if minValue <= 1/7.5 %if spike is within 1 second of moving. no idea if good time
+            if minValue <= 1/15 %if spike is within 1 second of moving. no idea if good time
               highspeedspikes(end+1) = currspikes(i);
             end;
           end
@@ -57,9 +59,10 @@ function field_centers  = fieldcenters_openfield_BULK(peaks_time_struct, pos_str
 
 
 
-          fr = ca_firingrate(currspikes, pos);
+      %    fr = ca_firingrate(currspikes, pos);
 
-          if fr > .0000000001 && length(highspeedspikes)>0
+        %  if fr > .0000000001 && length(highspeedspikes)>0
+          if length(highspeedspikes)>0
             [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(highspeedspikes,goodpos,dim, 1.000);
             [maxval, maxindex] = max(rate(:));
             [x,y] = ind2sub(size(rate), maxindex);

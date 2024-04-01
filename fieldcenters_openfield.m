@@ -4,10 +4,12 @@ function fieldcent  = fieldcenters_openfield(peaks_time, pos, dim, velthreshold,
   %rates returns max rate, av rate, min rate
 
 
+
   if nargin < 5
       goodcells = (1:size(peaks_time,1)); % Example: considering all cells as good
   end
 
+  pos = smoothpos(pos);
   vel = ca_velocity(pos);
   goodvel = find(vel(1,:)>=velthreshold);
   goodtime = pos(goodvel, 1);
@@ -33,7 +35,7 @@ function fieldcent  = fieldcenters_openfield(peaks_time, pos, dim, velthreshold,
 
     for i=1:length(currspikes) %finding if in good vel
       [minValue,closestIndex] = min(abs(currspikes(i)-goodtime));
-      if minValue <= 1/7.5 %if spike is within 1 second of moving. no idea if good time
+      if minValue <= 1/15 %if spike is within 1 second of moving. no idea if good time
         highspeedspikes(end+1) = currspikes(i);
       end;
     end
@@ -44,13 +46,12 @@ function fieldcent  = fieldcenters_openfield(peaks_time, pos, dim, velthreshold,
 
 
 
-    fr = ca_firingrate(currspikes, pos);
+    %fr = ca_firingrate(currspikes, pos);
 
-    if fr > .000001 && length(highspeedspikes)>0
+    %if fr > .000001 && length(highspeedspikes)>0
+    if length(highspeedspikes)>0
 
       [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(highspeedspikes,goodpos,dim, 1.000);
-      rate;
-      rate = smoothdata(rate, 'gaussian', dim);
       [maxval, maxindex] = max(rate(:));
       [x,y] = ind2sub(size(rate), maxindex);
       maxrate(1, k) = x*dim;

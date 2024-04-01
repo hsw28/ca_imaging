@@ -68,7 +68,7 @@ end
 %occprob = occupancy./nansum(occupancy);
 
 filtWidth = 3;
-filtSigma = 2.5;
+filtSigma = .5;
 imageFilter=fspecial('gaussian',filtWidth,filtSigma);
 
 trace_mean = (events);
@@ -83,6 +83,8 @@ occprob = occupancy2./nansum(occupancy2);
 trace_mean_rate = trace_mean./occupancy2;
 
 %occprob = occupancy./nansum(occupancy);
+
+
 
 
 

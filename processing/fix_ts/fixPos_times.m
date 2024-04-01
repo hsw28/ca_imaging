@@ -30,7 +30,8 @@ for i = 1:numel(fields)
 
 
 
-
+%what i originally used for all positions
+%{
   if for_rec_1_for_oval_2 == 2 %oval
     xpos = xpos*.14;
     xpos = xpos-min(xpos);
@@ -42,6 +43,22 @@ for i = 1:numel(fields)
       ypos = ypos*.16;
       ypos = ypos-min(ypos);
   end
+%}
+
+
+
+%use this now
+if for_rec_1_for_oval_2 == 2 %oval
+  xpos = xpos*.15;
+  xpos = xpos-min(xpos);
+  ypos = ypos*.17;
+  ypos = ypos-min(ypos);
+else
+    xpos = xpos*.15;
+    xpos = xpos-min(xpos);
+    ypos = ypos*.16;
+    ypos = ypos-min(ypos);
+end
 
 
   current_pos(:,2) = xpos;

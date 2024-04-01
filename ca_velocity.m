@@ -3,9 +3,12 @@ function v = ca_velocity(pos);
 %computes velocity. input a [#ofpoints, 3] vector, where first column is time, second is x, third is y
 %linear track is 248.92cm and about 620 pixels = 2.5pixels per cm
 
-file = pos';
-%file = fixpos(pos);
 
+if size(pos,1)>size(pos,2)
+pos = pos';
+end
+
+file = pos;
 
 t = file(1, :);
 xpos = (file(2, :))';
@@ -31,7 +34,8 @@ end
 %velvector = filloutliers(velvector, 'pchip', 'movmedian',10);
 
 %v = hampel(velvector, 30, 3);
-v = smoothdata(velvector,'gaussian',7);
+%v = smoothdata(velvector,'gaussian',7);
+v = velvector;
 v = v(1:length(timevector));
 
 v = [(v/1.000); timevector];

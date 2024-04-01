@@ -63,7 +63,7 @@ for i = 1:numel(fields_spikes)
         pos = pos(1:length(peaks_time),:);
       end
 
-
+      pos = smoothpos(pos);
 
 
       vel = ca_velocity(pos);
@@ -73,12 +73,12 @@ for i = 1:numel(fields_spikes)
       fprintf('got velocities')
       %want highspeedspikes
 
-      timeThreshold = 1/7.5; % second
+      timeThreshold = 1/15; % second
       % Find indices where velocity is greater than the threshold
-      highVelIndices = find(velocities >= velThreshold);
+      highVelIndices = find(velocities >= velthreshold);
 
       % Find indices where velocity is less than or equal to the threshold
-      lowVelIndices = find(velocities < velThreshold);
+      lowVelIndices = find(velocities < velthreshold);
       % Filter out high velocity indices that are too close to low velocities
       validHighVelIndices = [];
 

@@ -41,7 +41,7 @@ function rates  = rateinfo(peaks_time, goodcells, pos, dim)
     for i=1:length(currspikes) %finding if in good vel
       [minValue,closestIndex] = min(abs(currspikes(i)-goodtime));
 
-      if minValue <= 1/7.5 %if spike is within 1 second of moving. no idea if good time
+      if minValue <= 1/15 %if spike is within 1 second of moving. no idea if good time
         highspeedspikes(end+1) = currspikes(i);
       end;
     end

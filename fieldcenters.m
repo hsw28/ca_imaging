@@ -5,8 +5,8 @@ function fieldcent  = fieldcenters(peaks_time, goodcells, pos, dim, velthreshold
 
 
   %velthreshold = 12;
+  pos = smoothpos(pos);
   vel = ca_velocity(pos);
-  vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30.0005); %originally had this at 30, trying with 15 now
   goodvel = find(vel(1,:)>=velthreshold);
   goodtime = pos(goodvel, 1);
   goodpos = pos(goodvel,:);
@@ -34,7 +34,7 @@ function fieldcent  = fieldcenters(peaks_time, goodcells, pos, dim, velthreshold
     for i=1:length(currspikes) %finding if in good vel
       [minValue,closestIndex] = min(abs(currspikes(i)-goodtime));
 
-      if minValue <= 1/7.5 %if spike is within 1 second of moving. no idea if good time
+      if minValue <= 1/15 %if spike is within 1 second of moving. no idea if good time
         highspeedspikes(end+1) = currspikes(i);
       end;
     end

@@ -63,6 +63,7 @@ for i = 1:numel(fields_spikes)
       biggest = max(peaks_time(:));
       [minValue,closestIndex] = min(abs(biggest-tm));
       pos = pos(1:closestIndex, :);
+      pos = smoothpos(pos);
 
 
 
@@ -95,7 +96,7 @@ for k=1:numunits
   for ii=1:length(currspikes) %finding if in good vel
     [minValue,closestIndex] = min(abs(currspikes(ii)-goodtime));
 
-    if minValue <= 1/7.5 %if spike is within 1 second of moving. no idea if good time
+    if minValue <= 1/15 %if spike is within 1 second of moving. no idea if good time
       highspeedspikes(end+1) = currspikes(ii);
     end;
   end

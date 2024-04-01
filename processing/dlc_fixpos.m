@@ -181,10 +181,10 @@ pos = inpaint_nans(pos, 2);
 %size(pos)
 xpos = (pos(:, 1));
 %xpos = filloutliers(xpos, 'pchip', 'movmedian',30);
-xpos =  smoothdata(xpos, 'gaussian', 15);
+
 ypos = (pos(:, 2));
 %ypos = filloutliers(ypos, 'pchip', 'movmedian',30);
-ypos =  smoothdata(ypos, 'gaussian', 15);
+
 timestamps = timestamps/1000;
 %size(xpos)
 

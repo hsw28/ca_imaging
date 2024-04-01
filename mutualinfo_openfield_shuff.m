@@ -1,4 +1,4 @@
-function f = mutualinfo_openfield_shuff(spike_structure, pos_structure, velthreshold, dim, CA_timestamps, num_times_to_run, ca_MI)
+1/15function f = mutualinfo_openfield_shuff(spike_structure, pos_structure, velthreshold, dim, CA_timestamps, num_times_to_run, ca_MI)
 %finds mutual info for a bunch of cells
 %little did I know i already had code for this: ca_mutualinfo_openfield.m
 
@@ -46,6 +46,7 @@ for i = 1:numel(fields_spikes)
       fieldValue_pos = pos_structure.(fieldName_pos);
       pos = fieldValue_pos;
 
+
       fieldName_cats = fields_cats{i};
       curr_CA_timestamps = CA_timestamps.(fieldName_cats);
 
@@ -70,10 +71,10 @@ for i = 1:numel(fields_spikes)
               pos = convertpostoframe(pos, curr_CA_timestamps);
             end
 
+      pos = smoothpos(pos);
 
       fprintf('trimming velocity')
       vel = ca_velocity(pos);
-      %vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30.0005); %originally had this at 30, trying with 15 now
       goodvel = find(vel(1,:)>=velthreshold);
       goodtime = pos(goodvel, 1);
       goodpos = pos(goodvel,:);
@@ -110,7 +111,7 @@ for i = 1:numel(fields_spikes)
 
                 for ii=1:length(currspikes) %finding if in good vel
                     [minValue,closestIndex] = min(abs(currspikes(ii)-goodtime));
-                    if minValue <= 1/7.5 %if spike is within 1 second of moving. no idea if good time
+                    if minValue <= 1/15 %if spike is within 1 second of moving. no idea if good time
                       highspeedspikes(end+1) = currspikes(ii);
                     end
                 end
