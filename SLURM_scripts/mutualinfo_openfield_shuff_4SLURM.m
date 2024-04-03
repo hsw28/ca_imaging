@@ -32,6 +32,6 @@ fprintf('done loading')
 clearvars slurm_var
 fprintf('cleared excess variables, starting process')
 
-f = mutualinfo_openfield_shuff(spikes, pos_structure, 2, 2.5, ca_ts, 500, ca_MI);
+f = mutualinfo_openfield_shuff(spikes, pos_structure, 4, 2.5, ca_ts, 500, ca_MI);
 
 end

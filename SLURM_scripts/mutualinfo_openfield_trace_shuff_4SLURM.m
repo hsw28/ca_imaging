@@ -30,7 +30,7 @@ fprintf('clearing excess')
 clearvars slurm_var
 
 fprintf('starting script')
-f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, 2, 2.5, ca_ts, 500, ca_MI);
+f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, 4, 2.5, ca_ts, 500, ca_MI);
 
 
 

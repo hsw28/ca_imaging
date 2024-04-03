@@ -182,7 +182,6 @@ for i = 1:numel(fields_spikes)
 
               end
     fprintf('assigning MI')
-    mutinfo = mutinfo(2,:); %%COMMENT OUT
     mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
     end
   end

@@ -1,5 +1,8 @@
-function f = highvelspikes(spike_structure, pos_structure, velthreshold, dim, CA_timestamps)
+function f = highvelspikes(spike_structure, pos_structure, dim, velthreshold, CA_timestamps)
 
+if dim>velthreshold
+  warning('did you reverse your dimension and vel threshold?')
+end
 
   fields_spikes = fieldnames(spike_structure);
   fields_pos = fieldnames(pos_structure);

@@ -165,7 +165,7 @@ for i = 1:numel(fields_spikes)
                       mutinfo(1, k) = NaN;
                     end
                     if isnan(topMI1)==0
-                      mutinfo(2, k) = shuf(topMI1);
+                      mutinfo(2, k) = nanmean(shuf);
                     else
                       mutinfo(2, k) = NaN;
                     end
