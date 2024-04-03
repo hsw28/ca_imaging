@@ -1,6 +1,7 @@
-1/15function f = mutualinfo_openfield_shuff(spike_structure, pos_structure, velthreshold, dim, CA_timestamps, num_times_to_run, ca_MI)
+function f = mutualinfo_openfield_shuff(spike_structure, pos_structure, velthreshold, dim, CA_timestamps, num_times_to_run, ca_MI)
 %finds mutual info for a bunch of cells
 %little did I know i already had code for this: ca_mutualinfo_openfield.m
+%returns 95% cutoff, average MI, and rank of actual MI
 
 
 

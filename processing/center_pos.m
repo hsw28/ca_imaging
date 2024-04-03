@@ -25,10 +25,11 @@ fields = fieldnames(pos);
   %  if for_rec_1_for_oval_2 == 1
   %    current_pos(:,2) = (current_pos(:,2)).*1.1538;
   %  end
-  %  if for_rec_1_for_oval_2 == 2
-  %    current_pos(:,3) = (current_pos(:,3)).*1.06;
-  %    current_pos(:,3) = (current_pos(:,3)).*1.13;
-  %  end
+    if for_rec_1_for_oval_2 == 2
+      current_pos(:,3) = (current_pos(:,3)).*1.06;
+      current_pos(:,3) = (current_pos(:,3)).*1.13;
+      fprintf('oval')
+    end
 
 
 
