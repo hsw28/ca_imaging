@@ -21,7 +21,9 @@ function mutualinfoCSUS_trace_shuff_4SLURM
 
 fprintf('loading variables')
 load('slurm_var.mat')
+fprintf('loading traces')
 calcium_traces = slurm_var.Ca_traces;
+fprintf('loading IDs')
 CSUS_id = slurm_var.CSUS_id;
 
 
@@ -39,8 +41,11 @@ CSUS_id = slurm_var.CSUS_id;
 %f = mutualinfo_CSUS_trace_shuff(calcium_traces, CSUS_id, 0, 5, 500, ca_MI)
 
 %%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS NO PRETRIAL%%%%%%%%
+fprintf('loading MI')
 ca_MI = slurm_var.MI_CSUS2_trace;
+fprintf('clearing var')
 clearvars slurm_var
+fprintf('starting')
 f = mutualinfo_CSUS_trace_shuff(calcium_traces, CSUS_id, 0, 2, 500, ca_MI)
 
 
