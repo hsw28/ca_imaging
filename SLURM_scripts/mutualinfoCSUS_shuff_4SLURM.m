@@ -32,14 +32,14 @@ CSUS_id = slurm_var.CSUS_id;
 %f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 1, 5, 500, ca_MI)
 
 %%%%%BELOW IS FOR CSUS WITH 5 DIVISIONS AND NO PRETRIAL%%%%%%%%
-%ca_MI = slurm_var.MI_CSUS5;
-%clearvars slurm_var
-%f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 0, 5, 500, ca_MI)
+ca_MI = slurm_var.MI_CSUS5;
+clearvars slurm_var
+f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 0, 5, 500, ca_MI)
 
 %%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS AND NO PRETRIAL%%%%%%%
-ca_MI = slurm_var.MI_CSUS2;
-clearvars slurm_var
-f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 0, 2, 500, ca_MI)
+%ca_MI = slurm_var.MI_CSUS2;
+%clearvars slurm_var
+%f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 0, 2, 500, ca_MI)
 
 
 
