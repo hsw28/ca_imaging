@@ -30,4 +30,4 @@ addpath(pwd)
 addpath(genpath('/home/hsw967/Programming/ca_imaging'))
 addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/matlab/'));
 addpath(genpath('/home/hsw967/Programming/data_analysis/hannah-in-use/include'));
-job = c.batch('mutualinfo_openfield_trace_shuff_4SLURM', 'Pool', 12, 'CurrentFolder', '.');
+job = c.batch('mutualinfo_openfield_trace_shuff_4SLURM', 'Pool', 14, 'CurrentFolder', '.');
