@@ -188,15 +188,30 @@ for i = 1:numel(fields_spikes)
   end
 
 
+%{
   results_MI_shuff = mutualinfo_struct;
-  fprintf('saving')
+  fprintf('saving\n');
   MI_trace_shuff = mutualinfo_struct;
-  fprintf('Get the current date and time as a string')
+  fprintf('Get the current date and time as a string\n');
   currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
-  fprintf('Create a filename with the timestamp')
-  filename = ['results_MI_shift', currentDateTime, '.mat'];
-  fprintf('Save the output to the .mat file with the timestamped filename')
-  save(filename, 'results_MI_shift');
-  print('save is a success')
+  fprintf('Create a filename with the timestamp\n');
+  filename = ['results_MI_shuff_', currentDateTime, '.mat'];
+  fprintf('Save the output to the .mat file with the timestamped filename\n');
+  save(filename, 'results_MI_shuff');
+  fprintf('Save is a success\n');
+%}
+
+
+results_MI_shift = mutualinfo_struct;
+fprintf('saving\n');
+MI_trace_shift = mutualinfo_struct;
+fprintf('Get the current date and time as a string\n');
+currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
+fprintf('Create a filename with the timestamp\n');
+filename = ['results_MI_shift_', currentDateTime, '.mat'];
+fprintf('Save the output to the .mat file with the timestamped filename\n');
+save(filename, 'results_MI_shift');
+fprintf('Save is a success\n');
+
 
   f = mutualinfo_struct
