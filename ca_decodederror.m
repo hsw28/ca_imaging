@@ -16,12 +16,11 @@ pointstime = decoded(4,:);
 X = decoded(1,:);
 Y = decoded(2,:);
 
-decin = decodedinterval*7.5;
 
 
 
+pos = smoothpos(pos);
 vel = ca_velocity(pos);
-%vel(1,:) = smoothdata(vel(1,:), 'gaussian', 3);
 vel = vel(1,:);
 
 alldiffmean = [];
@@ -36,9 +35,6 @@ numpoints = [];
 
 
 
-%vel = assignvelOLD(pointstime, vel);
-
-
 realX = [];
 realY = [];
 realT = [];
@@ -46,6 +42,9 @@ predX = [];
 predY = [];
 predT = [];
 realV = [];
+
+decodedinterval = round(15*decodedinterval);
+
 for i=1:length(decoded)
 
   curtime = pointstime(i)+(decodedinterval);
@@ -56,12 +55,12 @@ for i=1:length(decoded)
 
 
   if decodedinterval>.5
-    postimes1 = (i-1)*(decodedinterval*30/2)+1;
-    postimes2 = postimes1+(decodedinterval*30)-1;
+    postimes1 = (i-1)*(decodedinterval)+1;
+    postimes2 = postimes1+(decodedinterval/2)-1;
     postimes = [postimes1:1:postimes2];
   else
-    postimes1 = (i-1)*(decodedinterval*30)+1;
-    postimes2 = postimes1+(decodedinterval*30)-1;
+    postimes1 = (i-1)*(decodedinterval)+1;
+    postimes2 = postimes1+(decodedinterval)-1;
     postimes = [postimes1:1:postimes2];
   end
 
@@ -75,7 +74,9 @@ for i=1:length(decoded)
   if isnan(X(i))==0 & isnan(Y(i))==0
 
     %pairs = [X(i),Y(i);(pos(index,2)),(pos(index,3))];
-    pairs = [X(i),Y(i);nanmean(pos(postimes,2)),0];
+    i
+    postimes
+    pairs = [X(i),Y(i);nanmean(pos(postimes,2)),nanmean(pos(postimes,3))];
     diff = pdist(pairs,'euclidean');
   else
     diff = NaN;
@@ -84,8 +85,6 @@ for i=1:length(decoded)
 
     alldiff(end+1) = diff;
     %numpoints(end+1) = c;
-    size(postimes)
-    size(pos)
     realX(end+1) = nanmean(pos(postimes,2));
     realT(end+1) = nanmean(pos(postimes(1),1));
     %realT(end+1) = pointstime(i);
@@ -104,6 +103,5 @@ nanmedian(alldiff)./1.000
 size(predX);
 size(realX);
 size(realT);
-f = [predX; realX; realT]';
-f = (alldiff)./2.5
+f = [realT; predX; predY; realX; realY; alldiff]';
 %f = [alldiff/2.5; realT];

@@ -1,31 +1,48 @@
-function f = pos_decoding_with_model(model, newClusters, newPos)
+function [values error] = pos_decoding_with_model(model, newClusters, newPos)
+
+
+
 
 
   pos = newPos;
+  posData = smoothpos(pos);
+
   spike_clusters = newClusters;
 
   if isa(spike_clusters,'double')==1
-    for k = 1:size(spike_clusters,1)
-      name = num2words(k);
-      for z = 1:length(name)
-        if strfind(name(z),'-')
-          name(z) = ' ';
-        end
+      for k = 1:size(spike_clusters,1)
+          name = num2words(k);
+          for z = 1:length(name)
+              if strfind(name(z),'-')
+                  name(z) = ' ';
+              end
+          end
+          name = name(find(~isspace(name)));
+          curclus = spike_clusters(k,:);
+          curclus = curclus(find(~isnan(curclus)));
+          cluststruct.(name) = curclus;
       end
-      name = name(find(~isspace(name)));
-      curclus = spike_clusters(k,:);
-      curclus = curclus(find(~isnan(curclus)));
-      cluststruct.(name) = curclus;
-    end
-    clusters = cluststruct;
+      clusters = cluststruct;
+  end  % <-- This is the missing end statement
+
+
+  %find number of clusters
+  clustname = (fieldnames(clusters));
+  numclust = length(clustname);
+
+
+
+  fxmatrix = model.fxmatrix;
+  tdecode = model.tdecode;
+  dim = model.dim;
+  velthreshold = model.velthreshold;
+
+  ogspikes = length(fieldnames(fxmatrix));
+  if ogspikes ~= numclust
+    error('did you only use spikes common between training and running the model?')
   end
 
 
-
-fxmatrix = model.fxmatrix;
-tdecode = model.tdecode;
-dim = model.dim;
-velthreshold = model.velthreshold;
 
 
 maxprob = [];
@@ -51,9 +68,6 @@ if ybins ==0
   ybins = 1;
 end
 
-%time decoding
-tdecodesec = tdecode;
-t = round(7.5*tdecode);
 
 
 xinc = xmin +(0:xbins)*psize; %makes a vectors of all the x values at each increment
@@ -84,12 +98,30 @@ for x = (1:xbins)
 end
 end
 
-pos = smoothpos(pos);
-vel = ca_velocity(pos);
+
+vel = ca_velocity(posData);
+
+timee = pos(:,1);
+[cc indexmin] = min(abs(posData(1,1)-timee));
+[cc indexmax] = min(abs(posData(end,1)-timee));
+decodetimevector = timee(indexmin:indexmax);
+if length(decodetimevector)<10
+  timevector = timee;
+else
+  timevector = decodetimevector;
+end
+
+
+pos_samp_per_sec = length(posData(:,1))./(posData(end,1)-posData(1,1));
+%time decoding
+tdecodesec = tdecode;
+t = round(pos_samp_per_sec*tdecode);
+
 
 n =0;
 nivector = zeros((numclust),1);
 tm = 1;
+
 while tm < (length(timevector)-t)
 
 
@@ -105,7 +137,6 @@ while tm < (length(timevector)-t)
      nivector(c) = length(find(clusters.(name)>=timevector(tm) & clusters.(name)<timevector(tm+t)));
    end
 
-
       %for the cluster, permute through the different positions
       endprob = zeros(xbins, ybins);
         for x = (1:xbins) %WANT TO PERMUTE THROUGH EACH SQUARE OF SPACE SKIPPING NON OCCUPIED SQUARES. SO EACH BIN SHOULD HAVE TWO COORDINATES
@@ -116,6 +147,7 @@ while tm < (length(timevector)-t)
 
           if occ(x,y) == 0 %means never went there, dont consider
             endprob(x,y) = NaN;
+          %  break
           end
 
           for c=1:numclust  %permute through cluster
@@ -125,6 +157,7 @@ while tm < (length(timevector)-t)
               if length(fx)<2
                 continue
               end
+
 
               fx = (fx(x, y));
               productme = productme + (ni)*log(fx);  %IN
@@ -171,7 +204,12 @@ while tm < (length(timevector)-t)
             end
 
 
-
+    else
+      %means vel is too low
+      maxx(end+1) = NaN;
+      maxy(end+1) = NaN;
+      percents(end+1) = NaN;
+    end
 
         times(end+1) = timevector(tm);
 
@@ -190,15 +228,13 @@ end
 
 warning('your probabilities were the same')
 same = same
-maxx = maxx+psize/2;
-maxy = maxy+psize/2;
-notnan = ~isnan(maxy);
-maxy(notnan) = 0;
+maxx = maxx+(psize/2);
+maxy = maxy+(psize/2);
 values = [maxx; maxy; percents; times];
 
 
-toc
-f = values;
+
+values;
 
 error = ca_decodederror(f, posData, tdecode);
 error_av = nanmean(error(1,:))

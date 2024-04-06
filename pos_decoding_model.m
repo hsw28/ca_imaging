@@ -41,7 +41,6 @@ end
 posData = smoothpos(posData);
 
 tdecodesec = tdecode;
-t = round(7.5*tdecode);
 
 
 %find number of clusters
@@ -78,7 +77,7 @@ for k=1:length(names)
     if size(fxmatrix.(curname),2)>1 & max(now)>0
       fxmatrix.(curname) = chartinterp(fxmatrix.(curname));
       fxmatrix.(curname) = ndnanfilter(fxmatrix.(curname), 'gausswin', [dim*2/dim, dim*2/dim], 2, {}, {'replicate'}, 1);
-  end
+    end
 
   current = fxmatrix.(curname);
   current(isnan(current)) = eps;
@@ -88,6 +87,6 @@ for k=1:length(names)
 end
 
 
-end
+
 
 model = struct('fxmatrix', fxmatrix, 'tdecode', tdecode, 'dim', dim, 'velthreshold', velthreshold);
