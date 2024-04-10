@@ -68,8 +68,6 @@ if ybins ==0
   ybins = 1;
 end
 
-
-
 xinc = xmin +(0:xbins)*psize; %makes a vectors of all the x values at each increment
 yinc = ymin +(0:ybins)*psize; %makes a vector of all the y values at each increment
 
@@ -228,14 +226,14 @@ end
 
 warning('your probabilities were the same')
 same = same
-maxx = maxx+(psize/2);
-maxy = maxy+(psize/2);
+maxx = maxx+psize/2;
+maxy = maxy+psize/2;
 values = [maxx; maxy; percents; times];
 
 
 
 values;
 
-error = ca_decodederror(f, posData, tdecode);
+error = ca_decodederror(values, posData, tdecode);
 error_av = nanmean(error(1,:))
 error_med = nanmedian(error(1,:))
