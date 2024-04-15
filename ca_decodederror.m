@@ -54,15 +54,11 @@ for i=1:length(decoded)
   %postimes = intersect(postimes1,postimes2)
 
 
-  if decodedinterval>.5
-    postimes1 = (i-1)*(decodedinterval)+1;
-    postimes2 = postimes1+(decodedinterval/2)-1;
-    postimes = [postimes1:1:postimes2];
-  else
+
     postimes1 = (i-1)*(decodedinterval)+1;
     postimes2 = postimes1+(decodedinterval)-1;
     postimes = [postimes1:1:postimes2];
-  end
+  
 
 
 
@@ -74,8 +70,7 @@ for i=1:length(decoded)
   if isnan(X(i))==0 & isnan(Y(i))==0
 
     %pairs = [X(i),Y(i);(pos(index,2)),(pos(index,3))];
-    i
-    postimes
+
     pairs = [X(i),Y(i);nanmean(pos(postimes,2)),nanmean(pos(postimes,3))];
     diff = pdist(pairs,'euclidean');
   else
@@ -86,7 +81,8 @@ for i=1:length(decoded)
     alldiff(end+1) = diff;
     %numpoints(end+1) = c;
     realX(end+1) = nanmean(pos(postimes,2));
-    realT(end+1) = nanmean(pos(postimes(1),1));
+    realY(end+1) = nanmean(pos(postimes,3));
+    realT(end+1) = nanmean(pos(postimes,1));
     %realT(end+1) = pointstime(i);
     predX(end+1) = X(i);
     predY(end+1) = Y(i);

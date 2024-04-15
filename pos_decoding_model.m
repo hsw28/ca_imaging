@@ -56,6 +56,28 @@ xmin = min(posData(:,2));
 ymin = min(posData(:,3));
 xmax = max(posData(:,2));
 ymax = max(posData(:,3));
+
+%xmin = 25;
+%ymin = 50;
+%xmax = 175;
+%ymax = 150;
+
+if xmin>min(posData(:,2))
+  error('your xmin value is too large')
+end
+if ymin>min(posData(:,3))
+  error('your ymin value is too large')
+end
+if xmax<max(posData(:,2))
+    error('your xmax value is too small')
+end
+if ymax<max(posData(:,3))
+    error('your ymax value is too small')
+end
+
+
+
+
 xbins = ceil((xmax-xmin)/psize); %number of x
 ybins = ceil((ymax-ymin)/psize); %number of y
 if ybins ==0
@@ -89,4 +111,4 @@ end
 
 
 
-model = struct('fxmatrix', fxmatrix, 'tdecode', tdecode, 'dim', dim, 'velthreshold', velthreshold);
+model = struct('fxmatrix', fxmatrix, 'tdecode', tdecode, 'dim', dim, 'velthreshold', velthreshold)

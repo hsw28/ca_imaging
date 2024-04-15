@@ -1,6 +1,4 @@
-function [values error] = pos_decoding_with_model(model, newClusters, newPos)
-
-
+function [values dec_error] = pos_decoding_with_model(model, newClusters, newPos)
 
 
 
@@ -38,6 +36,8 @@ function [values error] = pos_decoding_with_model(model, newClusters, newPos)
   velthreshold = model.velthreshold;
 
   ogspikes = length(fieldnames(fxmatrix));
+
+
   if ogspikes ~= numclust
     error('did you only use spikes common between training and running the model?')
   end
@@ -71,6 +71,28 @@ end
 xinc = xmin +(0:xbins)*psize; %makes a vectors of all the x values at each increment
 yinc = ymin +(0:ybins)*psize; %makes a vector of all the y values at each increment
 
+%xmin = 25;
+%ymin = 50;
+%xmax = 175;
+%ymax = 150;
+
+%{
+if xmin>min(posData(:,2))
+  error('your xmin value is too large')
+end
+if ymin>min(posData(:,3))
+  error('your ymin value is too large')
+end
+if xmax<max(posData(:,2))
+  max(posData(:,2))
+    error('your xmax value is too small')
+end
+if ymax<max(posData(:,3))
+    error('your ymax value is too small')
+end
+%}
+
+
 occ = zeros(xbins, ybins);
 testing = 0;
 for x = (1:xbins)
@@ -95,6 +117,7 @@ for x = (1:xbins)
     end
 end
 end
+
 
 
 vel = ca_velocity(posData);
@@ -122,7 +145,6 @@ tm = 1;
 
 while tm < (length(timevector)-t)
 
-
   goodvel = find(vel(2,:)>=timevector(tm) & vel(2,:)<timevector(tm+t));
 
 %  if nanmean((vel(1,goodvel)))>velthreshold & nanmedian((vel(1,goodvel)))>velthreshold
@@ -137,25 +159,36 @@ while tm < (length(timevector)-t)
 
       %for the cluster, permute through the different positions
       endprob = zeros(xbins, ybins);
-        for x = (1:xbins) %WANT TO PERMUTE THROUGH EACH SQUARE OF SPACE SKIPPING NON OCCUPIED SQUARES. SO EACH BIN SHOULD HAVE TWO COORDINATES
-          for y = (1:ybins)
+    endprob = zeros(size(fxmatrix.one));
+      %for x = (1:xbins) %WANT TO PERMUTE THROUGH EACH SQUARE OF SPACE SKIPPING NON OCCUPIED SQUARES. SO EACH BIN SHOULD HAVE TWO COORDINATES
+        %for y = (1:ybins)
+      for x = 1:size(fxmatrix.one,1)
+        for y = 1:size(fxmatrix.one,2)
           productme =0;
           expme = 0;
           c = 1;
 
-          if occ(x,y) == 0 %means never went there, dont consider
-            endprob(x,y) = NaN;
-          %  break
-          end
+        %  if occ(x,y) == 0 %means never went there, dont consider
+        %    endprob(x,y) = NaN;
+        %    break
+        %  end
 
           for c=1:numclust  %permute through cluster
               ni = nivector(c);
               name = char(clustname(c));
               fx = fxmatrix.(name);
+
               if length(fx)<2
                 continue
               end
 
+
+              if x>size(fx,1)
+                x = size(fx,1);
+              end
+              if y>size(fx,2)
+                y = size(fx,2);
+              end
 
               fx = (fx(x, y));
               productme = productme + (ni)*log(fx);  %IN
@@ -212,11 +245,11 @@ while tm < (length(timevector)-t)
         times(end+1) = timevector(tm);
 
     %if want overlap
-    if tdecodesec>.5
-      tm = tm+(t/2);
-    else
+  %  if tdecodesec>.5
+  %    tm = round(tm+(t/2));
+  %  else
       tm = tm+t;
-    end
+  %  end
 
     n = n+1;
     if rem(n,500)==0
@@ -226,14 +259,14 @@ end
 
 warning('your probabilities were the same')
 same = same
-maxx = maxx+psize/2;
-maxy = maxy+psize/2;
+maxx = maxx+(psize/2);
+maxy = maxy+(psize/2);
 values = [maxx; maxy; percents; times];
 
 
 
 values;
 
-error = ca_decodederror(values, posData, tdecode);
-error_av = nanmean(error(1,:))
-error_med = nanmedian(error(1,:))
+dec_error = ca_decodederror(values, posData, tdecode);
+error_av = nanmean(dec_error(:,6));
+error_med = nanmedian(dec_error(:,6));

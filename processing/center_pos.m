@@ -34,8 +34,12 @@ fields = fieldnames(pos);
 
 
     % Calculate the center of the traveled area
-    center_x = nanmedian(current_pos(:,2));
-    center_y = nanmedian(current_pos(:,3));
+    minx = min(current_pos(:,2));
+    miny = min(current_pos(:,3));
+    maxx = max(current_pos(:,2));
+    maxy = max(current_pos(:,3));
+    center_x = (maxx+minx)/2;
+    center_y = (maxy+miny)/2;
 
     % Calculate the shift required to move the center to (a, b)
     shift_x = a - center_x;

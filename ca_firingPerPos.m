@@ -36,6 +36,11 @@ ymin = min(posData(:,3));
 xmax = max(posData(:,2));
 ymax = max(posData(:,3));
 
+%xmin = 25;
+%ymin = 50;
+%xmax = 175;
+%ymax = 150;
+
 
 
 xbins = ceil((xmax-xmin)/psize); %number of x
