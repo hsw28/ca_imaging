@@ -19,7 +19,6 @@ Y = decoded(2,:);
 
 
 
-pos = smoothpos(pos);
 vel = ca_velocity(pos);
 vel = vel(1,:);
 
@@ -58,7 +57,7 @@ for i=1:length(decoded)
     postimes1 = (i-1)*(decodedinterval)+1;
     postimes2 = postimes1+(decodedinterval)-1;
     postimes = [postimes1:1:postimes2];
-  
+
 
 
 

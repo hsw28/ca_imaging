@@ -7,5 +7,10 @@ spikes1 = spikes_for_model(want1,:);
 spikes2 = spikes_for_decoding(want2,:);
 
 
+
+
+
+
+
 model = pos_decoding_model(pos_for_model, spikes1, tdecode, dim, velthreshold);
 [values error] = pos_decoding_with_model(model, spikes2, pos_for_decoding);

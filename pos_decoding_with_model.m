@@ -221,8 +221,11 @@ while tm < (length(timevector)-t)
         percents(end+1) = max(endprob(:)); %finds confidence
         if length(maxvalx) > 1 %if probs are the sample, randomly pick one and print warning
             same = same+1;
-            maxvalx = datasample(maxvalx, 1);
-            maxvaly = datasample(maxvaly, 1);
+            in = datasample(1:length(maxvalx), 1);
+            maxvalx = maxvalx(in);
+            maxvaly = maxvaly(in);
+          %  maxvalx = maxvalx(8); %17 best so far
+          %  maxvaly = maxvaly(8);
 
         end
 
@@ -230,6 +233,7 @@ while tm < (length(timevector)-t)
               maxx(end+1) = NaN;
               maxy(end+1) = NaN;
             else
+
               maxx(end+1) = (xinc(maxvalx)); %translates to x and y coordinates
               maxy(end+1) = (yinc(maxvaly));
             end
@@ -245,9 +249,9 @@ while tm < (length(timevector)-t)
         times(end+1) = timevector(tm);
 
     %if want overlap
-  %  if tdecodesec>.5
+  %  if tdecodesec>5
   %    tm = round(tm+(t/2));
-  %  else
+  % else
       tm = tm+t;
   %  end
 
