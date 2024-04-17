@@ -22,16 +22,24 @@ fprintf('loading pos')
 pos_structure = slurm_var.pos;
 fprintf('loading traces')
 calcium_traces = slurm_var.Ca_traces;
-fprintf('loading MI')
-ca_MI = slurm_var.MI_trace;
 fprintf('loading times')
 ca_ts = slurm_var.Ca_ts;
 fprintf('clearing excess')
 clearvars slurm_var
 
-fprintf('starting script')
-f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, 4, 2.5, ca_ts, 500, ca_MI);
 
+fprintf('loading MI')
+%for regular MI
+%ca_MI = slurm_var.MI_trace;
+%for MI5
+ca_MI = slurm_var.MI_trace5;
+
+fprintf('starting script')
+%regular
+%f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, 4, 2.5, ca_ts, 500, ca_MI);
+
+%5
+f = mutualinfo_openfield_trace_shuff(calcium_traces, pos_structure, 4, 5, ca_ts, 500, ca_MI);
 
 
 
