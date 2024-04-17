@@ -22,7 +22,6 @@ end
 
 
 posData = pos;
-%posData = fixpos(posData);
 
 
 timee = pos(:,1);
@@ -57,25 +56,6 @@ ymin = min(posData(:,3));
 xmax = max(posData(:,2));
 ymax = max(posData(:,3));
 
-%xmin = 25;
-%ymin = 50;
-%xmax = 175;
-%ymax = 150;
-
-if xmin>min(posData(:,2))
-  error('your xmin value is too large')
-end
-if ymin>min(posData(:,3))
-  error('your ymin value is too large')
-end
-if xmax<max(posData(:,2))
-    error('your xmax value is too small')
-end
-if ymax<max(posData(:,3))
-    error('your ymax value is too small')
-end
-
-
 
 
 xbins = ceil((xmax-xmin)/psize); %number of x
@@ -88,17 +68,23 @@ end
 xinc = xmin +(0:xbins)*psize; %makes a vectors of all the x values at each increment
 yinc = ymin +(0:ybins)*psize; %makes a vector of all the y values at each increment
 
-
+pos_samp_per_sec = length(posData(:,1))./(posData(end,1)-posData(1,1));
 
 % for each cluster,find the firing rate at esch location
-fxmatrix = ca_firingPerPos(posData, clusters, dim, tdecodesec, 7.5, velthreshold);
+fxmatrix = ca_firingPerPos(posData, clusters, dim, tdecodesec, pos_samp_per_sec, velthreshold);
 names = (fieldnames(fxmatrix));
 for k=1:length(names)
     curname = char(names(k));
     now = fxmatrix.(curname);
     if size(fxmatrix.(curname),2)>1 & max(now)>0
+    %  fxmatrix.(curname) = chartinterp(fxmatrix.(curname));
+    %  fxmatrix.(curname) = ndnanfilter(fxmatrix.(curname), 'gausswin', [dim*2/dim, dim*2/dim], 2, {}, {'replicate'}, 1);
 
-      fxmatrix.(curname) = ndnanfilter(fxmatrix.(curname), 'gausswin', [dim*2/dim, dim*2/dim], 2, {}, {'replicate'}, 1);
+          inan = (isnan(fxmatrix.(curname)));
+          [filt w] = ndnanfilter(fxmatrix.(curname), 'gausswin', [4, 4], 2, {}, {'replicate'}, 0);
+          filt(inan) = NaN;
+          fxmatrix.(curname) = filt;
+
 
     end
 
@@ -112,4 +98,4 @@ end
 
 
 
-model = struct('fxmatrix', fxmatrix, 'tdecode', tdecode, 'dim', dim, 'velthreshold', velthreshold)
+model = struct('fxmatrix', fxmatrix, 'tdecode', tdecode, 'dim', dim, 'velthreshold', velthreshold, 'xmin', xmin, 'xmax', xmax, 'ymin', ymin, 'ymax', ymax, 'xbins', xbins, 'ybins', ybins)

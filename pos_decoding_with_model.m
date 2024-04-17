@@ -34,6 +34,12 @@ function [values dec_error] = pos_decoding_with_model(model, newClusters, newPos
   tdecode = model.tdecode;
   dim = model.dim;
   velthreshold = model.velthreshold;
+  xmin_old = model.xmin;
+  xmax_old = model.xmax;
+  ymin_old = model.ymin;
+  ymax_old = model.ymax;
+  xbins_old = model.xbins;
+  ybins_old = model.ybins;
 
   ogspikes = length(fieldnames(fxmatrix));
 
@@ -58,15 +64,33 @@ same = 0;
 psize = 1.000 * dim;
 xvals = posData(:,2);
 yvals = posData(:,3);
+
+
 xmin = min(posData(:,2));
 ymin = min(posData(:,3));
 xmax = max(posData(:,2));
 ymax = max(posData(:,3));
+
+
 xbins = ceil((xmax-xmin)/psize); %number of x
 ybins = ceil((ymax-ymin)/psize); %number of y
 if ybins ==0
   ybins = 1;
 end
+
+
+
+if xbins ~= xbins_old
+  xmin = min(xmin, xmin_old);
+  xmax = max(xmax, xmax_old);
+  xbins = ceil((xmax-xmin)/psize);
+end
+if ybins ~= ybins_old
+  ymin = min(ymin, ymin_old);
+  ymax = max(ymax, ymax_old);
+  ybins = ceil((ymax-ymin)/psize);
+end
+
 
 xinc = xmin +(0:xbins)*psize; %makes a vectors of all the x values at each increment
 yinc = ymin +(0:ybins)*psize; %makes a vector of all the y values at each increment
@@ -148,7 +172,7 @@ while tm < (length(timevector)-t)
   goodvel = find(vel(2,:)>=timevector(tm) & vel(2,:)<timevector(tm+t));
 
 %  if nanmean((vel(1,goodvel)))>velthreshold & nanmedian((vel(1,goodvel)))>velthreshold
-  if length(find(vel(1,goodvel)>velthreshold)) >= length(goodvel)*.75
+  if (length(find(vel(1,goodvel)>velthreshold)) >= length(goodvel)*.75) && nanmean((vel(1,goodvel)))>velthreshold
    %find spikes in each cluster for time
    nivector = zeros((numclust),1);
    for c=1:numclust   %permute through cluster
@@ -183,13 +207,6 @@ while tm < (length(timevector)-t)
               end
 
 
-              if x>size(fx,1)
-                x = size(fx,1);
-              end
-              if y>size(fx,2)
-                y = size(fx,2);
-              end
-
               fx = (fx(x, y));
               productme = productme + (ni)*log(fx);  %IN
               expme = (expme) + (fx);
@@ -219,21 +236,28 @@ while tm < (length(timevector)-t)
         %percents = vertcat(percents, endprob);
 
         percents(end+1) = max(endprob(:)); %finds confidence
-        if length(maxvalx) > 1 %if probs are the sample, randomly pick one and print warning
-            same = same+1;
-            in = datasample(1:length(maxvalx), 1);
-            maxvalx = maxvalx(in);
-            maxvaly = maxvaly(in);
-          %  maxvalx = maxvalx(8); %17 best so far
-          %  maxvaly = maxvaly(8);
+%        if length(maxvalx) > 1 %if probs are the sample, randomly pick one and print warning
+%            same = same+1;
+%            maxvalx = datasample(maxvalx, 1);
+%            maxvaly = datasample(maxvaly, 1);
+%        end
 
-        end
+        if length(maxvalx) > 1
+          same = same+1;
+          % Compute the centroid of the highest probability locations
+          top_x = xinc(maxvalx);  % x coordinates of max probabilities
+          top_y = yinc(maxvaly);  % y coordinates of max probabilities
+          centroid_x = mean(top_x);
+          centroid_y = mean(top_y);
+          maxvalx = find(min(abs(xinc - centroid_x)) == abs(xinc - centroid_x), 1);
+          maxvaly = find(min(abs(yinc - centroid_y)) == abs(yinc - centroid_y), 1);
+      end
+
 
             if length(maxvalx)<1 | length(maxvaly) <1
               maxx(end+1) = NaN;
               maxy(end+1) = NaN;
             else
-
               maxx(end+1) = (xinc(maxvalx)); %translates to x and y coordinates
               maxy(end+1) = (yinc(maxvaly));
             end
@@ -248,12 +272,12 @@ while tm < (length(timevector)-t)
 
         times(end+1) = timevector(tm);
 
-    %if want overlap
-  %  if tdecodesec>5
-  %    tm = round(tm+(t/2));
-  % else
+  %  if want overlap
+    if tdecodesec>=3
+      tm = round(tm+(t/2));
+    else
       tm = tm+t;
-  %  end
+    end
 
     n = n+1;
     if rem(n,500)==0

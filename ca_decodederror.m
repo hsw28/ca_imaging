@@ -19,6 +19,7 @@ Y = decoded(2,:);
 
 
 
+pos = smoothpos(pos);
 vel = ca_velocity(pos);
 vel = vel(1,:);
 
@@ -42,7 +43,9 @@ predY = [];
 predT = [];
 realV = [];
 
-decodedinterval = round(15*decodedinterval);
+pos_samp_per_sec = length(pos(:,1))./(pos(end,1)-pos(1,1));
+decodedinterval = round(pos_samp_per_sec*decodedinterval);
+
 
 for i=1:length(decoded)
 
@@ -54,9 +57,15 @@ for i=1:length(decoded)
 
 
 
+  if decodedinterval/pos_samp_per_sec >= 3
+    postimes1 = (i-1)*round(decodedinterval/2)+1;
+    postimes2 = postimes1+(decodedinterval)-1;
+    postimes = [postimes1:1:postimes2];
+  else
     postimes1 = (i-1)*(decodedinterval)+1;
     postimes2 = postimes1+(decodedinterval)-1;
     postimes = [postimes1:1:postimes2];
+  end
 
 
 
@@ -89,8 +98,8 @@ for i=1:length(decoded)
 
 
 
-
 end
+
 
 nanmean(alldiff)./1.000
 nanmedian(alldiff)./1.000

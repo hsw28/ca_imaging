@@ -102,6 +102,7 @@ occupancy2 = nanconv(occupancy2,imageFilter, 'edge', 'nanout');
 
 rate = events./occupancy2;
 
+
 occprob = occupancy2./nansum(occupancy2);
 spikeprob = events./nansum(events);
 

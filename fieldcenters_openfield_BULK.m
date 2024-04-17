@@ -75,5 +75,6 @@ function field_centers  = fieldcenters_openfield_BULK(peaks_time_struct, pos_str
           maxrate;
         end
 
+
         field_centers.(sprintf('centers_%s', spikes_date)) = maxrate';
   end

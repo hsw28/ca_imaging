@@ -66,8 +66,6 @@ vel = ca_velocity(posData);
 
 
 
-%vel(1,:) = smoothdata(vel(1,:), 'gaussian', round(pos_samp_per_sec)); %originally had this at 30, trying with 15 now
-
 fastvel = find(vel(1,:) > velthreshold);
 
 
