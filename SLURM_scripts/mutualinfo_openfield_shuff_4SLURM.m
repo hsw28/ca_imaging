@@ -27,8 +27,7 @@ spikes = slurm_var.Ca_peaks;
 fprintf('loading TS')
 ca_ts = slurm_var.Ca_ts;
 fprintf('done loading')
-clearvars slurm_var
-fprintf('cleared excess variables, starting process')
+
 
 fprintf('loading MI')
 %for regular MI
@@ -36,9 +35,13 @@ fprintf('loading MI')
 %for MI 5
 ca_MI = slurm_var.MI5;
 
+
+clearvars slurm_var
+fprintf('cleared excess variables, starting process')
 %for regular
 %f = mutualinfo_openfield_shuff(spikes, pos_structure, 4, 2.5, ca_ts, 500, ca_MI);
 %for MI5
+
 f = mutualinfo_openfield_shuff(spikes, pos_structure, 4, 5, ca_ts, 500, ca_MI);
 
 end
