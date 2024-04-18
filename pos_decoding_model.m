@@ -22,8 +22,6 @@ end
 
 
 posData = pos;
-
-
 timee = pos(:,1);
 
 

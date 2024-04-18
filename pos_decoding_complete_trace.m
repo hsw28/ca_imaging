@@ -1,4 +1,4 @@
-function [model values error] = pos_decoding_complete(pos_for_model, spikes_for_model, CA_timestamps_model, pos_for_decoding, spikes_for_decoding, CA_timestamps_decoding, tdecode, dim, velthreshold, alignmentdata1, alignmentdata2)
+function [model values error] = pos_decoding_complete_trace(pos_for_model, spikes_for_model, CA_timestamps_model, pos_for_decoding, spikes_for_decoding, CA_timestamps_decoding, tdecode, dim, velthreshold, alignmentdata1, alignmentdata2)
 
 both = find(alignmentdata1>0 & alignmentdata2>0);
 want1 = (alignmentdata1(both));
