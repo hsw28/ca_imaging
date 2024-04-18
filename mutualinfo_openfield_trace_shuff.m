@@ -142,14 +142,35 @@ for i = 1:numel(fields_spikes)
                             %shuff_pos(:, 2:3) = shuff_pos(shuffled_indices, 1:2);
 
                             % code for circular shift
-                            pos_only = goodpos(:, 2:3);
-                            time = goodpos(:, 1);
-                            shift = randi([8 length(pos_only)], 1);
-                            if rand < 0.5
-                              shift = -shift;
+                            try
+                                pos_only = goodpos(:, 2:3);
+                            catch
+                                warning('Problem using function 1')
                             end
-                            shiftedData = circshift(pos_only, shift);
-                            shuff_pos = [time, shiftedData];
+
+                            try
+                              time = goodpos(:, 1);
+                            catch
+                              warning('Problem using function 2')
+                            end
+
+                            try
+                              shift = randi([8 length(time)], 1);
+                            catch
+                              warning('Problem using function 3')
+                            end
+
+                            try
+                                if rand < 0.5
+                                  shift = -shift;
+                                end
+                            catch
+                              warning('Problem using function 4')
+                            end
+
+                                shiftedData = circshift(pos_only, shift);
+                                shuff_pos = [time, shiftedData];
+
                             %% end circular shift
 
                             fprintf('check 5') %%%
