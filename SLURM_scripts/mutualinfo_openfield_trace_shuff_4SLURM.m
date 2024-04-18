@@ -29,9 +29,9 @@ ca_ts = slurm_var.Ca_ts;
 
 fprintf('loading MI')
 %for regular MI
-%ca_MI = slurm_var.MI_trace;
+ca_MI = slurm_var.MI_trace;
 %for MI5
-ca_MI = slurm_var.MI_trace5;
+%ca_MI = slurm_var.MI_trace5;
 
 fprintf('clearing excess')
 clearvars slurm_var
