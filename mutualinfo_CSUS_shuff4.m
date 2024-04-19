@@ -54,7 +54,7 @@ for i = 1:numel(fields_spikes)
       CSUS = CSUS(1:closestIndex);
       time = time(1:closestIndex);
 
-      biggest = max(time)
+      biggest = max(time);
       [I,J] = find(peaks_time>biggest);
       peaks_time(I,J) = NaN;
 
