@@ -117,12 +117,12 @@ for i = 1:numel(fields_spikes)
         fprintf('going through units') %%%
           for k=1:numunits
                     if isnan(MI(k))==1
-                      fprintf('check 1') %%%
+                    %  fprintf('check 1') %%%
                       mutinfo(1, k) = NaN;
                       mutinfo(2, k) = NaN;
                       continue
                     else
-                      fprintf('check 2') %%%
+                    %  fprintf('check 2') %%%
                       highspeedspikes = all_highspeedspikes(k,:);
                     end
 
@@ -131,11 +131,11 @@ for i = 1:numel(fields_spikes)
 
                     shuf = NaN(num_times_to_run,1);
                     %for l = 1:num_times_to_run
-                    fprintf('check 3') %%%
+                    %fprintf('check 3') %%%
                     parfor l = 1:num_times_to_run
 
                           if isnan(MI(k))==0 && length(highspeedspikes)>1
-                            fprintf('check 4') %%%
+                            %fprintf('check 4') %%%
                             %shuff_pos = goodpos;
                             %shuffled_indices = randperm(size(shuff_pos, 1));
                             % Apply the shuffled indices to the first two columns
@@ -173,7 +173,7 @@ for i = 1:numel(fields_spikes)
 
                             %% end circular shift
 
-                            fprintf('check 5') %%%
+                            %fprintf('check 5') %%%
                             [trace_mean occprob] = CA_normalizePosData_trace(highspeedspikes, shuff_pos, dim, 1.000);
                             if (size(trace_mean,1)) < (size(trace_mean,2))
                               trace_mean = trace_mean';
@@ -181,22 +181,22 @@ for i = 1:numel(fields_spikes)
                             if (size(occprob,1)) < (size(occprob,2))
                               occprob = occprob';
                             end
-                            fprintf('check 6') %%%
+                            %fprintf('check 6') %%%
                             shuf(l) = mutualinfo([trace_mean, occprob]);
-                            fprintf('check 7') %%%
+                            %fprintf('check 7') %%%
 
                           else
                             shuf(l) = NaN;
-                            fprintf('check 8') %%%
+                            %fprintf('check 8') %%%
                           end
-                          fprintf('check 9') %%%
+                          %fprintf('check 9') %%%
 
                       end
 
-                      fprintf('check 10') %%%
+                      %fprintf('check 10') %%%
                       topMI5 = floor(num_times_to_run*.95);
                       topMI1 = floor(num_times_to_run*.99);
-                      fprintf('check 11') %%%
+                      %fprintf('check 11') %%%
                       shuf = sort(shuf);
                       if isnan(topMI5)==0
                         mutinfo(1, k) = shuf(topMI5);
@@ -208,7 +208,7 @@ for i = 1:numel(fields_spikes)
                       else
                         mutinfo(2, k) = NaN;
                       end
-                      fprintf('check 12') %%%
+                      %fprintf('check 12') %%%
                       [c index] = (min(abs(MI(k)-shuf)));
                       if isnan(index)==0
                         rank = index./length(shuf);
@@ -216,7 +216,7 @@ for i = 1:numel(fields_spikes)
                       else
                         mutinfo(3,k) = NaN;
                       end
-                      fprintf('check 13') %%%
+                      %fprintf('check 13') %%%
                   end %ending the for loop for units
 
                   %fprintf('assigning MI')

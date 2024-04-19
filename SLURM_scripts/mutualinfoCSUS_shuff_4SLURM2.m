@@ -21,21 +21,26 @@ function mutualinfoCSUS_shuff_4SLURM2
 
 fprintf('loading variables')
 load('slurm_var.mat')
+fprintf('loading peaks')
 spikes = slurm_var.Ca_peaks;
+fprintf('loading CSUS_id')
 CSUS_id = slurm_var.CSUS_id;
 
 
 
 %%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS AND NO PRETRIAL%%%%%%%
-ca_MI = slurm_var.MI_CSUS2;
+fprintf('loading MI1')
+ca_MI0 = slurm_var.MI_CSUS2;
+fprintf('loading MI2')
+ca_MI1 = slurm_var.MI_CSUS2_pt;
 clearvars slurm_var
-f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 0, 500, ca_MI)
+
+%%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS AND NO PRETRIAL%%%%%%%
+f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 0, 500, ca_MI0)
 
 
 %%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS AND PRETRIAL%%%%%%%
-ca_MI = slurm_var.MI_CSUS2_pt;
-clearvars slurm_var
-f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 1, 500, ca_MI)
+f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 1, 500, ca_MI1)
 
 
 
