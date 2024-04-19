@@ -1,4 +1,4 @@
-function mutualinfoCSUS_shuff_4SLURM
+function mutualinfoCSUS_shuff_4SLURM2
 
 
     addpath(pwd);
@@ -26,20 +26,16 @@ CSUS_id = slurm_var.CSUS_id;
 
 
 
-%%%%%BELOW IS FOR CSUS WITH 5 DIVISIONS AND PRETRIAL%%%%%%%%
-%ca_MI = slurm_var.MI_CSUS5_pretrial;
-%clearvars slurm_var
-%f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 1, 5, 500, ca_MI)
-
-%%%%%BELOW IS FOR CSUS WITH 5 DIVISIONS AND NO PRETRIAL%%%%%%%%
-%ca_MI = slurm_var.MI_CSUS5;
-%clearvars slurm_var
-%f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 0, 5, 500, ca_MI)
-
 %%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS AND NO PRETRIAL%%%%%%%
 ca_MI = slurm_var.MI_CSUS2;
 clearvars slurm_var
-f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 0, 2, 500, ca_MI)
+f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 0, 500, ca_MI)
+
+
+%%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS AND PRETRIAL%%%%%%%
+ca_MI = slurm_var.MI_CSUS2_pt;
+clearvars slurm_var
+f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 1, 500, ca_MI)
 
 
 

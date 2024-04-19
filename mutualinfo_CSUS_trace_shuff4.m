@@ -203,7 +203,7 @@ for i = 1:numel(fields_spikes)
                 f = mutualinfo_struct;
 
 
-                MI_CSUS_trace_shuff = f;
+                MI_CSUS4_trace_shuff = f;
 
                 % Determine the suffix based on do_you_want_pretrial
                 if do_you_want_pretrial == 0
@@ -214,10 +214,10 @@ for i = 1:numel(fields_spikes)
 
 
                 % Create the dynamic variable name
-                variableName = sprintf('MI_CSUS%d_%s_trace_shuff', how_many_divisions, suffix);
+                variableName = sprintf('MI_CSUS4%d_%s_trace_shuff', suffix);
 
                 % Assign the structure to the new variable name
-                eval([variableName ' = MI_CSUS_trace_shuff;']);
+                eval([variableName ' = MI_CSUS4_trace_shuff;']);
 
                 % Get the current date and time as a string
                 currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
