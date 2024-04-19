@@ -36,11 +36,13 @@ ca_MI1 = slurm_var.MI_CSUS2_pt;
 clearvars slurm_var
 
 %%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS AND NO PRETRIAL%%%%%%%
-f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 0, 500, ca_MI0)
+fprintf('starting script no pretrial')
+f = mutualinfo_CSUS_shuff2(spikes, CSUS_id, 0, 500, ca_MI0)
 
 
 %%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS AND PRETRIAL%%%%%%%
-f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 1, 500, ca_MI1)
+fprintf('starting script pretrial')
+f = mutualinfo_CSUS_shuff2(spikes, CSUS_id, 1, 500, ca_MI1)
 
 
 

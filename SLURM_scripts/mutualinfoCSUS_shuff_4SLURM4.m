@@ -29,7 +29,7 @@ CSUS_id = slurm_var.CSUS_id;
 
 ca_MI = slurm_var.MI_CSUS4;
 clearvars slurm_var
-f = mutualinfo_CSUS_shuff(spikes, CSUS_id, 0, 500, ca_MI)
+f = mutualinfo_CSUS_shuff4(spikes, CSUS_id, 0, 500, ca_MI)
 
 
 

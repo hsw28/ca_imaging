@@ -46,7 +46,7 @@ ca_MI = slurm_var.MI_CSUS4_trace;
 fprintf('clearing var')
 clearvars slurm_var
 fprintf('starting')
-f = mutualinfo_CSUS_trace_shuff(calcium_traces, CSUS_id, 0, 500, ca_MI)
+f = mutualinfo_CSUS_trace_shuff4(calcium_traces, CSUS_id, 0, 500, ca_MI)
 
 
 end
