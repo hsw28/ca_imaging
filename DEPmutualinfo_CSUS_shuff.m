@@ -1,4 +1,4 @@
-function [mutualinfo_struct, shuf_all] = mutualinfo_CSUS_shuff(spike_structure, CSUS_structure, do_you_want_pretrial, how_many_divisions, num_times_to_run, MI_CSUS)
+function [mutualinfo_struct, shuf_all] = DEPmutualinfo_CSUS_shuff(spike_structure, CSUS_structure, do_you_want_pretrial, how_many_divisions, num_times_to_run, MI_CSUS)
 %finds 'mutual info' for CS/US/ non CS/US
 %CSUS_structure should come from BULKconverttoframe.m
 %do_you_want_pretrial: 0 for only cs us, 1 for cs us pretrial

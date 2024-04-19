@@ -1,4 +1,4 @@
-function [values dec_error] = pos_decoding_with_model_trace(model, newClusters, newPos)
+function [values dec_error] = pos_decoding_with_model_traces(model, newClusters, newPos)
 
 
 

@@ -1,4 +1,4 @@
-function f = ca_mutualinfo_openfield(peaks_time, pos, dim, velthreshold, varargin)
+function f = DEPca_mutualinfo_openfield(peaks_time, pos, dim, velthreshold, varargin)
 %finds mutual info for a bunch of cells
 
 if size(varargin)==0

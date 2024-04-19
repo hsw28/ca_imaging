@@ -44,6 +44,14 @@ for i = 1:numel(fields_US)
 
 
             allframes = zeros(1,floor(length(timestamps)./2));
+            tsindex = 2:2:length(timestamps);
+            timestamps = timestamps(tsindex);
+
+            if length(allframes)<length(timestamps)
+              allframes(end+1) = 0;
+              warning('your timestamps and frames arent same length')
+            end
+
             for k=1:length(US_timestoconvert)
 
               currconv_US = US_timestoconvert(k);
@@ -69,31 +77,24 @@ for i = 1:numel(fields_US)
 
                 if US_frame-5>0 && US_frame+4<=length(allframes)
                   if US_frame-10>1
-                    allframes(US_frame-10:US_frame-6)=[-1,-1,-1,-1,-1];
-                    allframes(US_frame-5:US_frame-1)=[1,2,3,4,5];
-                    allframes(US_frame+0:US_frame+4)=[6,7,8,9,10];
+                    allframes(US_frame-11:US_frame-7)=[-1,-1,-1,-1,-1];
+                    allframes(US_frame-6:US_frame-1)=[1,2,3,4,5,6];
+                    allframes(US_frame+0:US_frame+1)=[7,8];
                   else
                     allframes(1:US_frame-6)=ones(length(allframes(1:US_frame-6)),1);
-                    allframes(US_frame-5:US_frame-1)=[1,2,3,4,5];
-                    allframes(US_frame+0:US_frame+4)=[6,7,8,9,10];
+                    allframes(US_frame-6:US_frame-1)=[1,2,3,4,5,6];
+                    allframes(US_frame+0:US_frame+1)=[7,8];
                   end
-                elseif US_frame-5<=0
-                  startpoint = 5+(US_frame-5);
-                  allframes(1:startpoint) = [5-startpoint+1:1:5];
-                elseif US_frame+4>length(allframes)
-                  endpoint = length(allframes)-US_frame + 6;
-                  allframes(US_frame+0:end)=[6:1:endpoint];
+                elseif US_frame-6<=0
+                  startpoint = 6+(US_frame-6);
+                  allframes(1:startpoint) = [6-startpoint+1:1:6];
+                elseif US_frame+1>length(allframes)
+                  allframes(US_frame)=[7];
                 end
 
 
             end
 
-            tsindex = 2:2:length(timestamps);
-            timestamps = timestamps(tsindex);
-
-            if length(timestamps)~=length(allframes)
-              warning('your timestamps and frames arent same length')
-            end
 
 
         CS_US_id_struct.(sprintf('CSUS_id_%s', date)) = [allframes' timestamps]';

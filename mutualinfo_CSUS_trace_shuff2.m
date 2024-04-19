@@ -1,4 +1,4 @@
-function f = mutualinfo_CSUS_trace_shuff(spike_structure, CSUS_structure, do_you_want_pretrial, how_many_divisions, num_times_to_run, MI_CSUS)
+function f = mutualinfo_CSUS_trace_shuff(spike_structure, CSUS_structure, do_you_want_pretrial, num_times_to_run, MI_CSUS)
 %SHUFFLES CSUS
 %finds 'mutual info' for CS/US/ non CS/US
 %CSUS_structure should come from BULKconverttoframe.m
@@ -12,7 +12,7 @@ function f = mutualinfo_CSUS_trace_shuff(spike_structure, CSUS_structure, do_you
 
 fprintf('running mutualinfo_CSUS_trace_shuff')
 
-divisions = how_many_divisions;
+divisions = 2;
 fields_spikes = fieldnames(spike_structure);
 fields_CSUS = fieldnames(CSUS_structure);
 fields_MI = fieldnames(MI_CSUS);
@@ -58,27 +58,25 @@ for i = 1:numel(fields_spikes)
         CSUS = CSUS(1:size(peaks_time,2));
       end
 
-      occ_in_CS_US = zeros(1,10);
+      occ_in_CS_US = zeros(1,2);
       occ_pretrial = zeros(1,1);
       occ_intertrial = zeros(1,1);
 
-        numbering = 10./divisions;
         previousz = 0;
 
-        fprintf('assigning IDs')
-        for z=0:numbering:10
-            if z==0
-              occ_pretrial = length(find(CSUS ==-1));
-              occ_intertrial = length(find(CSUS ==0));
-            else
-              wanted1 = find(CSUS > previousz);
-              wanted2 = find(CSUS <= z);
-              wanted = intersect(wanted1,wanted2);
-              occ_in_CS_US(z) = length(wanted);
-              CSUS(wanted) = z;
-              previousz = z;
-            end
-          end
+        occ_pretrial = length(find(CSUS ==-1));
+        occ_intertrial = length(find(CSUS ==0));
+
+        CS_time1 = find(CSUS <= 6);
+        CS_time2 = find(CSUS > 0);
+        CS_time = intersect(CS_time1,CS_time2);
+        US_time = find(CSUS > 6);
+        CSUS(CS_time) = 1;
+        CSUS(US_time) = 2;
+
+        occ_in_CS_US(1) = length(CS_time);
+        occ_in_CS_US(2) = length(US_time);
+
 
 
         fprintf('going through spikes')
@@ -116,7 +114,7 @@ for i = 1:numel(fields_spikes)
                   spikes_pretrial = NaN(1,1);
 
                   index=1;
-                  for q=0:numbering:10
+                  for q=0:2
                         if q == 0
                           wanted= (find(shuffCSUS == -1));
                           occ_pretrial = length(wanted);

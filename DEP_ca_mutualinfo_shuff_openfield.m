@@ -1,4 +1,4 @@
-function f = ca_mutualinfo_shuff_openfield(peaks_time, pos, dim, num_times_to_run, ca_MI, velthreshold)
+function f = DEPca_mutualinfo_shuff_openfield(peaks_time, pos, dim, num_times_to_run, ca_MI, velthreshold)
 %finds 95% top shuffled and 99% top shuffled mutual info for X number of runs
 %put in ca_mutualinfo so you know what to skip
 

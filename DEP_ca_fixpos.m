@@ -1,4 +1,4 @@
-function f = ca_fixpos(pos, timestamps)
+function f = DEPca_fixpos(pos, timestamps)
 %converts position file to time, x, y and interpolates missing values
 %USE dlc_fixpos for deeeplabcut videoos
 

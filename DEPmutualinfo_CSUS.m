@@ -1,4 +1,4 @@
-function f = mutualinfo_CSUS(spike_structure, CSUS_structure, do_you_want_pretrial, how_many_divisions)
+function f = DEPmutualinfo_CSUS(spike_structure, CSUS_structure, do_you_want_pretrial, how_many_divisions)
 %finds 'mutual info' for CS/US/ non CS/US
 %CSUS_structure should come from BULKconverttoframe.m
 %do_you_want_pretrial: 0 for only cs us, 1 for cs us pretrial
