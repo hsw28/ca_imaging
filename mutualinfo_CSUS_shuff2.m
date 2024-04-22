@@ -192,16 +192,18 @@ for i = 1:numel(fields_spikes)
       f = mutualinfo_struct;
       fprintf('saving\n');
 
+
       MI_CSUS2_shuff = f;
 
       % Determine the suffix based on do_you_want_pretrial
       if do_you_want_pretrial == 0
           suffix = '';
       elseif do_you_want_pretrial == 1
-          suffix = 'pretrial';
+          suffix = '_pt';
       end
-      % Create the dynamic variable name
-      variableName = sprintf('MI_CSUS2%d_%s_shuff', suffix);
+
+      % Create the dynamic variable name with the suffix
+      variableName = sprintf('MI_CSUS2_shuff%s', suffix);
 
       % Assign the structure to the new variable name
       eval([variableName ' = MI_CSUS2_shuff;']);
@@ -215,6 +217,7 @@ for i = 1:numel(fields_spikes)
       % Save the output to the .mat file with the timestamped filename
       save(filename, variableName);
       fprintf('File saved successfully as %s\n', filename);
+
 
 
     end

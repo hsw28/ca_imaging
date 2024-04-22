@@ -200,14 +200,17 @@ for i = 1:numel(fields_spikes)
 
       MI_CSUS8_shuff = f;
 
+      MI_CSUS4_shuff = f;
+
       % Determine the suffix based on do_you_want_pretrial
       if do_you_want_pretrial == 0
           suffix = '';
       elseif do_you_want_pretrial == 1
-          suffix = 'pretrial';
+          suffix = '_pt';
       end
-      % Create the dynamic variable name
-      variableName = sprintf('MI_CSUS8%d_%s_shuff', suffix);
+
+      % Create the dynamic variable name with the suffix
+      variableName = sprintf('MI_CSUS8_shuff%s', suffix);
 
       % Assign the structure to the new variable name
       eval([variableName ' = MI_CSUS8_shuff;']);

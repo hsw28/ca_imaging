@@ -44,18 +44,14 @@ for i = 1:numel(fields_US)
 
 
             allframes = zeros(1,floor(length(timestamps)./2));
-            tsindex = 2:2:length(timestamps);
-            timestamps = timestamps(tsindex);
 
-            if length(allframes)<length(timestamps)
-              allframes(end+1) = 0;
-              warning('your timestamps and frames arent same length')
-            end
+
 
             for k=1:length(US_timestoconvert)
 
               currconv_US = US_timestoconvert(k);
               [c index] = min(abs(timestamps-currconv_US));
+
               if (currconv_US-timestamps(index))>0
                 US_frame = ceil(index./2);
               else
@@ -82,7 +78,12 @@ for i = 1:numel(fields_US)
                     allframes(US_frame+0:US_frame+1)=[7,8];
                   else
                     allframes(1:US_frame-6)=ones(length(allframes(1:US_frame-6)),1);
+                    if US_frame-6 <1
+                      cutam = 6-US_frame+1;
+                      allframes(1:US_frame-cutam)=[cutam+1:6];
+                    else
                     allframes(US_frame-6:US_frame-1)=[1,2,3,4,5,6];
+                    end
                     allframes(US_frame+0:US_frame+1)=[7,8];
                   end
                 elseif US_frame-6<=0
@@ -95,6 +96,16 @@ for i = 1:numel(fields_US)
 
             end
 
+            tsindex = 2:2:length(timestamps);
+            timestamps = timestamps(tsindex);
+            if length(allframes)<length(timestamps)
+              allframes(end+1) = 0;
+              warning('your timestamps and frames arent same length')
+            end
+            if length(allframes)>length(timestamps)
+              timestamps(end+1) = timestamps(end)+1/7.5;
+              warning('your timestamps and frames arent same length')
+            end
 
 
         CS_US_id_struct.(sprintf('CSUS_id_%s', date)) = [allframes' timestamps]';

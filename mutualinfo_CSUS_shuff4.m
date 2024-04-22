@@ -204,10 +204,11 @@ for i = 1:numel(fields_spikes)
       if do_you_want_pretrial == 0
           suffix = '';
       elseif do_you_want_pretrial == 1
-          suffix = 'pretrial';
+          suffix = '_pt';
       end
-      % Create the dynamic variable name
-      variableName = sprintf('MI_CSUS4%d_%s_shuff', suffix);
+
+      % Create the dynamic variable name with the suffix
+      variableName = sprintf('MI_CSUS4_shuff%s', suffix);
 
       % Assign the structure to the new variable name
       eval([variableName ' = MI_CSUS4_shuff;']);
@@ -221,6 +222,7 @@ for i = 1:numel(fields_spikes)
       % Save the output to the .mat file with the timestamped filename
       save(filename, variableName);
       fprintf('File saved successfully as %s\n', filename);
+
 
 
     end
