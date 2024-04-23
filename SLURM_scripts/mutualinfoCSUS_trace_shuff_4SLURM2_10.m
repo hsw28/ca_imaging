@@ -34,7 +34,7 @@ ca_MI2 = slurm_var.MI_CSUS2_trace_pt_10;
 
 %%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS NO PRETRIAL%%%%%%%%
 fprintf('loading MI')
-%f = mutualinfo_CSUS_trace_shuff2(calcium_traces, CSUS_id, 0, 500, ca_MI1)
+f = mutualinfo_CSUS_trace_shuff2(calcium_traces, CSUS_id, 0, 500, ca_MI1)
 
 
 f = mutualinfo_CSUS_trace_shuff2(calcium_traces, CSUS_id, 1, 500, ca_MI2)
