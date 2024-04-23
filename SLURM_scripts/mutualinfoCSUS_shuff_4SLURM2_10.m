@@ -1,4 +1,4 @@
-function mutualinfoCSUS_shuff_4SLURM2
+function mutualinfoCSUS_shuff_4SLURM2_10
 
 
     addpath(pwd);
@@ -23,17 +23,20 @@ fprintf('loading variables')
 load('slurm_var.mat')
 fprintf('loading peaks')
 spikes = slurm_var.Ca_peaks;
+
+
+%for 10 divisions
 fprintf('loading CSUS_id')
-CSUS_id = slurm_var.CSUS_id;
+CSUS_id = slurm_var.CSUS_id10;
 fprintf('loading MI1')
-ca_MI0 = slurm_var.MI_CSUS2;
+ca_MI0 = slurm_var.MI_CSUS2_10;
 fprintf('loading MI2')
-ca_MI1 = slurm_var.MI_CSUS2_pt;
+ca_MI1 = slurm_var.MI_CSUS2_pt_10;
 clearvars slurm_var
 
 %%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS AND NO PRETRIAL%%%%%%%
 fprintf('starting script no pretrial')
-%f = mutualinfo_CSUS_shuff2(spikes, CSUS_id, 0, 500, ca_MI0)
+f = mutualinfo_CSUS_shuff2(spikes, CSUS_id, 0, 500, ca_MI0)
 
 
 %%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS AND PRETRIAL%%%%%%%

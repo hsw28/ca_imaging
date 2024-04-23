@@ -1,4 +1,4 @@
-function mutualinfoCSUS_trace_shuff_4SLURM2
+function mutualinfoCSUS_trace_shuff_4SLURM2_10
 
 
     addpath(pwd);
@@ -25,15 +25,16 @@ fprintf('loading traces')
 calcium_traces = slurm_var.Ca_traces;
 fprintf('loading IDs')
 
-%for 8 divisions
-CSUS_id = slurm_var.CSUS_id;
-ca_MI1 = slurm_var.MI_CSUS2_trace;
-ca_M2 = slurm_var.MI_CSUS2_trace_pt;
+
+%for 10 divisions
+CSUS_id = slurm_var.CSUS_id10;
+ca_MI1 = slurm_var.MI_CSUS2_trace_10;
+ca_M2 = slurm_var.MI_CSUS2_trace_pt_10;
 
 
 %%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS NO PRETRIAL%%%%%%%%
 fprintf('loading MI')
-%f = mutualinfo_CSUS_trace_shuff2(calcium_traces, CSUS_id, 0, 500, ca_MI1)
+f = mutualinfo_CSUS_trace_shuff2(calcium_traces, CSUS_id, 0, 500, ca_MI1)
 
 
 f = mutualinfo_CSUS_trace_shuff2(calcium_traces, CSUS_id, 1, 500, ca_MI2)

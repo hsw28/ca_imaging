@@ -1,7 +1,8 @@
 function CS_US_id_struct = BULKconverttoframe(US_time_structure, Ca_timestamps)
 
+%8 divisions
 %converts from a timestamp to a frame #.
-%then converts to a spike train (can uncomment this) putting a 1-5 for CS and a 6-10 for US, and a 0 for neither
+%then converts to a spike train (can uncomment this) putting a 1-6 for CS and a 7-8 for US, and a 0 for neither
 
 
 ratios = struct();
@@ -75,7 +76,7 @@ for i = 1:numel(fields_US)
                   if US_frame-10>1
                     allframes(US_frame-16:US_frame-7)=[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1];
                     allframes(US_frame-6:US_frame-1)=[1,2,3,4,5,6];
-                    allframes(US_frame+0:US_frame+1)=[7,8];
+                    allframes(US_frame+0:US_frame+3)=[7,8,9,10];
                   else
                     allframes(1:US_frame-6)=ones(length(allframes(1:US_frame-6)),1);
                     if US_frame-6 <1
@@ -84,13 +85,13 @@ for i = 1:numel(fields_US)
                     else
                     allframes(US_frame-6:US_frame-1)=[1,2,3,4,5,6];
                     end
-                    allframes(US_frame+0:US_frame+1)=[7,8];
+                    allframes(US_frame+0:US_frame+3)=[7,8,9,10];
                   end
-                elseif US_frame-6<=0
+                elseif US_frame-10<=0
                   startpoint = 10+(US_frame-10);
                   allframes(1:startpoint) = [10-startpoint+1:1:10];
-                elseif US_frame+1>length(allframes)
-                  allframes(US_frame)=[7];
+                elseif US_frame+3>length(allframes)
+                  allframes(US_frame:allframes(end))=[7:1:length(allframes)-US_frame];
                 end
 
 
