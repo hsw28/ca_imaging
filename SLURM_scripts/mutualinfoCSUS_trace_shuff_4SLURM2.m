@@ -28,7 +28,7 @@ fprintf('loading IDs')
 %for 8 divisions
 CSUS_id = slurm_var.CSUS_id;
 ca_MI1 = slurm_var.MI_CSUS2_trace;
-ca_M2 = slurm_var.MI_CSUS2_trace_pt;
+ca_MI2 = slurm_var.MI_CSUS2_trace_pt;
 
 
 %%%%%BELOW IS FOR CSUS WITH 2 DIVISIONS NO PRETRIAL%%%%%%%%
