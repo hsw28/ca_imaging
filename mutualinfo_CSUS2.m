@@ -1,4 +1,4 @@
-function f = mutualinfo_CSUS2(spike_structure, CSUS_structure, do_you_want_pretrial, how_many_divisions)
+function f = mutualinfo_CSUS2(spike_structure, CSUS_structure, do_you_want_pretrial)
 %finds 'mutual info' for CS/US/ non CS/US
 %CSUS_structure should come from BULKconverttoframe.m
 %do_you_want_pretrial: 0 for only cs us, 1 for cs us pretrial
@@ -7,6 +7,7 @@ function f = mutualinfo_CSUS2(spike_structure, CSUS_structure, do_you_want_pretr
     % how_many_divisions = 2 will just split between cs and us
                         %= 10 will split CS and US each into 5
 %right now because im lazy how_many_divisions must be a factor of 10
+
 
 
 divisions = 2;
@@ -33,7 +34,7 @@ for i = 1:numel(fields_spikes)
       index = strfind(fieldName_spikes, '_');
       CSUS_date = fieldName_spikes(index(2)+1:end)
 
-      if length(peaks_time) <5
+      if length(peaks_time) <1
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
         continue
       end
@@ -45,7 +46,7 @@ for i = 1:numel(fields_spikes)
       time = CSUS(2,:);
       CSUS = CSUS(1,:);
 
-      biggest = max([peaks_time(:)]);
+      biggest = max(peaks_time(:));
       [minValue,closestIndex] = min(abs(biggest-time));
       CSUS = CSUS(1:closestIndex);
       time = time(1:closestIndex);
@@ -80,9 +81,7 @@ for i = 1:numel(fields_spikes)
           warning('you have no spikes')
       else
           wanted = find(CSUS > 0);
-
           for k=1:size(peaks_time,1)
-
           currspikes = peaks_time(k,:);
 
 
@@ -90,10 +89,11 @@ for i = 1:numel(fields_spikes)
           spikes_in_CS_US = zeros(1,2);
           spikes_intertrial = zeros(1,1);
           spikes_pretial = zeros(1,1);
-            if length(currspikes)>0  && length(unique(CSUS))>=2 %finding how many spikes in each time bin
+            if length(currspikes)>0  %finding how many spikes in each time bin
                 for q =1:length(currspikes)
                   if isnan(currspikes(q))==1
                     continue
+
                   end
 
                   [c index] = (min(abs(currspikes(q)-time))); %
@@ -107,9 +107,11 @@ for i = 1:numel(fields_spikes)
                         spikes_in_CS_US(spikebin) = spikes_in_CS_US(spikebin)+1;
                   end
                 end
+
               if do_you_want_pretrial == 1
                   pretrial_occprob = occ_pretrial*(1/7.5);
                   spikes_occprob = occ_in_CS_US.*(1/7.5);
+
                   occprob = [pretrial_occprob, spikes_occprob];
                   occprob = occprob./nansum(occprob);
                   spikeprob =  [spikes_pretial, spikes_in_CS_US];
@@ -119,7 +121,7 @@ for i = 1:numel(fields_spikes)
                   if (size(occprob,1)) < (size(occprob,2))
                     occprob = occprob';
                   end
-                  mutinfo(k) = mutualinfo([spikeprob, occprob]); %is this oriented the right way
+                  mutinfo(k) = mutualinfo([spikeprob, occprob]);
               else
                   occprob = occ_in_CS_US.*(1/7.5);
                   occprob = occprob./nansum(occprob);

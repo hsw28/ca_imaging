@@ -43,7 +43,7 @@ for i = 1:numel(fields_spikes)
       fieldValue_MI = MI_CSUS.(fieldName_MI);
       MI = fieldValue_MI;
 
-      if length(peaks_time) <5
+      if length(peaks_time) <1
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
         continue
       end
@@ -80,7 +80,7 @@ for i = 1:numel(fields_spikes)
 
 
         fprintf('going through spikes')
-      if length(peaks_time)<3 || length(unique(CSUS))<3
+      if length(peaks_time)<3 || length(unique(CSUS))<2
           mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
           warning('you have no spikes')
       else
@@ -107,8 +107,8 @@ for i = 1:numel(fields_spikes)
                   wanted = currspikes(wantedindex);
 
                   uni = unique(CSUS);
-                  occ_in_CS_US = NaN(length(uni)-1,1);
-                  spikes_in_CS_US = NaN(length(uni)-1,1);
+                  occ_in_CS_US = NaN(2,1);
+                  spikes_in_CS_US = NaN(2,1);
 
                   occ_pretrial = zeros(1,1);
                   spikes_pretrial = NaN(1,1);
@@ -141,6 +141,7 @@ for i = 1:numel(fields_spikes)
                         if (size(occprob,1)) < (size(occprob,2))
                           occprob = occprob';
                         end
+                        size([spikeprob, occprob])
                         shuf(d) = mutualinfo([spikeprob, occprob]); %is this oriented the right way
                   else
                     occprob = occ_in_CS_US.*(1/7.5);

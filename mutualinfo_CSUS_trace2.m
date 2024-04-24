@@ -37,7 +37,7 @@ for i = 1:numel(fields_spikes)
 
       mutinfo = NaN(size(peaks_time,1),1);
 
-      if length(peaks_time) <5
+      if length(peaks_time) <1
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
         continue
       end
@@ -79,9 +79,9 @@ for i = 1:numel(fields_spikes)
 
 
 
-              if length(currspikes)>0 && length(unique(CSUS))>=2 %finding how many spikes in each time bin
-                occ_in_CS_US = NaN(length(unique(CSUS))-1,1);
-                spikes_in_CS_US = NaN(length(unique(CSUS))-1,1);
+              if length(currspikes)>0
+                occ_in_CS_US = NaN(2,1);
+                spikes_in_CS_US = NaN(2,1);
                 spikes_pretrial = zeros(1,1);
                 occ_pretrial = zeros(1,1);
 
@@ -104,7 +104,9 @@ for i = 1:numel(fields_spikes)
                       end
                       if do_you_want_pretrial == 1
                             pretrial_occprob = occ_pretrial*(1/7.5);
+
                             spikes_occprob = occ_in_CS_US.*(1/7.5);
+
                             occprob = [pretrial_occprob, spikes_occprob'];
                             occprob = occprob./nansum(occprob);
                             spikeprob =  [spikes_pretrial, spikes_in_CS_US'];
@@ -114,6 +116,8 @@ for i = 1:numel(fields_spikes)
                             if (size(occprob,1)) < (size(occprob,2))
                               occprob = occprob';
                             end
+
+                            size([spikeprob, occprob]);
                             mutinfo(k) = mutualinfo([spikeprob, occprob]); %is this oriented the right way
                       else
                             occprob = occ_in_CS_US.*(1/7.5);
