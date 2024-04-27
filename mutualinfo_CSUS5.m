@@ -83,7 +83,7 @@ for i = 1:numel(fields_spikes)
 
           wanted = find(CSUS > 0);
           for k=1:size(peaks_time,1)
-
+            k
           currspikes = peaks_time(k,:);
 
 
@@ -118,7 +118,7 @@ for i = 1:numel(fields_spikes)
                 if (size(occprob,1)) < (size(occprob,2))
                   occprob = occprob';
                 end
-                mutinfo(k) = mutualinfo([spikeprob, occprob]); %is this oriented the right way
+                mutinfo(k) = mutualinfo([spikeprob, occprob]) %is this oriented the right way
               else
                 occprob = occ_in_CS_US.*(1/7.5);
                 occprob = occprob./nansum(occprob);

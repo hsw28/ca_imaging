@@ -1,10 +1,10 @@
-function f = ca_firingPerPos(posData, clusters, dim, varargin)
+function f = ca_firingPerPos_BULK(posData, clusters, dim, tdecode, pos_samp_per_sec, varargin)
 %returns firing per position. dim is number of centimeters for binning
 
 if length(varargin)>1
   velthreshold = cell2mat(varargin)
 else
-velthreshold = 4;
+velthreshold = 2;
 end
 
 %pos(:,3) = 0;
@@ -60,11 +60,16 @@ end
 
 %only uses data that is >15cm/s -- first smooths for length of bin
 
-if velthreshold>0
+%posData = fixpos(posData);
 vel = ca_velocity(posData);
+
+
+
+
 fastvel = find(vel(1,:) > velthreshold);
+
+
 posDataFast = posData(fastvel, :);
-end
 
 
 
@@ -109,15 +114,10 @@ for k = 1:spikenum
     [m lastspike] = min(abs(unit-maxtime));
     unit = unit(firstspike:lastspike);
 
-    if velthreshold>0
-      assvel = assignvelOLD(unit, vel);
-      fastspikeindex = find(assvel > velthreshold);
-      fastspike = unit(fastspikeindex);
-    else
-      fastspikeindex = length(unit);
-      fastspike = unit;
-    end
-
+    assvel = assignvelOLD(unit, vel);
+    fastspikeindex = find(assvel > velthreshold);
+    fastspike = unit(fastspikeindex);
+    size(fastspike);
     ls = placeevent(fastspike, posData); %outputs [event; xposvector; yposvector];
     ls = ls';
 
@@ -193,7 +193,7 @@ for k = 1:spikenum
 end
 
 fprintf('firing per complete')
-f = rate;
+f = myStruct;
 
 %[row,col] = find(rate==Inf)
 %for k=1:length(row)
