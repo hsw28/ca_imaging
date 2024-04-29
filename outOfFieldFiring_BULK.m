@@ -32,7 +32,10 @@ for q = 1:numel(fields_spikes)
       CA_timestamps = CA_timestamps_struct.(fieldName_ts);
 
 
-
+      if length(place_MI)<=1
+          outoffield.(sprintf('OOF_%s', spikes_date)) = NaN;
+          continue
+      end
 
       %looking at mutual info to see if it is a place cell
       place_MI = place_MI(:,3);
@@ -57,6 +60,8 @@ for q = 1:numel(fields_spikes)
 
       goodvel = find(vel(1,:)>=4);
       goodCSUS = find(CSUS_id(1,:)>0);
+      goodvel = setdiff(goodvel, goodCSUS);
+
       good_veltime = pos(goodvel, 1);
       good_CSUStime = pos(goodCSUS,1);
 
@@ -93,6 +98,11 @@ for q = 1:numel(fields_spikes)
           p_fast = [NaN,NaN];
           dim = 2.5;
           if length(CSUSspikes>1)
+            if length(good_CSUSpos)<=10
+              maxrate_csus = [NaN,NaN];
+              warning('no csus detected although file exists')
+            else
+
             [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(CSUSspikes,good_CSUSpos,2.5, 1.000);
             [maxval, maxindex] = max(rate(:));
             [x,y] = ind2sub(size(rate), maxindex);
@@ -106,6 +116,7 @@ for q = 1:numel(fields_spikes)
             %    p_CSUS(end+1,:) = curr_center;
             %    d_CSUS(end+1) = pdist(points, 'euclidean');
             %  end
+            end
           else
               maxrate_csus = [NaN,NaN];
           end

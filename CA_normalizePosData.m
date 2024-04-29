@@ -23,10 +23,11 @@ if size(eventData, 1)>size(eventData,2)
 end
 
 %eventData = cutclosest(posData(1,1), posData(end,1), eventData, eventData);
-ls = placeevent(eventData,posData);
+ls = ca_placeevent(eventData,posData);
+if size(ls,2)~=3
+	ls = ls';
+end
 
-
-ls = ls';
 if size(varargin)==0
 psize = 1 * dim; %some REAL ratio of pixels to cm -- 3.5 for wilson, 2.5 for disterhoft linear, 6.85 for eyeblink
 else
@@ -36,80 +37,41 @@ end
 
 %only find occupancy map if one hasn't been provided
 
-	xmax = max(posData(:,2));
-	xmin = min(posData(:,2));
-	ymax = max(posData(:,3));
-	ymin = min(posData(:,3));
-	xbins = ceil((xmax)/psize);
-	ybins = ceil((ymax)/psize);
+% Calculate bin edges for position data
+xmax = max(posData(:, 2));
+xmin = min(posData(:, 2));
+ymax = max(posData(:, 3));
+ymin = min(posData(:, 3));
+xbins = ceil((xmax - xmin) / psize);
+ybins = ceil((ymax - ymin) / psize);
+xEdges = linspace(xmin, xmax, xbins+1);
+yEdges = linspace(ymin, ymax, ybins+1);
 
-	time = zeros(ybins,xbins);
-	events = zeros(ybins,xbins);
-	xstep = xmax/xbins;
-	ystep = ymax/ybins;
-	tstep = (posData(end,1)-posData(1,1))./length(posData);
-	%tstep = 1/15;
+% Histogram counts for position data to create occupancy map
+[occCounts, ~, ~] = histcounts2(posData(:, 2), posData(:, 3), xEdges, yEdges);
+timePerBin = (posData(end, 1) - posData(1, 1)) / length(posData);
 
-
-
-	for i = 1:xbins
-    	for j = 1:ybins
-        	A1 = posData(:,2)>((i-1)*xstep) & posData(:,2)<=(i*xstep); %finds all rows that are in the current x axis bin
-        	A2 = posData(:,3)>((j-1)*ystep) & posData(:,3)<=(j*ystep); %finds all rows that are in the current y axis bin
-        	A = [A1 A2]; %merge results
-        	B = sum(A,2); %find the rows that satisfy both previous conditions
-				%	if length(B) >= 1
-						C = B > 1;
-        		time(ybins+1-j,i) = sum(C); %set the matrix cell for that bin to the number of rows that satisfy both
-				%	else
-				%		time(ybins+1-j,i) = NaN;
-				%	end
-			end
-		end
+% Histogram counts for event data to create events map
+[eventCounts, ~, ~] = histcounts2(ls(:, 2), ls(:, 3), xEdges, yEdges);  % Using mapped events data
 
 
-
-for i = 1:xbins
-    for j = 1:ybins
-        A1 = ls(:,2)>((i-1)*xstep) & ls(:,2)<=(i*xstep); %finds all rows that are in the current x axis bin
-        A2 = ls(:,3)>((j-1)*ystep) & ls(:,3)<=(j*ystep); %finds all rows that are in the current y axis bin
-        A = [A1 A2]; %merge results
-        B = sum(A,2); %find the rows that satisfy both previous conditions
-			%	if length(B) >= 1
-					C = B > 1;
-        	events(ybins+1-j,i) = sum(C); %set the matrix cell for that bin to the number of rows that satisfy both
-			%	else
-			%		events(ybins+1-j,i) = NaN;
-			%	end
-		end
-end
-
-
-events = (events);
-occupancy = (time*tstep);
+% Calculate rate, spike probability, and occupancy probability
+occupancy = occCounts * timePerBin;
 
 filtWidth = 3;
 filtSigma = .5;
 imageFilter=fspecial('gaussian',filtWidth,filtSigma);
 
-events = (events);
-events = nanconv(events,imageFilter, 'edge', 'nanout');
 
-occupancy = (time*tstep);
-occupancy2 = occupancy;
-occupancy2(occupancy == 0)= NaN;
-occupancy2 = nanconv(occupancy2,imageFilter, 'edge', 'nanout');
+occupancy(occupancy == 0) = NaN;  % Avoid division by zero to handle empty bins
+occupancy2 = nanconv(occupancy,imageFilter, 'edge', 'nanout');
+
+events = nanconv(eventCounts,imageFilter, 'edge', 'nanout');
 
 rate = events./occupancy2;
 
-
 occprob = occupancy2./nansum(occupancy2);
 spikeprob = events./nansum(events);
-
-
-
-
-
 
 
 
@@ -119,9 +81,8 @@ rate(isinf(rate)) = NaN;
 
 
 
-
-totspikes = events;
-totstime = (time*tstep);
+totspikes = sum(eventCounts(:));
+totstime = sum(occupancy(:));
 %rate = rate(:, 15:end-20);
 
 

@@ -1,4 +1,4 @@
-function fieldcent  = fieldcenters(peaks_time, goodcells, pos, dim, velthreshold)
+function fieldcent  = fieldcenters_onedirection(peaks_time, goodcells, pos, dim, velthreshold)
   %good cells are the ones you know have fields
   % field ceenters are the highest spiking point, not the geometric center
   %rates returns max rate, av rate, min rate

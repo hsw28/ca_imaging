@@ -11,6 +11,17 @@ data = data_matrix;
 tebc_coords = data(:, 1:2);
 non_tebc_coords = data(:, 3:4);
 
+n1 = ~isnan(tebc_coords(:,1));
+
+tebc_coords = tebc_coords(n1,:);
+non_tebc_coords = non_tebc_coords(n1,:);
+
+n1 = ~isnan(non_tebc_coords(:,1));
+
+tebc_coords = tebc_coords(n1,:);
+non_tebc_coords = non_tebc_coords(n1,:);
+
+
 % Computing distance matrices
 dist_matrix_tebc = squareform(pdist(tebc_coords));
 dist_matrix_nontebc = squareform(pdist(non_tebc_coords));
@@ -21,7 +32,9 @@ mantel_statistic = sum(sum(triu(dist_matrix_tebc, 1) .* triu(dist_matrix_nontebc
 fprintf('Mantel statistic (correlation between distance matrices): %f\n', mantel_statistic);
 
 % Permutation test to assess significance
-num_permutations = 10000;
+%num_permutations = 10000;
+num_permutations = 5000;
+
 permutation_stats = zeros(num_permutations, 1);
 for i = 1:num_permutations
     permuted_indices = randperm(size(non_tebc_coords, 1));
@@ -38,13 +51,23 @@ fprintf('P-value from permutation test: %f\n', p_value);
 
 % 1. Distance Matrix Heatmaps
 figure;
-subplot(1, 2, 1);
+subplot(1, 3, 1);
 imagesc(dist_matrix_tebc);
 title('TEBC Distance Matrix');
 colorbar;
-subplot(1, 2, 2);
+caxis([0 100]);
+subplot(1, 3, 2);
 imagesc(dist_matrix_nontebc);
 title('Non-TEBC Distance Matrix');
+colorbar;
+caxis([0 100]);
+% Calculate and Plot the Absolute Difference Heatmap
+difference_matrix = abs(dist_matrix_tebc - dist_matrix_nontebc);
+% Plot Composite Difference Heatmap
+subplot(1, 3, 3);
+imagesc(difference_matrix);
+title('Absolute Difference Heatmap');
+caxis([0 75]);
 colorbar;
 
 % 2. Scatter Plot of Distances
