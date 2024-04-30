@@ -1,4 +1,4 @@
-function field_centers  = fieldcenters_openfield_BULK_noCSUS(peaks_time_struct, pos_struct, dim, velthreshold, CSUS_id_struct)
+function field_centers  = fieldcenters_openfield_BULK_noCSUS(peaks_time_struct, pos_struct, dim, velthreshold, CA_timestamps_struct, CSUS_id_struct)
   %good cells IS AN OPTIONAL INPUT and are indices of the cells you know have fields
   % field ceenters are the highest spiking point, not the geometric center
   %rates returns max rate, av rate, min rate
@@ -7,6 +7,7 @@ function field_centers  = fieldcenters_openfield_BULK_noCSUS(peaks_time_struct, 
   fields_peaks_time = fieldnames(peaks_time_struct);
   fields_pos = fieldnames(pos_struct);
   fields_CSUS = fieldnames(CSUS_id_struct);
+  fields_ts = fieldnames(CA_timestamps_struct);
 
   if numel(fields_peaks_time) ~= numel(fields_pos)
     error('your spike and pos structures do not have the same number of values. you may need to pad your US structure for exploration days')
@@ -22,12 +23,21 @@ function field_centers  = fieldcenters_openfield_BULK_noCSUS(peaks_time_struct, 
         CSUS_id = CSUS_id_struct.(fieldName_CSUS);
 
 
+
         index = strfind(fieldName_spikes, '_');
         spikes_date = fieldName_spikes(index(2)+1:end)
 
         fieldName_pos = fields_pos{i};
         fieldValue_pos = pos_struct.(fieldName_pos);
         pos = fieldValue_pos;
+
+        fieldName_ts = fields_ts{i};
+        CA_timestamps = CA_timestamps_struct.(fieldName_ts);
+        if (pos(1,1)-pos(end,1))./length(pos) < 1
+          pos = convertpostoframe(pos, CA_timestamps);
+        end
+
+
 
         pos = smoothpos(pos);
 
@@ -40,6 +50,7 @@ function field_centers  = fieldcenters_openfield_BULK_noCSUS(peaks_time_struct, 
         goodtime = pos(goodvel, 1);
         goodpos = pos(goodvel,:);
         goodvel = setdiff(goodvel, goodCSUS);
+
 
 
         mintime = vel(2,1);

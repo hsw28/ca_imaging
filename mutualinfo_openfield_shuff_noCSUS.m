@@ -63,7 +63,7 @@ for i = 1:numel(fields_spikes)
       tm = pos(:, 1);
       biggest = max(peaks_time(:));
       [minValue,closestIndex] = min(abs(biggest-tm));
-      pos = pos(1:closestIndex, :);
+
 
       index = strfind(fieldName_spikes, '_');
       pos_date = fieldName_spikes(index(2)+1:end)

@@ -8,9 +8,11 @@ if isa(timestamps,'table')
   timestamps = timestamps(:,2);
 end
 
+
 if size(timestamps,2)==3
   timestamps = timestamps(:,2);
 end
+
 
 
 if timestamps(5)>2

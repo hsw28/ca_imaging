@@ -63,8 +63,6 @@ for i = 1:numel(fields_spikes)
 
       if length(peaks_time)>length(pos)
         peaks_time = peaks_time(1:length(pos));
-      elseif length(peaks_time)<length(pos)
-        pos = pos(1:length(peaks_time),:);
       end
 
       pos = smoothpos(pos);
@@ -86,28 +84,32 @@ for i = 1:numel(fields_spikes)
       validHighVelIndices = [];
 
       goodCSUS = find(CSUS_id(1,:)>0);
+
+        wn = find(goodCSUS<=length(pos));
+        goodCSUS = goodCSUS(wn);
+
       good_CSUStime = pos(goodCSUS,1);
+
 
       for ii = 1:length(highVelIndices)
           highVelTime = times(highVelIndices(ii));
-          % Find the closest low velocity time
-          [~, closestLowVelIndex] = min(abs(highVelTime - times(lowVelIndices)));
-          closestLowVelTime = times(lowVelIndices(closestLowVelIndex));
-
           [closestCSUS, ind] = min(abs(highVelTime - good_CSUStime));
-
           % Check if the high velocity time is more than 1 second away from the closest low velocity time
-          if abs(highVelTime - closestLowVelTime) > timeThreshold & (closestCSUS>timeThreshold)
+          if (closestCSUS>timeThreshold)
+            if highVelIndices(ii)<=length(peaks_time)
               validHighVelIndices = [validHighVelIndices, highVelIndices(ii)];
+            end
           end
-          if
+
       end
+
 
 
       goodpos = pos(validHighVelIndices,:);
       all_highspeedspikes = peaks_time(:,validHighVelIndices);
 
-  fprintf('starting units')
+
+      fprintf('starting units')
       numunits = size(peaks_time,1);
       if numunits<=1
         mutinfo = NaN;
@@ -136,7 +138,7 @@ for i = 1:numel(fields_spikes)
               mutinfo(k) = mutualinfo([trace_mean, occprob]);
             else
               mutinfo(k) = NaN;
-              fprintf('not enough high speed spikes')
+              %fprintf('not enough high speed spikes')
             end
           end
       end
