@@ -1,0 +1,55 @@
+rat0222.field_centers_noCSUS = fieldcenters_openfield_BULK_noCSUS(rat0222.Ca_peaks, rat0222.pos, 2.5, 4, rat0222.Ca_ts, rat0222.CSUS_id);
+rat0307.field_centers_noCSUS = fieldcenters_openfield_BULK_noCSUS(rat0307.Ca_peaks, rat0307.pos, 2.5, 4, rat0307.Ca_ts, rat0307.CSUS_id);
+rat0313.field_centers_noCSUS = fieldcenters_openfield_BULK_noCSUS(rat0313.Ca_peaks, rat0313.pos, 2.5, 4, rat0313.Ca_ts, rat0313.CSUS_id);
+rat0314.field_centers_noCSUS = fieldcenters_openfield_BULK_noCSUS(rat0314.Ca_peaks, rat0314.pos, 2.5, 4, rat0314.Ca_ts, rat0314.CSUS_id);
+rat0816.field_centers_noCSUS = fieldcenters_openfield_BULK_noCSUS(rat0816.Ca_peaks, rat0816.pos, 2.5, 4, rat0816.Ca_ts, rat0816.CSUS_id);
+
+
+%day An-1 to day An
+rat0222.centerdif_noCSUS.An1_An = fielddistancebyday(rat0222.alignment(:,2), rat0222.alignment(:,3), rat0222.field_centers_noCSUS.centers_2023_05_08, rat0222.field_centers_noCSUS.centers_2023_05_09);
+
+rat0307.centerdif_noCSUS.An1_An = fielddistancebyday(rat0307.alignment(:,2), rat0307.alignment(:,3), rat0307.field_centers_noCSUS.centers_2023_06_02, rat0307.field_centers_noCSUS.centers_2023_06_05);
+
+rat0313.centerdif_noCSUS.An1_An = fielddistancebyday(rat0313.alignment(:,2), rat0313.alignment(:,3), rat0313.field_centers_noCSUS.centers_2023_05_30, rat0313.field_centers_noCSUS.centers_2023_05_31);
+
+rat0314.centerdif_noCSUS.An1_An = fielddistancebyday(rat0314.alignment(:,2), rat0314.alignment(:,3), rat0314.field_centers_noCSUS.centers_2023_05_21, rat0314.field_centers_noCSUS.centers_2023_05_22);
+
+rat0816.centerdif_noCSUS.An1_An = fielddistancebyday(rat0816.alignment(:,2), rat0816.alignment(:,3), rat0816.field_centers_noCSUS.centers_2022_11_04, rat0816.field_centers_noCSUS.centers_2022_11_08);
+
+%day An to B1
+rat0222.centerdif_noCSUS.An_B1 = fielddistancebyday(rat0222.alignment(:,5), rat0222.alignment(:,3), rat0222.field_centers_noCSUS.centers_2023_05_11, rat0222.field_centers_noCSUS.centers_2023_05_09);
+
+rat0307.centerdif_noCSUS.An_B1 = fielddistancebyday(rat0307.alignment(:,5), rat0307.alignment(:,3), rat0307.field_centers_noCSUS.centers_2023_06_08, rat0307.field_centers_noCSUS.centers_2023_06_05);
+
+rat0313.centerdif_noCSUS.An_B1 = fielddistancebyday(rat0313.alignment(:,5), rat0313.alignment(:,3), rat0313.field_centers_noCSUS.centers_2023_06_02, rat0313.field_centers_noCSUS.centers_2023_05_31);
+
+rat0314.centerdif_noCSUS.An_B1 = fielddistancebyday(rat0314.alignment(:,5), rat0314.alignment(:,3), rat0314.field_centers_noCSUS.centers_2023_05_24, rat0314.field_centers_noCSUS.centers_2023_05_22);
+
+rat0816.centerdif_noCSUS.An_B1 = fielddistancebyday(rat0816.alignment(:,5), rat0816.alignment(:,3), rat0816.field_centers_noCSUS.centers_2022_11_10, rat0816.field_centers_noCSUS.centers_2022_11_08);
+
+%And to put them all togther
+centerdif_noCSUS_An1_An = [rat0222.centerdif_noCSUS.An1_An; rat0307.centerdif_noCSUS.An1_An; rat0313.centerdif_noCSUS.An1_An; rat0314.centerdif_noCSUS.An1_An; rat0816.centerdif_noCSUS.An1_An];
+centerdif_noCSUS_An_B1 = [rat0222.centerdif_noCSUS.An_B1; rat0307.centerdif_noCSUS.An_B1; rat0313.centerdif_noCSUS.An_B1; rat0314.centerdif_noCSUS.An_B1; rat0816.centerdif_noCSUS.An_B1];
+
+figure
+histogram(centerdif_noCSUS_An1_An, 'BinWidth', 3.6, 'Normalization', 'probability')
+hold on
+histogram(centerdif_noCSUS_An_B1, 'BinWidth', 3.6,'Normalization', 'probability' )
+
+nanmean(centerdif_noCSUS_An1_An)
+nanmean(centerdif_noCSUS_An_B1)
+
+
+
+------
+rat0222.MI_noCSUS = mutualinfo_openfield_noCSUS(rat0222.Ca_peaks, rat0222.pos, 4, 2.5, rat0222.Ca_ts,rat0222.CSUS_id);
+rat0307.MI_noCSUS = mutualinfo_openfield_noCSUS(rat0307.Ca_peaks, rat0307.pos, 4, 2.5, rat0307.Ca_ts,rat0307.CSUS_id);
+rat0313.MI_noCSUS = mutualinfo_openfield_noCSUS(rat0313.Ca_peaks, rat0313.pos, 4, 2.5, rat0313.Ca_ts,rat0313.CSUS_id);
+rat0314.MI_noCSUS = mutualinfo_openfield_noCSUS(rat0314.Ca_peaks, rat0314.pos, 4, 2.5, rat0314.Ca_ts,rat0314.CSUS_id);
+rat0816.MI_noCSUS = mutualinfo_openfield_noCSUS(rat0816.Ca_peaks, rat0816.pos, 4, 2.5, rat0816.Ca_ts,rat0816.CSUS_id);
+
+rat0222.MI_trace_noCSUS = mutualinfo_openfield_trace_noCSUS(rat0222.Ca_traces, rat0222.pos, 4, 2.5, rat0222.Ca_ts,rat0222.CSUS_id);
+rat0307.MI_trace_noCSUS = mutualinfo_openfield_trace_noCSUS(rat0307.Ca_traces, rat0307.pos, 4, 2.5, rat0307.Ca_ts,rat0307.CSUS_id);
+rat0313.MI_trace_noCSUS = mutualinfo_openfield_trace_noCSUS(rat0313.Ca_traces, rat0313.pos, 4, 2.5, rat0313.Ca_ts,rat0313.CSUS_id);
+rat0314.MI_trace_noCSUS  = mutualinfo_openfield_trace_noCSUS(rat0314.Ca_traces, rat0314.pos, 4, 2.5, rat0314.Ca_ts,rat0314.CSUS_id);
+rat0816.MI_trace_noCSUS = mutualinfo_openfield_trace_noCSUS(rat0816.Ca_traces, rat0816.pos, 4, 2.5, rat0816.Ca_ts,rat0816.CSUS_id);

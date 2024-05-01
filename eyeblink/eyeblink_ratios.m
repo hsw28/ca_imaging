@@ -37,7 +37,7 @@ for i = 1:numel(fields_US) %going through each day
 
 
     if strcmp(US_date, spikes_date)==1
-      US_end = US+.750;
+      US_end = US+.5;
       US_start = US;
       CS_start = US_start-.750; %this is start of CS, -.5 is end of CS
       pretrial_start=CS_start-.750;
@@ -65,7 +65,7 @@ for i = 1:numel(fields_US) %going through each day
 
       CS_sum = sum(inCS);
       US_sum = sum(inUS);
-      
+
       if CS_sum >= cutoff | US_sum >= cutoff | CS_sum >= cutoff
         if pretrial_sum+CS_sum>0
           CS_change = CS_sum-pretrial_sum;
