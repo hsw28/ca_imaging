@@ -1,4 +1,4 @@
-function [allframes timestamps] = converttoframe(US_timestoconvert, Ca_timestamps)
+function [allframes timestamps] = DEPconverttoframe(US_timestoconvert, Ca_timestamps)
 %converts from a timestamp to a frame #.
 %then converts to a spike train (can uncomment this) putting a 1-5 for CS and a 6-10 for US
 

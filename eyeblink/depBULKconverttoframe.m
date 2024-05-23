@@ -1,4 +1,4 @@
-function CS_US_id_struct = BULKconverttoframe(US_time_structure, Ca_timestamps)
+function CS_US_id_struct = DEPBULKconverttoframe(US_time_structure, Ca_timestamps)
 
 %converts from a timestamp to a frame #.
 %then converts to a spike train (can uncomment this) putting a 1-5 for CS and a 6-10 for US, and a 0 for neither
