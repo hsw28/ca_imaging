@@ -1,4 +1,4 @@
-function [EMG_cr_detected, EMG_cr_onset_times, EMG_cr_types] = detectCRs(EMG_struct_unfiltered, EMG_ts_struct, us_times_struct, debug)
+function [EMG_cr_detected, percentCRs, EMG_cr_onset_times, EMG_cr_types] = detectCRs(EMG_struct_unfiltered, EMG_ts_struct, us_times_struct, debug)
 
 %Detects conditioned responses in EMG data
 %A CR was defined as an increase in integrated EMG activity that was greater than the mean baseline amplitude plus
@@ -39,6 +39,10 @@ fields_EMG = fieldnames(EMG_struct);
 fields_TS = fieldnames(EMG_ts_struct);
 fields_US = fieldnames(us_times_struct);
 
+if length(fields_EMG) ~= length(fields_TS) | length(fields_EMG) ~= length(fields_US)
+  error('your structure lengths do night align')
+end
+
 % Output structs
 EMG_cr_detected = struct();
 EMG_cr_onset_times = struct();
@@ -49,9 +53,8 @@ for i = 1:numel(fields_TS)
     timestamps = EMG_ts_struct.(ts_field);
     emg_field = fields_EMG{i};
     emg_data = EMG_struct.(emg_field);
-    emg_data = filter_emg(emg_data);
     us_field = fields_US{i};
-    us_times = us_times_struct.(us_field)-.0083;
+    us_times = us_times_struct.(us_field);
     cs_times = us_times - US_DELAY;
 
     num_trials = numel(cs_times);
@@ -59,75 +62,86 @@ for i = 1:numel(fields_TS)
     cr_onsets = cell(num_trials, 1);
     cr_types = cell(num_trials, 1);
 
-    for t = 1:num_trials
-        cs = cs_times(t);
-        us = us_times(t);
+    if length(emg_data)>1 & length(us_times)>1
+      emg_data = filter_emg(emg_data);
+      for t = 1:num_trials
+          cs = cs_times(t);
+          us = us_times(t);
 
-        % Baseline
-        baseline_idx = timestamps >= (cs - BASELINE_DURATION) & timestamps < cs;
-        baseline = emg_data(baseline_idx);
-        threshold = nanmean(baseline) + STD_THRESHOLD * nanstd(baseline);
+          % Baseline
+          baseline_idx = timestamps >= (cs - BASELINE_DURATION) & timestamps < cs;
+          baseline = emg_data(baseline_idx);
+          threshold = nanmean(baseline) + STD_THRESHOLD * nanstd(baseline);
 
-        % Response window
-        response_idx = timestamps >= cs & timestamps < us;
-        response_window = emg_data(response_idx);
-        response_times = timestamps(response_idx);
-        above_threshold = response_window > threshold;
+          % Response window
+          response_idx = timestamps >= cs & timestamps < us;
+          response_window = emg_data(response_idx);
+          response_times = timestamps(response_idx);
+          above_threshold = response_window > threshold;
 
-        [starts, lengths, times] = findRuns(above_threshold, response_times);
-        durations = lengths .* nanmean(diff(timestamps));
-        valid_idx = durations >= MIN_CR_DURATION;
+          [starts, lengths, times] = findRuns(above_threshold, response_times);
+          durations = lengths .* nanmean(diff(timestamps));
+          valid_idx = durations >= MIN_CR_DURATION;
 
-        trial_onsets = [];
-        trial_types = {};
+          trial_onsets = [];
+          trial_types = {};
 
-        for j = find(valid_idx)'
-            onset = times(j);
-            rel_onset = onset - cs;
+          for j = find(valid_idx)'
+              onset = times(j);
+              rel_onset = onset - cs;
 
-            if rel_onset < MIN_LATENCY
-                continue;  % alpha
-            end
+              if rel_onset < MIN_LATENCY
+                  continue;  % alpha
+              end
 
-            % Check adaptive: still above threshold in last 20 ms before US
-            adaptive_idx = timestamps >= (us - 0.020) & timestamps < us;
-            if any(emg_data(adaptive_idx) > threshold)
-                trial_onsets(end+1) = onset;
-                trial_types{end+1} = "adaptive";
-            else
-                % Non-adaptive: skip
-                continue;
-            end
-        end
+              % Check adaptive: still above threshold in last 20 ms before US
+              adaptive_idx = timestamps >= (us - 0.020) & timestamps < us;
+              if any(emg_data(adaptive_idx) > threshold)
+                  trial_onsets(end+1) = onset;
+                  trial_types{end+1} = "adaptive";
+              else
+                  % Non-adaptive: skip
+                  continue;
+              end
+          end
 
-        if ~isempty(trial_onsets)
-            cr_detected(t) = true;
-        end
+          if ~isempty(trial_onsets)
+              cr_detected(t) = true;
+          end
 
-        cr_onsets{t} = trial_onsets;
-        cr_types{t} = trial_types;
+          cr_onsets{t} = trial_onsets;
+          cr_types{t} = trial_types;
 
-        % Optional plotting
-        if debug
-            figure;
-            plot(timestamps, emg_data); hold on;
-            yline(threshold, 'r--');
-            xline(cs, 'k--', 'CS');
-            xline(us, 'm--', 'US');
-            for m = 1:length(trial_onsets)
-                xline(trial_onsets(m), '--g', trial_types{m});
-            end
-            xline(us - 0.020, 'c--', 'US - 20 ms');
-            title(sprintf('Trial %d (%s)', t, strjoin(trial_types, ', ')));
-            xlabel('Time (s)'); ylabel('EMG');
-        end
+          % Optional plotting
+          if debug
+              figure;
+              plot(timestamps, emg_data); hold on;
+              yline(threshold, 'r--');
+              xline(cs, 'k--', 'CS');
+              xline(us, 'm--', 'US');
+              for m = 1:length(trial_onsets)
+                  xline(trial_onsets(m), '--g', trial_types{m});
+              end
+              xline(us - 0.020, 'c--', 'US - 20 ms');
+              title(sprintf('Trial %d (%s)', t, strjoin(trial_types, ', ')));
+              xlabel('Time (s)'); ylabel('EMG');
+          end
+      end
+
+      EMG_cr_detected.(ts_field) = cr_detected;
+      EMG_cr_onset_times.(emg_field) = cr_onsets;
+      EMG_cr_types.(ts_field) = cr_types;
+      percentCRs.(ts_field) = length(find(cr_detected==1))./length(find(cr_detected>-1));
+
+    else
+      EMG_cr_detected.(ts_field) = NaN;
+      EMG_cr_onset_times.(emg_field) = NaN;
+      EMG_cr_types.(ts_field) = NaN;
+      percentCRs.(ts_field) = NaN;
     end
 
-    EMG_cr_detected.(ts_field) = cr_detected;
-    EMG_cr_onset_times.(emg_field) = cr_onsets;
-    EMG_cr_types.(ts_field) = cr_types;
 end
-end
+
 
 function [starts, lengths, times] = findRuns(binary, t)
 d = diff([0; binary(:); 0]);
@@ -135,4 +149,3 @@ starts = find(d == 1);
 ends = find(d == -1) - 1;
 lengths = ends - starts + 1;
 times = t(starts);
-end
