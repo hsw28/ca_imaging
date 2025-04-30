@@ -1,122 +1,138 @@
-function [EMG_cr_detected, EMG_cr_onset_times] = detectCRs(EMG_struct, EMG_ts_struct, cs_times_struct)
-% DETECTCRS Detects conditioned responses in EMG data
-%   EMG_struct: Struct containing raw EMG signals
+function [EMG_cr_detected, EMG_cr_onset_times, EMG_cr_types] = detectCRs(EMG_struct_unfiltered, EMG_ts_struct, us_times_struct, debug)
+
+%Detects conditioned responses in EMG data
+%A CR was defined as an increase in integrated EMG activity that was greater than the mean baseline amplitude plus
+%4 times the standard deviation of the baseline activity, for a minimum of 10 ms. The response also had to begin at
+%least 35 ms after the onset of the CS, but before US onset. A response in the 200 ms before the onset of the US
+%was defined as a late or adaptive CR. Finally, a short-latency or alpha response was defined as one that began
+%within 35 ms of CS onset.
+%
+%CRs that returned to baseline before the onset of the US were considered poorly timed or “non-adaptive” CRs and
+%were not counted for analysis. Any CR that began <35 ms after CS onset was considered an “alpha” response and was not counted.
+
+%   EMG_struct: Struct containing raw EMG signals -- SIGNALS ARE FILTERED IN THIS FUNCTION
 %   EMG_ts_struct: Struct containing timestamps corresponding to each EMG sample (in seconds)
-%   cs_times_struct: Struct containing CS onset times (in seconds)
+%   cs_times_struct: Struct containing US onset times (in seconds) -- note this corrects for the 0.0083 offset
 %
 % Returns:
 %   EMG_cr_detected: Struct indicating presence of CR for each trial
 %   EMG_cr_onset_times: Struct of CR onset times (in seconds) for each trial
 
-% Define timing parameters (in seconds)
-BASELINE_DURATION = .5;    % 500ms baseline
-CS_DURATION = 0.25;         % 250ms CS
-TRACE_DURATION = 0.5;       % 500ms trace period
-US_DURATION = 0.1;          % 100ms US
-MIN_CR_DURATION = 0.015;    % 15ms minimum duration
-MIN_LATENCY = 0.05;         % 50ms minimum latency after CS
-STD_THRESHOLD = 4;          % 4 SD above baseline mean
-adaptive = 0.2;
+
+
+EMG_struct = EMG_struct_unfiltered;
+
+if nargin < 4
+    debug = false;
+end
+
+% Constants
+BASELINE_DURATION = 0.5;
+US_DELAY = 0.75;                  % Time from CS to US
+MIN_LATENCY = 0.035;
+MAX_LATENCY = 0.740;
+ADAPTIVE_WINDOW_START = 0.73;
+MIN_CR_DURATION = 0.010;
+STD_THRESHOLD = 4;
 
 fields_EMG = fieldnames(EMG_struct);
-fields_CS = fieldnames(cs_times_struct);
 fields_TS = fieldnames(EMG_ts_struct);
+fields_US = fieldnames(us_times_struct);
 
-if numel(fields_EMG) ~= numel(fields_CS)
-    error('EMG and CS structures do not have the same number of fields.');
-end
-
-if numel(fields_TS) ~= numel(fields_CS)
-    error('TS and CS structures do not have the same number of fields.');
-end
-
+% Output structs
 EMG_cr_detected = struct();
 EMG_cr_onset_times = struct();
+EMG_cr_types = struct();
 
 for i = 1:numel(fields_TS)
-    fieldName_TS = fields_TS{i};
-    timestamps = EMG_ts_struct.(fieldName_TS);
+    ts_field = fields_TS{i};
+    timestamps = EMG_ts_struct.(ts_field);
+    emg_field = fields_EMG{i};
+    emg_data = EMG_struct.(emg_field);
+    emg_data = filter_emg(emg_data);
+    us_field = fields_US{i};
+    us_times = us_times_struct.(us_field)-.0083;
+    cs_times = us_times - US_DELAY;
 
-    index = strfind(fieldName_TS, '_');
-    TS_date = fieldName_TS(index(2)+1:end);
+    num_trials = numel(cs_times);
+    cr_detected = false(num_trials, 1);
+    cr_onsets = cell(num_trials, 1);
+    cr_types = cell(num_trials, 1);
 
-    fieldName_EMG = fields_EMG{i};
-    emg_data = EMG_struct.(fieldName_EMG);
+    for t = 1:num_trials
+        cs = cs_times(t);
+        us = us_times(t);
 
-    index = strfind(fieldName_EMG, '_');
-    EMG_date = fieldName_EMG(index(2)+1:end);
+        % Baseline
+        baseline_idx = timestamps >= (cs - BASELINE_DURATION) & timestamps < cs;
+        baseline = emg_data(baseline_idx);
+        threshold = nanmean(baseline) + STD_THRESHOLD * nanstd(baseline);
 
-    fieldName_CS = fields_CS{i};
-    cs_times = cs_times_struct.(fieldName_CS);
+        % Response window
+        response_idx = timestamps >= cs & timestamps < us;
+        response_window = emg_data(response_idx);
+        response_times = timestamps(response_idx);
+        above_threshold = response_window > threshold;
 
-    index = strfind(fieldName_CS, '_');
-    CS_date = fieldName_CS(index(2)+1:end);
+        [starts, lengths, times] = findRuns(above_threshold, response_times);
+        durations = lengths .* nanmean(diff(timestamps));
+        valid_idx = durations >= MIN_CR_DURATION;
 
-    if strcmp(TS_date, EMG_date) && strcmp(TS_date, CS_date)
-        num_trials = length(cs_times);
-        cr_detected = false(num_trials, 1);
-        cr_onset_times = zeros(num_trials, 1);
+        trial_onsets = [];
+        trial_types = {};
 
-        for trial = 1:num_trials
-            % Find indices for baseline period (500ms before CS)
-            baseline_idx = timestamps >= (cs_times(trial) - BASELINE_DURATION) & ...
-                           timestamps < cs_times(trial);
-            baseline = emg_data(baseline_idx);
+        for j = find(valid_idx)'
+            onset = times(j);
+            rel_onset = onset - cs;
 
+            if rel_onset < MIN_LATENCY
+                continue;  % alpha
+            end
 
-            % Calculate baseline statistics
-            baseline_mean = mean(baseline);
-            baseline_std = std(baseline);
-            threshold = baseline_mean + (STD_THRESHOLD * baseline_std);
-
-            % Define response window (from CS + 50ms to CS + trace period end)
-            response_idx = timestamps >= (cs_times(trial) + MIN_LATENCY ) & ...
-                           timestamps < (cs_times(trial) + CS_DURATION + TRACE_DURATION);
-
-            %late CRs
-            %response_idx2 = timestamps >= (cs_times(trial) + CS_DURATION + TRACE_DURATION - adaptive) & ...
-            %               timestamps < (cs_times(trial) + CS_DURATION + TRACE_DURATION);
-
-            response_window = emg_data(response_idx);
-            response_times = timestamps(response_idx);
-
-            % Find periods where EMG exceeds threshold
-            above_threshold = response_window > threshold;
-
-            % Use runs test to find consecutive samples above threshold
-            [runs_start, runs_length, run_times] = findRuns(above_threshold, response_times);
-
-            % Convert run lengths from samples to duration in seconds
-            run_durations = runs_length .* nanmean(diff(timestamps))
-
-            % Check if any run meets the duration criterion
-            valid_runs = run_durations >= MIN_CR_DURATION;
-
-            if any(valid_runs)
-                % CR detected - use first valid run
-                first_valid_run = find(valid_runs, 1);
-                cr_detected(trial) = true;
-                cr_onset_times(trial) = run_times(first_valid_run);
+            % Check adaptive: still above threshold in last 20 ms before US
+            adaptive_idx = timestamps >= (us - 0.020) & timestamps < us;
+            if any(emg_data(adaptive_idx) > threshold)
+                trial_onsets(end+1) = onset;
+                trial_types{end+1} = "adaptive";
+            else
+                % Non-adaptive: skip
+                continue;
             end
         end
 
-        EMG_cr_detected.(fieldName_TS) = cr_detected;
-        EMG_cr_onset_times.(fieldName_EMG) = cr_onset_times;
-    else
-        error('Dates do not match: TS_date = %s, EMG_date = %s, CS_date = %s', TS_date, EMG_date, CS_date);
+        if ~isempty(trial_onsets)
+            cr_detected(t) = true;
+        end
+
+        cr_onsets{t} = trial_onsets;
+        cr_types{t} = trial_types;
+
+        % Optional plotting
+        if debug
+            figure;
+            plot(timestamps, emg_data); hold on;
+            yline(threshold, 'r--');
+            xline(cs, 'k--', 'CS');
+            xline(us, 'm--', 'US');
+            for m = 1:length(trial_onsets)
+                xline(trial_onsets(m), '--g', trial_types{m});
+            end
+            xline(us - 0.020, 'c--', 'US - 20 ms');
+            title(sprintf('Trial %d (%s)', t, strjoin(trial_types, ', ')));
+            xlabel('Time (s)'); ylabel('EMG');
+        end
     end
+
+    EMG_cr_detected.(ts_field) = cr_detected;
+    EMG_cr_onset_times.(emg_field) = cr_onsets;
+    EMG_cr_types.(ts_field) = cr_types;
+end
 end
 
-
-function [runs_start, runs_length, run_times] = findRuns(binary_signal, times)
-% Helper function to find runs of ones in a binary signal
-% Returns the start indices, lengths, and start times of runs
-
-% Find transitions
-transitions = diff([0; binary_signal; 0]);
-run_starts = find(transitions == 1);
-run_ends = find(transitions == -1) - 1;
-
-runs_start = run_starts;
-runs_length = run_ends - run_starts + 1;
-run_times = times(run_starts);
+function [starts, lengths, times] = findRuns(binary, t)
+d = diff([0; binary(:); 0]);
+starts = find(d == 1);
+ends = find(d == -1) - 1;
+lengths = ends - starts + 1;
+times = t(starts);
+end

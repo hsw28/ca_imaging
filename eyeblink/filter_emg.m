@@ -1,38 +1,30 @@
-function emg_filtered = filter_emg(emg_raw)
+function emg_processed = filter_emg(emg_raw)
+% process_emg_signal - Full EMG processing pipeline
+%   - Bandpass 100 Hz to 1000 Hz (adjusted for fs=2000Hz)
+%   - Full-wave rectification
+%   - Integration with a 10 ms time constant
 
-%% Continuous EMG data were initially filtered using a 4th order Butterworth band‐pass filter with
-%cutoff frequency of 28 Hz and 250 Hz, following previous literature (Barker, Reeb‐Sutherland, & Fox, 2014).
-%Mains noise was removed with a 50 Hz notch filter. Filtered continuous EMG signals were rectified and
-%smoothed using a 4th order Butterworth low‐pass filter with a time constant of 3 ms corresponding to a
-%cutoff frequency of 53.05 Hz (Blumenthal et al., 2005).
-%https://pmc.ncbi.nlm.nih.gov/articles/PMC5298047/
-
-% preprocess_emg - Preprocess EMG signal
-%
 % Inputs:
-%   emg_raw - Raw EMG signal vector
-%   fs      - Sampling frequency in Hz
-%
+%   emg_raw - Raw EMG signal (vector)
+%   fs - Sampling frequency (Hz)
+
 % Output:
-%   emg_filtered - Preprocessed EMG signal
+%   emg_processed - Final processed EMG signal
 
-fs = 2000;
+%fs = 3.2000e+04;
+fs=2000;
 
-% Design a 4th-order Butterworth band-pass filter (28–250 Hz)
-[b_bp, a_bp] = butter(4, [28 250]/(fs/2), 'bandpass');
-emg_bp = filtfilt(b_bp, a_bp, emg_raw);
+% --- Step 1: Bandpass filter (100 Hz to 1000 Hz or fs/2)
+low_cutoff = 100;            % Hz
+high_cutoff = min(1000, fs/2-1);  % Hz (cannot exceed fs/2)
+%high_cutoff = 5000;  % Hz (cannot exceed fs/2)
 
-% Design a 50 Hz notch filter
-wo = 50/(fs/2);  % Normalized frequency
-bw = wo/35;      % Bandwidth
-[b_notch, a_notch] = iirnotch(wo, bw);
-emg_notched = filtfilt(b_notch, a_notch, emg_bp);
+[b_bp, a_bp] = butter(4, [low_cutoff high_cutoff]/(fs/2), 'bandpass');
+emg_bandpassed = filtfilt(b_bp, a_bp, emg_raw);
 
-% Rectify the signal
-emg_rectified = abs(emg_notched);
+% --- Step 2: Full-wave rectification
+emg_rectified = abs(emg_bandpassed);
 
-% Design a 4th-order Butterworth low-pass filter with 53.05 Hz cutoff
-[b_lp, a_lp] = butter(4, 53.05/(fs/2), 'low');
-emg_filtered = filtfilt(b_lp, a_lp, emg_rectified);
-
-end
+% --- Step 3: Integration with 10 ms time constant
+window_size = max(1, round(0.010 * fs));  % 10 ms
+emg_processed = movmean(emg_rectified, window_size);
