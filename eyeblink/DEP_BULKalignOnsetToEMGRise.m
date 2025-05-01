@@ -1,4 +1,4 @@
-function [corrected_US corrected_CS] = BULKalignOnsetToEMGRise(EMG_struct, EMG_ts_struct, us_times_struct)
+function [corrected_US corrected_CS] = DEP_BULKalignOnsetToEMGRise(EMG_struct, EMG_ts_struct, us_times_struct)
 
 % CORRECTPREDICTEDONSETSSTRUCT
 % Adjusts predicted onset times based on EMG by aligning to last negative slope.
@@ -71,9 +71,9 @@ for i = 1:numel(fields_EMG)
             continue;
         end
 
-        want = max(neg) + idx_pred - searcharea;
+        want = max(neg) + idx_pred - searcharea +2;
         true_onsets(t) = emg_ts(want);
-        delta_onsets(t) = pred_time - emg_ts(want);
+        delta_onsets(i) = emg_ts(want)-pred_time;
     end
 
     avg_shift = nanmean(delta_onsets);

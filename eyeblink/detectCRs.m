@@ -1,6 +1,10 @@
 function [EMG_cr_detected, percentCRs, EMG_cr_onset_times, EMG_cr_types] = detectCRs(EMG_struct_unfiltered, EMG_ts_struct, us_times_struct, debug)
 
 %Detects conditioned responses in EMG data
+% filters EMG data using filter_emg
+% tags noisy trials using flagNoisyBaselines
+%determines if there was a CR response
+
 %A CR was defined as an increase in integrated EMG activity that was greater than the mean baseline amplitude plus
 %4 times the standard deviation of the baseline activity, for a minimum of 10 ms. The response also had to begin at
 %least 35 ms after the onset of the CS, but before US onset. A response in the 200 ms before the onset of the US
@@ -26,9 +30,12 @@ if nargin < 4
     debug = false;
 end
 
+
+
+
 % Constants
-BASELINE_DURATION = 0.5;
-US_DELAY = 0.75;                  % Time from CS to US
+BASELINE_DURATION = .5;
+US_DELAY = 0.750;                  % Time from CS to US
 MIN_LATENCY = 0.035;
 MAX_LATENCY = 0.740;
 ADAPTIVE_WINDOW_START = 0.73;
@@ -55,18 +62,32 @@ for i = 1:numel(fields_TS)
     emg_data = EMG_struct.(emg_field);
     us_field = fields_US{i};
     us_times = us_times_struct.(us_field);
-    cs_times = us_times - US_DELAY;
 
-    num_trials = numel(cs_times);
-    cr_detected = false(num_trials, 1);
+
+    num_trials = numel(us_times);
+    cr_detected = zeros(num_trials, 1);
     cr_onsets = cell(num_trials, 1);
     cr_types = cell(num_trials, 1);
 
     if length(emg_data)>1 & length(us_times)>1
-      emg_data = filter_emg(emg_data);
+    emg_data = filter_emg(emg_data);
+
+    [US_times_noise noisy_trials] = flagNoisyBaselines(emg_data, timestamps, us_times);
+
+    us_times = US_times_noise;
+    cs_times = us_times - US_DELAY;
+
       for t = 1:num_trials
           cs = cs_times(t);
           us = us_times(t);
+
+          if isnan(cs)==1 %this means noisy trial
+            cr_detected(t) = NaN;
+            cr_onsets{t} = NaN;
+            cr_types{t} = NaN;
+            continue;
+          end
+
 
           % Baseline
           baseline_idx = timestamps >= (cs - BASELINE_DURATION) & timestamps < cs;
@@ -95,7 +116,8 @@ for i = 1:numel(fields_TS)
               end
 
               % Check adaptive: still above threshold in last 20 ms before US
-              adaptive_idx = timestamps >= (us - 0.020) & timestamps < us;
+              %adaptive_idx = timestamps >= (cs) & timestamps < us;
+              adaptive_idx = timestamps >= (us - 0.200) & timestamps < us;
               if any(emg_data(adaptive_idx) > threshold)
                   trial_onsets(end+1) = onset;
                   trial_types{end+1} = "adaptive";
@@ -106,7 +128,7 @@ for i = 1:numel(fields_TS)
           end
 
           if ~isempty(trial_onsets)
-              cr_detected(t) = true;
+              cr_detected(t) = 1;
           end
 
           cr_onsets{t} = trial_onsets;
@@ -123,7 +145,6 @@ for i = 1:numel(fields_TS)
                   xline(trial_onsets(m), '--g', trial_types{m});
               end
               xline(us - 0.020, 'c--', 'US - 20 ms');
-              title(sprintf('Trial %d (%s)', t, strjoin(trial_types, ', ')));
               xlabel('Time (s)'); ylabel('EMG');
           end
       end
@@ -131,7 +152,8 @@ for i = 1:numel(fields_TS)
       EMG_cr_detected.(ts_field) = cr_detected;
       EMG_cr_onset_times.(emg_field) = cr_onsets;
       EMG_cr_types.(ts_field) = cr_types;
-      percentCRs.(ts_field) = length(find(cr_detected==1))./length(find(cr_detected>-1));
+
+      percentCRs.(ts_field) = length(find(cr_detected==1))./length(find(isnan(cr_detected)==0));
 
     else
       EMG_cr_detected.(ts_field) = NaN;

@@ -11,20 +11,22 @@ function emg_processed = filter_emg(emg_raw)
 % Output:
 %   emg_processed - Final processed EMG signal
 
-%fs = 3.2000e+04;
-fs=2000;
 
-% --- Step 1: Bandpass filter (100 Hz to 1000 Hz or fs/2)
-low_cutoff = 100;            % Hz
-high_cutoff = min(1000, fs/2-1);  % Hz (cannot exceed fs/2)
-%high_cutoff = 5000;  % Hz (cannot exceed fs/2)
+if nargin < 2
+    fs = 2000;
+end
 
-[b_bp, a_bp] = butter(4, [low_cutoff high_cutoff]/(fs/2), 'bandpass');
-emg_bandpassed = filtfilt(b_bp, a_bp, emg_raw);
+% --- Step 1: Low-order causal Butterworth bandpass
+%[b_bp, a_bp] = butter(2, [100 999]/(fs/2), 'bandpass');  % Low-order = shorter impulse
+%emg_bandpassed = filter(b_bp, a_bp, emg_raw);
 
-% --- Step 2: Full-wave rectification
-emg_rectified = abs(emg_bandpassed);
+% --- Step 2: Rectify
+emg_rectified = abs(emg_raw);
 
-% --- Step 3: Integration with 10 ms time constant
-window_size = max(1, round(0.010 * fs));  % 10 ms
-emg_processed = movmean(emg_rectified, window_size);
+% --- Step 3: Causal 10 ms smoothing
+window_size = round(0.010 * fs);
+kernel = ones(window_size,1) / window_size;
+emg_processed = filter(kernel, 1, emg_rectified);  % Causal only
+
+
+end
