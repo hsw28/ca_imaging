@@ -14,6 +14,7 @@ function [US_EMG, CS_EMG] = processFolders_US(currentDir)
         selected_folders = input('Enter the numbers of the folders to process (e.g., [1, 3, 5]): ');
 
         for i = 1:numel(selected_folders)
+            i
             selected_folder_idx = selected_folders(i);
             if selected_folder_idx > 0 && selected_folder_idx <= numel(validFoldersList)
                 selected_folder = validFoldersList{selected_folder_idx};
