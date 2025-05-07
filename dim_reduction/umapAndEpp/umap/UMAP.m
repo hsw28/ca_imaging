@@ -606,6 +606,7 @@ classdef UMAP < handle
                 end
 
                 warning('n_neighbors is larger than the dataset size; truncating to size(X, 1) - 1');
+                X_rows - 1
                 U.n_neighbors = X_rows - 1;
             end
 

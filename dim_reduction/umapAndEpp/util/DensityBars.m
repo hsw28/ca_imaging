@@ -188,10 +188,10 @@ classdef DensityBars < handle
                 nOff=sum(not0to1);
                 C_=size(data0to1,2);
                 if nOff<C_
-                    warning('%d/%d columns are off scale ... columns %s', nOff, C_, num2str(this.offscaleIdxs));
-                    fprintf('min=%0.2f, max=%0.2f\n', this.mnDataLimit, this.mxDataLimit);
-                    fprintf('mins:\t%s\nmaxs:\t%s', num2str(mns), num2str(mxs));
-                    fprintf('\n');
+%                    warning('%d/%d columns are off scale ... columns %s', nOff, C_, num2str(this.offscaleIdxs));
+ %                   fprintf('min=%0.2f, max=%0.2f\n', this.mnDataLimit, this.mxDataLimit);
+  %                  fprintf('mins:\t%s\nmaxs:\t%s', num2str(mns), num2str(mxs));
+   %                 fprintf('\n');
                 end
                 offScale=data0to1(:,not0to1);
                 minOff=min(offScale(:));
