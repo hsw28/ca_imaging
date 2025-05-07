@@ -29,11 +29,10 @@ AUROCs = [];
 % Store for legend
 legLabels = cell(1,nPCs);
 
-
 % Run for each PC count
 for i = 1:nPCs
     latentDim = pcList(i);
-    AUROC = runPCA_fromStruct(ratName, refDaySpec, latentDim);
+    [AUROC, dateList] = runPCA_fromStruct(ratName, refDaySpec, latentDim);
     AUROCs(i,:) = AUROC;
     legLabels{i} = sprintf('%d PCs', latentDim);
 end
@@ -44,7 +43,7 @@ plot(AUROCs', '-o', 'LineWidth', 1.5);
 legend(legLabels, 'Location','southeast');
 xlabel('Day index'); ylabel('AUROC');
 title(sprintf('Cross-day decoder performance (%s)', ratName), 'Interpreter','none');
-ylim([0 1]); grid on;
+ylim([0.4 1]); grid on;
 
 if exist('dateList','var') && ~isempty(dateList)
     xticks(1:numel(dateList));
