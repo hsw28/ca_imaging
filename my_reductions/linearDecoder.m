@@ -3,6 +3,9 @@ function decodeResults = linearDecoder(animalName, nPerms)
   %if you dont put in number of perms shuffling will be skipped
   % ie  linearDecoder('rat0314')
   %     linearDecoder('rat0314', 500)    <-- this is slow
+  % outputs accuracy, p score compared to shuffled, f1 score and f1 p value:
+        % Trial-flat:     accuracy = 65.52% (shuff p=1.000), f1 = 0.000 (f1 p=1.000)
+        % Timepoint-flat: accuracy = 65.52% (shuff p=1.000), f1 = 0.000 (f1 p=1.000)
 
 
   if nargin < 2
@@ -43,7 +46,7 @@ function decodeResults = linearDecoder(animalName, nPerms)
         'perm_acc_trial', [], 'perm_f1_trial', [], ...
         'perm_acc_time', [], 'perm_f1_time', []);
 
-    for d = 1:numel(dateList)
+  for d = 1:nDays
         dateStr = dateList{d};
         nBins = round((win(2) - win(1)) * Fs);
         [X, y] = getDayMatrixFromStruct(animal, dateStr, win, nBins, Fs);
@@ -57,6 +60,10 @@ function decodeResults = linearDecoder(animalName, nPerms)
         trialMask = squeeze(all(all(~isnan(X),1),2));
         X = X(:,:,trialMask);
         y = y(trialMask);
+
+        valid = ~isnan(y);
+        X = X(:,:,valid);
+        y = y(valid);
 
         % === TRIAL-FLATTENED ===
         Xtrial = reshape(X, [], size(X,3))';  % trials × features
@@ -121,11 +128,6 @@ function decodeResults = linearDecoder(animalName, nPerms)
 end
 
 function acc = crossvalAccuracy(X, y)
-    % Remove rows with NaN labels
-    valid = ~isnan(y);
-    X = X(valid, :);
-    y = y(valid);
-
     n = size(X, 1); yhat = nan(n,1);
     for i = 1:n
         train = setdiff(1:n,i);
@@ -137,10 +139,6 @@ end
 
 
 function f1 = crossvalF1(X, y)
-    valid = ~isnan(y);
-    X = X(valid, :);
-    y = y(valid);
-
     n = size(X, 1); yhat = nan(n,1);
     for i = 1:n
         train = setdiff(1:n,i);
