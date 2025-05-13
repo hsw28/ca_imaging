@@ -57,10 +57,12 @@ function decodeResults = linearDecoder(animalName, nPerms)
         end
 
         % Clean valid trials
-        trialMask = squeeze(all(all(~isnan(X),1),2));
+        size(y)
+        trialMask = squeeze(all(all((X),1),2));
+
         X = X(:,:,trialMask);
         y = y(trialMask);
-
+        
         valid = ~isnan(y);
         X = X(:,:,valid);
         y = y(valid);
@@ -120,6 +122,7 @@ function decodeResults = linearDecoder(animalName, nPerms)
             pval_f1_time   = mean(perm_f1_time   >= f1Time);
 
             fprintf('[%s]\n', dateStr);
+            fprintf('  Label balance: %d correct, %d incorrect\n', sum(y==1), sum(y==0));
             fprintf('  Trial-flat:     accuracy = %.2f%% (shuff p=%.3f), f1 = %.3f (f1 p=%.3f)\n', ...
                 accT*100, pval_acc_trial, f1T, pval_f1_trial);
             fprintf('  Timepoint-flat: accuracy = %.2f%% (shuff p=%.3f), f1 = %.3f (f1 p=%.3f)\n', ...
