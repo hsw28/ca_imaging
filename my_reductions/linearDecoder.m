@@ -57,7 +57,31 @@ function decodeResults = linearDecoder(animalName, nPerms)
         end
 
         % Clean valid trials
-        trialMask = squeeze(all(all((X),1),2));
+%        fprintf('[%s] size(X) = [%d %d %d], num NaN trials = %d\n', ...
+%            dateStr, size(X,1), size(X,2), size(X,3), ...
+%            sum(~squeeze(all(all(~isnan(X),1),2))));
+
+
+        %%%debugging
+
+%        [nC, nBins, nTrials] = size(X);
+%        % Find linear indices of NaNs
+%        nanIdx = find(isnan(X));
+%        % Convert to subscripts: neuron, timebin, trial
+%        [neuronIdx, timebinIdx, trialIdx] = ind2sub(size(X), nanIdx);
+%        % Display unique trials and where the NaNs are
+%        T = table(neuronIdx, timebinIdx, trialIdx, ...
+%            'VariableNames', {'Neuron', 'TimeBin', 'Trial'});
+%        % Optionally show only the first few if it's too long
+%        disp(T(1:min(50,height(T)), :));
+%        % Show which trials have any NaNs
+%        trialsWithNaNs = unique(trialIdx);
+%  %      fprintf('⚠️ Trials with NaNs: %s\n', mat2str(trialsWithNaNs'));
+
+
+
+        trialMask = squeeze(all(all(~isnan(X), 1), 2)); % trials without NaNs
+
 
         X = X(:,:,trialMask);
         y = y(trialMask);
@@ -94,8 +118,8 @@ function decodeResults = linearDecoder(animalName, nPerms)
         end
 
         if nPerms>1
-          for p = 1:nPerms
-          %parfor p = 1:nPerms
+          %for p = 1:nPerms
+          parfor p = 1:nPerms
               % Trial-level
               yshuf_trial = y(randperm(numel(y)));
               perm_acc_trial(p) = crossvalAccuracy(Xtrial, yshuf_trial);

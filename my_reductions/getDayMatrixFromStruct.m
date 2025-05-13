@@ -33,29 +33,34 @@ function [X, y] = getDayMatrixFromStruct(animal, dateStr, win, nBins, Fs)
         t0 = CSon(k) + win(1);
         t1 = CSon(k) + win(2);
 
-        if t1 > t(end)
-            fprintf('⚠️ Trial %d exceeds recording duration (t1 = %.2f > %.2f = t(end))\n', ...
-            k, t1, t(end));
+        if t0 < t(1) || t1 > t(end)
+            fprintf('Skipping trial %d: outside valid time range (t0 = %.2f, t1 = %.2f)\n', ...
+                k, t0, t1);
+            continue;
         end
-        
-        if t0 < t(1) || t1 > t(end), continue; end
 
-        idx = find(t >= t0 & t < t1);
-        if numel(idx) < 2, continue; end
+        idx = find(t >= t0, 1, 'first') + (0:nBins-1);
+        if any(idx > length(t))
+            fprintf('Skipping trial %d: would exceed trace length.\n', k);
+            continue;
+        end
+        trace = F(:, idx);
+        
 
         trace = F(:, idx);
+
         if size(trace,2) < nBins
-            trace(:, end+1:nBins) = NaN;
+            fprintf('⚠️ Padding trial %d (CSon = %.2f): only %d frames, expected %d\n', ...
+                k, CSon(k), size(trace,2), nBins);
+            trace(:, end+1:nBins) = NaN;  % <-- This is what's giving you NaNs
         elseif size(trace,2) > nBins
-            trace = trace(:,1:nBins);
+            trace = trace(:, 1:nBins);  % optional trimming
         end
 
         X(:,:,k) = trace;
         usedTrialIdx(k) = true;
     end
 
-    X = X(:,:,usedTrialIdx);
-    y = y(usedTrialIdx);
 
     if ~isempty(X)
         reshaped = reshape(X, nC, []);
