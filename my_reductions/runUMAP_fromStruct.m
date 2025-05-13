@@ -3,7 +3,7 @@ function [AUROC, Z_trials, labels] = runUMAP_fromStruct(animalName, refSpec, lat
     % of trial correctness from calcium imaging data stored in a structured format.
 
     if nargin < 3
-        latentDim = 15;
+        latentDim = 3;
     end
 
     Fs  = 7.5;
@@ -45,10 +45,8 @@ function [AUROC, Z_trials, labels] = runUMAP_fromStruct(animalName, refSpec, lat
 
 
         [embedding_cells, ~, ~] = run_umap(double(Xclean_cells), 'n_components', latentDim, ...
-            'n_neighbors', 40, 'min_dist', 0.6, ...
-            'verbose', false, 'cluster_output', 'none', 'metric', 'cosine');
-
-
+            'n_neighbors', 15, 'min_dist', 0.6, ...
+            'verbose', false, 'cluster_output', 'none', 'metric', 'euclidean');
 
             if istable(embedding_cells)
                 embedding_trials = table2array(embedding_cells);
@@ -62,8 +60,8 @@ function [AUROC, Z_trials, labels] = runUMAP_fromStruct(animalName, refSpec, lat
         Xclean_trials = zscore(X2d_trials(:, validTrials)', 0, 2);
 
         [embedding_trials, ~, ~] = run_umap(double(Xclean_trials), 'n_components', latentDim, ...
-            'n_neighbors', 40, 'min_dist', 0.6, ...
-            'verbose', false, 'cluster_output', 'none', 'metric', 'cosine');
+            'n_neighbors', 15, 'min_dist', 0.6, ...
+            'verbose', false, 'cluster_output', 'none', 'metric', 'euclidean');
             if istable(embedding_trials)
                 embedding_trials = table2array(embedding_trials);
             elseif isstruct(embedding_trials)
@@ -115,7 +113,7 @@ function [AUROC, Z_trials, labels] = runUMAP_fromStruct(animalName, refSpec, lat
     elseif ~isnumeric(refZ)
         error('Z_trials{%d} is not numeric and cannot be used with SVM.', refDay);
     end
-    mdl = fitcsvm(refZ', labels{refDay}, 'KernelFunction','linear');
+    mdl = fitcsvm(refZ', labels{refDay}, 'KernelFunction','rbf');
 
     for d = 1:nDays
         if isempty(Z_trials{d}) || isempty(labels{d})

@@ -59,11 +59,15 @@ function AUROC = runPCA_fromStruct(animalName, refSpec, latentDim)
         [X, y] = getDayMatrixFromStruct(animal, dateStr, win, nBins, Fs);
         if isempty(X), continue; end
 
-        % PCA across cells (average across trials) for decoding
-        %How trials differ from each other based on the spatial pattern of cell activity.
-        %The main dimensions along which trials vary — often related to trial type, performance (CR vs no CR), or learning stage.
-        %Decoding trial identity — by training a classifier in trial space.
-        %Helps answer: Can I tell what kind of trial this is, based on cell activation pattern?
+        %across cells (average across trials/time bins)
+        %What it does: Reduces the dimensionality of each cell’s temporal activity (e.g., average trace over time per condition).
+        %Focus: How cells vary in temporal dynamics during a trial.
+        %Use: Alignment across days using Procrustes or similar transforms to assess representational stability.
+        %Interpretation: Reveals whether individual cells maintain similar functional roles (e.g., ramping, phasic responses) across days.
+        %Helps answer:
+        %Are the same cells encoding similar dynamics over time across different days or conditions?
+
+
         X2d = squeeze(nanmean(X, 3));
         validCells = sum(isfinite(X2d), 2) >= round(0.8 * size(X2d,2));
         X2d = X2d(validCells, :);
@@ -73,17 +77,15 @@ function AUROC = runPCA_fromStruct(animalName, refSpec, latentDim)
         numPCs_cells = size(score_cells, 2);  % how many were returned
         fprintf('Day %d | PCA (cells): %d components returned\n', d, numPCs_cells);
 
-        % PCA across trials (average across time bins) for alignment
-        %How cells vary in their temporal activity patterns during a trial.
-        %Finds components that capture shared dynamics across time (e.g., response to CS).
-        %Alignment: Procrustes or other transformations align neural manifolds day to day.
-        %Helps answer: Are the same cells encoding similar temporal dynamics across days?
 
-        % This step extracts how whole-trial responses vary across cells.
-        % Each trial is compressed into a vector (mean across time bins),
-        % and we use PCA to find patterns of trial-to-trial variability
-        % (e.g., related to behavioral outcome).
 
+        % PCA across cells (average across time for each trial)
+        %What it does: Reduces dimensionality of the population vector per trial (spatial pattern across cells).
+        %Focus: How trials differ in overall cell activation patterns.
+        %Use: Trial-by-trial decoding (e.g., predict trial type or correctness).
+        %Interpretation: Shows the structure of trial identity (e.g., correct vs incorrect) in population space.
+        %Helps answer:
+        %Can I predict trial outcome or type from the population activity pattern?
 
         % Collapse time to get a [nCells × nTrials] matrix
         X2d_trials = squeeze(nanmean(X, 2));

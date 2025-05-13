@@ -1,4 +1,4 @@
-function [X, y, nC, nT, CSon, t] = getDayMatrixFromStruct(animal, dateStr, win, nBins, Fs)
+function [X, y] = getDayMatrixFromStruct(animal, dateStr, win, nBins, Fs)
     csVar = ['CS_' dateStr];
     caVar = ['CA_traces_' dateStr];
     ftVar = ['CA_time_' dateStr];
