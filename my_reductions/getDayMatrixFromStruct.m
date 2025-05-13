@@ -11,7 +11,10 @@ function [X, y] = getDayMatrixFromStruct(animal, dateStr, win, nBins, Fs)
 
     CSon = animal.CS_times.(csVar);
     F = animal.Ca_traces.(caVar);
-    t = animal.Ca_ts.(ftVar); t = t(:,2)/1000; t = t(1:2:end); t = t(1:size(F,2));
+    t = animal.Ca_ts.(ftVar);
+    t = t(:,2)/1000; %changes from miliseconds
+    t = t(1:2:end); % samples every other timepoint bc Ca_ts is 15hz and F is 7.5hz
+    t = t(1:size(F,2)); %sometimes sampling every other timepoint makes Ca_ts one longer than F, so truncate to time of F
     y = animal.CRs.(ttVar);
 
     %fprintf('Raw y labels for %s: %d zeros, %d ones, %d NaNs\n', dateStr, sum(y==0), sum(y==1), sum(isnan(y)));
@@ -29,6 +32,12 @@ function [X, y] = getDayMatrixFromStruct(animal, dateStr, win, nBins, Fs)
     for k = 1:nT
         t0 = CSon(k) + win(1);
         t1 = CSon(k) + win(2);
+
+        if t1 > t(end)
+            fprintf('⚠️ Trial %d exceeds recording duration (t1 = %.2f > %.2f = t(end))\n', ...
+            k, t1, t(end));
+        end
+        
         if t0 < t(1) || t1 > t(end), continue; end
 
         idx = find(t >= t0 & t < t1);

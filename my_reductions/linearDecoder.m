@@ -57,12 +57,11 @@ function decodeResults = linearDecoder(animalName, nPerms)
         end
 
         % Clean valid trials
-        size(y)
         trialMask = squeeze(all(all((X),1),2));
 
         X = X(:,:,trialMask);
         y = y(trialMask);
-        
+
         valid = ~isnan(y);
         X = X(:,:,valid);
         y = y(valid);
@@ -95,7 +94,8 @@ function decodeResults = linearDecoder(animalName, nPerms)
         end
 
         if nPerms>1
-          parfor p = 1:nPerms
+          for p = 1:nPerms
+          %parfor p = 1:nPerms
               % Trial-level
               yshuf_trial = y(randperm(numel(y)));
               perm_acc_trial(p) = crossvalAccuracy(Xtrial, yshuf_trial);
@@ -134,6 +134,16 @@ function acc = crossvalAccuracy(X, y)
     n = size(X, 1); yhat = nan(n,1);
     for i = 1:n
         train = setdiff(1:n,i);
+
+        if length(find(isnan(X(train,:)==1))) > 0
+          fprintf('nan is your Xs')
+          find(isnan(X(train,:)==1))
+        end
+        if length(find(isnan(y(train)==1))) > 0
+          fprintf('nan is your Ys')
+          find(isnan(y(train)==1))
+        end
+
         mdl = fitclinear(X(train,:), y(train), 'Learner','logistic', 'Regularization','lasso');
         yhat(i) = predict(mdl, X(i,:));
     end
@@ -142,14 +152,55 @@ end
 
 
 function f1 = crossvalF1(X, y)
-    n = size(X, 1); yhat = nan(n,1);
+    n = size(X, 1);
+    yhat = nan(n,1);
+    totalFeatures = size(X, 2);
+
     for i = 1:n
-        train = setdiff(1:n,i);
-        mdl = fitclinear(X(train,:), y(train), 'Learner','logistic', 'Regularization','lasso');
+        train = setdiff(1:n, i);
+
+%{
+        if any(isnan(X(train,:)), 'all')
+            fprintf('\n⚠️  NaN found in X during crossvalF1 training at fold %d\n', i);
+
+            % --- Smart shape inference ---
+            maxGuess = min(512, totalFeatures);  % Assume neurons ≤ 512
+            bestErr = inf;
+            for guessN = 1:maxGuess
+                guessT = totalFeatures / guessN;
+                if mod(guessT,1) == 0
+                    err = abs(guessN - guessT);  % Prefer "square" matrix
+                    if err < bestErr
+                        bestN = guessN;
+                        bestT = guessT;
+                        bestErr = err;
+                    end
+                end
+            end
+            nNeurons = bestN;
+            nBins = bestT;
+
+            fprintf('Inferred shape: neurons = %d, time bins = %d (features = %d)\n', ...
+                nNeurons, nBins, totalFeatures);
+
+            % --- Report NaN positions in (trial, neuron, timebin) ---
+            [row, col] = find(isnan(X(train,:)));
+            trials = train(row);
+            [neurons, timebins] = ind2sub([nNeurons, nBins], col);
+
+            T = table(trials(:), neurons(:), timebins(:), ...
+                'VariableNames', {'Trial', 'Neuron', 'TimeBin'});
+            disp(T);
+        end
+%}
+        mdl = fitclinear(X(train,:), y(train), ...
+            'Learner','logistic', 'Regularization','lasso');
         yhat(i) = predict(mdl, X(i,:));
     end
+
     f1 = f1score(y, yhat);
 end
+
 
 
 function f = f1score(ytrue, ypred)
