@@ -45,9 +45,8 @@ function [X, y] = getDayMatrixFromStruct(animal, dateStr, win, nBins, Fs)
             continue;
         end
         trace = F(:, idx);
-        
 
-        trace = F(:, idx);
+
 
         if size(trace,2) < nBins
             fprintf('⚠️ Padding trial %d (CSon = %.2f): only %d frames, expected %d\n', ...

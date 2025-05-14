@@ -1,4 +1,5 @@
 function decodeResults = linearDecoder(animalName, nPerms)
+    %~~~~decodes its own day
   %input animal name and number of permutations to run shuffling.
   %if you dont put in number of perms shuffling will be skipped
   % ie  linearDecoder('rat0314')
@@ -55,28 +56,6 @@ function decodeResults = linearDecoder(animalName, nPerms)
             fprintf('Skipping %s: insufficient data or only one class.\n', dateStr);
             continue;
         end
-
-        % Clean valid trials
-%        fprintf('[%s] size(X) = [%d %d %d], num NaN trials = %d\n', ...
-%            dateStr, size(X,1), size(X,2), size(X,3), ...
-%            sum(~squeeze(all(all(~isnan(X),1),2))));
-
-
-        %%%debugging
-
-%        [nC, nBins, nTrials] = size(X);
-%        % Find linear indices of NaNs
-%        nanIdx = find(isnan(X));
-%        % Convert to subscripts: neuron, timebin, trial
-%        [neuronIdx, timebinIdx, trialIdx] = ind2sub(size(X), nanIdx);
-%        % Display unique trials and where the NaNs are
-%        T = table(neuronIdx, timebinIdx, trialIdx, ...
-%            'VariableNames', {'Neuron', 'TimeBin', 'Trial'});
-%        % Optionally show only the first few if it's too long
-%        disp(T(1:min(50,height(T)), :));
-%        % Show which trials have any NaNs
-%        trialsWithNaNs = unique(trialIdx);
-%  %      fprintf('⚠️ Trials with NaNs: %s\n', mat2str(trialsWithNaNs'));
 
 
 
@@ -223,17 +202,4 @@ function f1 = crossvalF1(X, y)
     end
 
     f1 = f1score(y, yhat);
-end
-
-
-
-function f = f1score(ytrue, ypred)
-    ytrue = double(ytrue(:));
-    ypred = double(ypred(:));
-    tp = sum((ytrue == 1) & (ypred == 1));
-    fp = sum((ytrue == 0) & (ypred == 1));
-    fn = sum((ytrue == 1) & (ypred == 0));
-    prec = tp / (tp + fp + eps);
-    rec  = tp / (tp + fn + eps);
-    f = 2 * (prec * rec) / (prec + rec + eps);
 end
