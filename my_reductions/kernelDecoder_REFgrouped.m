@@ -219,13 +219,15 @@ end
     Xtrain_all_test(nanMask) = Xfill(nanMask);
 
 
+
     mdl = fitcsvm(Xtrain_all_test, ytrain_all, 'KernelFunction','rbf', 'KernelScale','auto', 'Standardize',true);
     yhat = predict(mdl, Xtest_flat);
     acc = mean(yhat == ytest);
     f1  = f1score(ytest, yhat);
 
+  length(find(yhat==1))/numel(yhat) %average
     % Timepoint-flattened
-    nNeurons = size(Xtest,1);
+      nNeurons = size(Xtest,1);
 
 
     Xtest_time = reshape(permute(Xtest, [1 3 2]), nNeurons, [])';
@@ -271,30 +273,61 @@ end
     acc_time = mean(yhat_time == ytest_time);
     f1_time  = f1score(ytest_time, yhat_time);
 
+    yhat_time'
+
+    length(find(yhat_time==1))/numel(yhat_time) %average
+
     % Permutation
     perm_acc = nan(nPerms,1);
     perm_f1  = nan(nPerms,1);
     perm_acc_time = nan(nPerms,1);
     perm_f1_time  = nan(nPerms,1);
 
+
+    % Mean imputation for training trial-level data
+    Xtrain_trial = Xtrain_all_test;  % This should match the test neuron subset
+    colMeans_trial = nanmean(Xtrain_trial, 1);
+    nanMask_trial = isnan(Xtrain_trial);
+    Xfill_trial = repmat(colMeans_trial, size(Xtrain_trial, 1), 1);
+    Xtrain_trial(nanMask_trial) = Xfill_trial(nanMask_trial);
+
+
+    % Predefine fixed training and test data for permutations
+    Xtrain_trial_perm   = Xtrain_all_test;
+    ytrain_all_perm     = ytrain_all;
+
+    Xtrain_time_perm    = Xtrain_time_test;
+    ytrain_time_perm    = ytrain_time_test;
+
+    Xtest_flat_perm     = Xtest_flat;
+    Xtest_time_perm     = Xtest_time;
+    ytest_perm          = ytest;
+    ytest_time_perm     = ytest_time;
+
+
     if nPerms > 1 && isempty(gcp('nocreate'))
         parpool('local');
     end
+
     if nPerms > 1
       parfor p = 1:nPerms
         try
+          % Shuffle labels ONLY (not rows of X)
           yshuf = ytrain_all(randperm(numel(ytrain_all)));
           mdl_shuf = fitcsvm(Xtrain_all_test, yshuf, 'KernelFunction','rbf', 'KernelScale','auto', 'Standardize',true);
           yhat_shuf = predict(mdl_shuf, Xtest_flat);
           perm_acc(p) = mean(yhat_shuf == ytest);
-          perm_f1(p) = f1score(ytest, yhat_shuf);
+          perm_f1(p)  = f1score(ytest, yhat_shuf);
 
-          yshuf_time = ytrain_time(randperm(numel(ytrain_time)));
+          % Timepoint-level (shuffle only labels)
+          yshuf_time = ytrain_time_test(randperm(numel(ytrain_time_test)));
           mdl_shuf_time = fitcsvm(Xtrain_time_test, yshuf_time, 'KernelFunction','rbf', 'KernelScale','auto', 'Standardize',true);
           yhat_shuf_time = predict(mdl_shuf_time, Xtest_time);
           perm_acc_time(p) = mean(yhat_shuf_time == ytest_time);
-          perm_f1_time(p) = f1score(ytest_time, yhat_shuf_time);
-        catch
+          perm_f1_time(p)  = f1score(ytest_time, yhat_shuf_time);
+
+        catch err
+          warning('Permutation %d failed: %s', p, err.message);
           perm_acc(p) = NaN;
           perm_f1(p) = NaN;
           perm_acc_time(p) = NaN;
@@ -303,9 +336,27 @@ end
       end
     end
 
+
+    fprintf('  Observed accuracy: %.2f\n', acc);
+    fprintf('  Permutation acc mean: %.2f, max: %.2f\n', mean(perm_acc), max(perm_acc));
+
+    fprintf('  Valid permutations: %d of %d\n', sum(~isnan(perm_acc)), nPerms);
+
+    validPerms = ~isnan(perm_acc);
+    % Include the observed value in the null to avoid p = 0
+    pval_acc = (sum(perm_acc(validPerms) >= acc) + 1) / (sum(validPerms) + 1);
+    pval_f1  = (sum(perm_f1(validPerms) >= f1) + 1) / (sum(validPerms) + 1);
+
+    validPermsTime = ~isnan(perm_acc_time);
+    pval_time_acc = (sum(perm_acc_time(validPermsTime) >= acc_time) + 1) / (sum(validPermsTime) + 1);
+    pval_time_f1  = (sum(perm_f1_time(validPermsTime) >= f1_time) + 1) / (sum(validPermsTime) + 1);
+
+
+
+
     decodeResults(end+1) = struct('testDate', testStr, 'nSharedNeurons', sum(shared), ...
-      'acc_trial', acc, 'f1_trial', f1, 'pval_acc', mean(perm_acc >= acc, 'omitnan'), 'pval_f1', mean(perm_f1 >= f1, 'omitnan'), ...
-      'acc_time', acc_time, 'f1_time', f1_time, 'pval_time_acc', mean(perm_acc_time >= acc_time, 'omitnan'), 'pval_time_f1', mean(perm_f1_time >= f1_time, 'omitnan'));
+      'acc_trial', acc, 'f1_trial', f1, 'pval_acc', pval_acc, 'pval_f1', pval_f1, ...
+      'acc_time', acc_time, 'f1_time', f1_time, 'pval_time_acc', pval_time_acc, 'pval_time_f1', pval_time_f1);
 
     fprintf('[Train: %s → Test: %s] Neurons: %d\n', strjoin(dateList(trainDays), ','), testStr, sum(shared));
     fprintf('  Label balance: %d correct, %d incorrect\n', sum(ytest == 1), sum(ytest == 0));
