@@ -1,5 +1,6 @@
 function decodeResults = kernelDecoder_REFgrouped(animalName, trainDays, nPerms, minTrainDays, minTestDays)
-% KERNELDECODER_GROUPED
+%%trial point flattened, multiple training days, no binned time points
+% KERNELDECODER_GROUPED -- only trial flattened rn
 % ----------------------
 % Performs kernel-based (RBF SVM) decoding using trial- and timepoint-flattened representations.
 % Trains on trials from multiple aligned days and tests on all others.
@@ -9,7 +10,7 @@ function decodeResults = kernelDecoder_REFgrouped(animalName, trainDays, nPerms,
 %   animalName    : string, name of struct in base workspace (e.g. 'rat0314')
 %   trainDays     : vector of day indices to train on (e.g. [1 2 3])
 %   nPerms        : number of permutations for p-value estimation (e.g. 100)
-%   minTrainDays  : min number of trainDays a neuron must appear in (default: all)
+%   minTrainDays  : min number of trainDays a neuron must appear in (default: 1) %% DOESNT work rn
 %   minTestDays   : min number of testDays a neuron must appear in (default: 1)
 %
 % OUTPUT:
@@ -22,7 +23,7 @@ function decodeResults = kernelDecoder_REFgrouped(animalName, trainDays, nPerms,
     nPerms = 1;
   end
   if nargin < 4
-    minTrainDays = numel(trainDays);  % default to strict intersection
+    minTrainDays = 1;  % default to strict intersection
   end
   if nargin < 5
     minTestDays = 1;  % lenient default: neuron must appear in test day
@@ -179,7 +180,7 @@ end
 
     nanRows = all(all(isnan(Xtest),3),2);
     if any(nanRows)
-        fprintf('⚠️ Removing %d test neurons with all-NaN data\n', sum(nanRows));
+  %      fprintf('⚠️ Removing %d test neurons with all-NaN data\n', sum(nanRows));
         Xtest(nanRows,:,:) = [];
 
 
@@ -210,7 +211,7 @@ end
     Xtest_flat = reshape(Xtest, [], size(Xtest,3))';
 
 
-    fprintf('Training size: %d trials × %d features\n', size(Xtrain_all_test,1), size(Xtrain_all_test,2));
+%    fprintf('Training size: %d trials × %d features\n', size(Xtrain_all_test,1), size(Xtrain_all_test,2));
 
     % Simple mean imputation across trials (column-wise)
     colMeans = nanmean(Xtrain_all_test, 1);
@@ -220,13 +221,16 @@ end
 
 
 
-    mdl = fitcsvm(Xtrain_all_test, ytrain_all, 'KernelFunction','rbf', 'KernelScale','auto', 'Standardize',true);
+    mdl = fitcsvm(Xtrain_all_test, ytrain_all, 'KernelFunction','linear', 'KernelScale','auto', 'Standardize',true);
     yhat = predict(mdl, Xtest_flat);
     acc = mean(yhat == ytest);
     f1  = f1score(ytest, yhat);
 
-  length(find(yhat==1))/numel(yhat) %average
-    % Timepoint-flattened
+  av = length(find(yhat==1))/numel(yhat); %average
+  if av==1
+    fprintf('guessed all 1s')
+  end
+
       nNeurons = size(Xtest,1);
 
 
@@ -258,24 +262,15 @@ end
 
 
 
-    fprintf('  Pre-prune timepoint size: Xtrain_time [%d×%d], Xtest_time [%d×%d]\n', ...
-        size(Xtrain_time,1), size(Xtrain_time,2), size(Xtest_time,1), size(Xtest_time,2));
-        fprintf('  Post-prune rows: %d train, %d test\n', size(Xtrain_time_test,1), sum(validTest));
-
     if isempty(Xtrain_time) || isempty(Xtest_time)
         fprintf('⚠️ Skipping %s: no valid timepoint-aligned data\n', testStr);
         continue;
     end
 
 
-    mdl_time = fitcsvm(Xtrain_time_test, ytrain_time_test, 'KernelFunction','rbf', 'KernelScale','auto', 'Standardize',true);
-    yhat_time = predict(mdl_time, Xtest_time);
-    acc_time = mean(yhat_time == ytest_time);
-    f1_time  = f1score(ytest_time, yhat_time);
+    classFreqs_time = histcounts(ytrain_time_test, [0 1 2]);
+    classWeights_time = 1 ./ classFreqs_time;
 
-    yhat_time'
-
-    length(find(yhat_time==1))/numel(yhat_time) %average
 
     % Permutation
     perm_acc = nan(nPerms,1);
@@ -314,17 +309,11 @@ end
         try
           % Shuffle labels ONLY (not rows of X)
           yshuf = ytrain_all(randperm(numel(ytrain_all)));
-          mdl_shuf = fitcsvm(Xtrain_all_test, yshuf, 'KernelFunction','rbf', 'KernelScale','auto', 'Standardize',true);
+          mdl_shuf = fitcsvm(Xtrain_all_test, yshuf, 'KernelFunction','linear', 'KernelScale','auto', 'Standardize',true);
           yhat_shuf = predict(mdl_shuf, Xtest_flat);
           perm_acc(p) = mean(yhat_shuf == ytest);
           perm_f1(p)  = f1score(ytest, yhat_shuf);
 
-          % Timepoint-level (shuffle only labels)
-          yshuf_time = ytrain_time_test(randperm(numel(ytrain_time_test)));
-          mdl_shuf_time = fitcsvm(Xtrain_time_test, yshuf_time, 'KernelFunction','rbf', 'KernelScale','auto', 'Standardize',true);
-          yhat_shuf_time = predict(mdl_shuf_time, Xtest_time);
-          perm_acc_time(p) = mean(yhat_shuf_time == ytest_time);
-          perm_f1_time(p)  = f1score(ytest_time, yhat_shuf_time);
 
         catch err
           warning('Permutation %d failed: %s', p, err.message);
@@ -336,32 +325,15 @@ end
       end
     end
 
-
-    fprintf('  Observed accuracy: %.2f\n', acc);
-    fprintf('  Permutation acc mean: %.2f, max: %.2f\n', mean(perm_acc), max(perm_acc));
-
-    fprintf('  Valid permutations: %d of %d\n', sum(~isnan(perm_acc)), nPerms);
-
     validPerms = ~isnan(perm_acc);
     % Include the observed value in the null to avoid p = 0
     pval_acc = (sum(perm_acc(validPerms) >= acc) + 1) / (sum(validPerms) + 1);
     pval_f1  = (sum(perm_f1(validPerms) >= f1) + 1) / (sum(validPerms) + 1);
 
-    validPermsTime = ~isnan(perm_acc_time);
-    pval_time_acc = (sum(perm_acc_time(validPermsTime) >= acc_time) + 1) / (sum(validPermsTime) + 1);
-    pval_time_f1  = (sum(perm_f1_time(validPermsTime) >= f1_time) + 1) / (sum(validPermsTime) + 1);
 
-
-
-
-    decodeResults(end+1) = struct('testDate', testStr, 'nSharedNeurons', sum(shared), ...
-      'acc_trial', acc, 'f1_trial', f1, 'pval_acc', pval_acc, 'pval_f1', pval_f1, ...
-      'acc_time', acc_time, 'f1_time', f1_time, 'pval_time_acc', pval_time_acc, 'pval_time_f1', pval_time_f1);
-
-    fprintf('[Train: %s → Test: %s] Neurons: %d\n', strjoin(dateList(trainDays), ','), testStr, sum(shared));
-    fprintf('  Label balance: %d correct, %d incorrect\n', sum(ytest == 1), sum(ytest == 0));
+%    fprintf('[Train: %s → Test: %s] Neurons: %d\n', strjoin(dateList(trainDays), ','), testStr, sum(shared));
+%    fprintf('  Label balance: %d correct, %d incorrect\n', sum(ytest == 1), sum(ytest == 0));
     fprintf('  Trial-flat:     Acc = %.2f%% (p=%.3f), F1 = %.3f (p=%.3f)\n', acc*100, mean(perm_acc >= acc, 'omitnan'), f1, mean(perm_f1 >= f1, 'omitnan'));
-    fprintf('  Timepoint-flat: Acc = %.2f%% (p=%.3f), F1 = %.3f (p=%.3f)\n', acc_time*100, mean(perm_acc_time >= acc_time, 'omitnan'), f1_time, mean(perm_f1_time >= f1_time, 'omitnan'));
   end
 end
 
