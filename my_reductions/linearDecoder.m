@@ -147,7 +147,7 @@ function acc = crossvalAccuracy(X, y)
           find(isnan(y(train)==1))
         end
 
-        mdl = fitclinear(X(train,:), y(train), 'Learner','logistic', 'Regularization','lasso');
+        mdl = fitclinear(X(train,:), y(train), 'Learner','logistic', 'Regularization','ridge');
         yhat(i) = predict(mdl, X(i,:));
     end
     acc = mean(yhat == y);

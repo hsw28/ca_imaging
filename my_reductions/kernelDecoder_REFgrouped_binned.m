@@ -1,7 +1,5 @@
-
 function decodeResults = kernelDecoder_REFgrouped_binned(animalName, trainDays, nPerms, minTrainDays, minTestDays)
 %time point flattened, multiple training days, bins time points into 3 bins
-
 if nargin < 3, nPerms = 1; end
 if nargin < 4, minTrainDays = numel(trainDays); end
 if nargin < 5, minTestDays = 1; end
@@ -94,6 +92,15 @@ Xtrain_summary(nanMask_train) = Xfill_train(nanMask_train);
 
 ytrain_all_use = ytrain_all;
 
+% Compute class weights to balance training if needed
+classes = unique(ytrain_all_use);
+counts = histc(ytrain_all_use, classes);
+weights = zeros(size(ytrain_all_use));
+for i = 1:numel(classes)
+  weights(ytrain_all_use == classes(i)) = 1 / counts(i);
+end
+weights = weights / mean(weights); % normalize weights
+
 for testDay = 1:nDays
   testStr = dateList{testDay};
   [Xtest, ytest] = getDayMatrixFromStruct(animal, testStr, win, nBins, Fs);
@@ -126,26 +133,44 @@ for testDay = 1:nDays
   Xfill_test = repmat(colMeans_test, size(Xtest_summary, 1), 1);
   Xtest_summary(nanMask_test) = Xfill_test(nanMask_test);
 
-  ytest_use = ytest;
+  classes = unique(ytrain_all_use);
+  classCounts = histc(ytrain_all_use, classes);
+  classPrior = classCounts / sum(classCounts);
+  invPrior = 1 ./ classPrior;
+  weights = zeros(size(ytrain_all_use));
+  for i = 1:numel(classes)
+      weights(ytrain_all_use == classes(i)) = invPrior(i);
+  end
+  weights = weights / mean(weights);
 
-  mdl = fitcsvm(Xtrain_summary, ytrain_all_use, 'KernelFunction','linear', 'Standardize', true);
+  mdl = fitcsvm(Xtrain_summary, ytrain_all_use, ...
+      'KernelFunction', 'linear', ...
+      'KernelScale', 'auto', ...
+      'Standardize', true, ...
+      'Weights', weights, ...
+      'ClassNames', classes, ...
+      'Prior', ones(size(classes)) / numel(classes));  % uniform prior
+
+  % Train with class weights
+%  mdl = fitcsvm(Xtrain_summary, ytrain_all_use, 'KernelFunction','linear', 'Standardize', true, 'Weights', weights);
   yhat = predict(mdl, Xtest_summary);
-  acc = mean(yhat == ytest_use);
-  f1 = f1score(ytest_use, yhat);
-  av = length(find(yhat==1))/numel(yhat); %average
-  if av==1
-    fprintf('model guessed all 1s')
-end
+  acc = mean(yhat == ytest);
+  f1 = f1score(ytest, yhat);
+
+  av = mean(yhat==1);
+  if av == 1 || av == 0
+    fprintf('Warning: Model predicted only one class (%d). Check class balance.\n', av);
+  end
 
   perm_acc = nan(nPerms, 1);
   perm_f1  = nan(nPerms, 1);
 
   for p = 1:nPerms
     yshuf = ytrain_all_use(randperm(numel(ytrain_all_use)));
-    mdl_shuf = fitcsvm(Xtrain_summary, yshuf, 'KernelFunction','linear', 'Standardize', true);
+    mdl_shuf = fitcsvm(Xtrain_summary, yshuf, 'KernelFunction','linear', 'Standardize', true, 'Weights', weights);
     yhat_shuf = predict(mdl_shuf, Xtest_summary);
-    perm_acc(p) = mean(yhat_shuf == ytest_use);
-    perm_f1(p)  = f1score(ytest_use, yhat_shuf);
+    perm_acc(p) = mean(yhat_shuf == ytest);
+    perm_f1(p)  = f1score(ytest, yhat_shuf);
   end
 
   pval_time_acc = (sum(perm_acc >= acc) + 1) / (nPerms + 1);

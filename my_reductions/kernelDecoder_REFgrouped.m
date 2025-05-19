@@ -1,72 +1,45 @@
 function decodeResults = kernelDecoder_REFgrouped(animalName, trainDays, nPerms, minTrainDays, minTestDays)
-%%trial point flattened, multiple training days, no binned time points
-% KERNELDECODER_GROUPED -- only trial flattened rn
-% ----------------------
-% Performs kernel-based (RBF SVM) decoding using trial- and timepoint-flattened representations.
-% Trains on trials from multiple aligned days and tests on all others.
-% Only neurons shared in >= minTrainDays train days and minTestDays test days are used.
-%
-% INPUTS:
-%   animalName    : string, name of struct in base workspace (e.g. 'rat0314')
-%   trainDays     : vector of day indices to train on (e.g. [1 2 3])
-%   nPerms        : number of permutations for p-value estimation (e.g. 100)
-%   minTrainDays  : min number of trainDays a neuron must appear in (default: 1) %% DOESNT work rn
-%   minTestDays   : min number of testDays a neuron must appear in (default: 1)
-%
-% OUTPUT:
-%   decodeResults : struct array with decoding metrics for each test day
-  % Kernel-based decoder (RBF SVM) trained on multiple days
-  % Trains on combined trials from trainDays and tests on remaining days
-  % Uses only shared neurons present in minTrainDays and testDay
+%% trial flattened decoder with lambda search and class weights
 
-  if nargin < 3
-    nPerms = 1;
-  end
-  if nargin < 4
-    minTrainDays = 1;  % default to strict intersection
-  end
-  if nargin < 5
-    minTestDays = 1;  % lenient default: neuron must appear in test day
-  end
+if nargin < 3, nPerms = 1; end
+if nargin < 4, minTrainDays = 1; end
+if nargin < 5, minTestDays = 1; end
 
-  win = [0, 1.3];
-  Fs = 7.5;
-  nBins = round((win(end) - win(1)) * Fs);
+win = [0, 1.3];
+Fs = 7.5;
+nBins = round((win(end) - win(1)) * Fs);
 
-  animal = evalin('base', animalName);
-  G = animal.alignmentALL;
-  dateList = autoDateList(animal);
-  nDays = min(numel(dateList), size(G, 2));
+animal = evalin('base', animalName);
+G = animal.alignmentALL;
+dateList = autoDateList(animal);
+nDays = min(numel(dateList), size(G, 2));
 
-  decodeResults = struct('testDate', [], 'nSharedNeurons', [], ...
-      'acc_trial', [], 'f1_trial', [], 'pval_acc', [], 'pval_f1', [], ...
-      'acc_time', [], 'f1_time', [], 'pval_time_acc', [], 'pval_time_f1', []);
+decodeResults = struct('testDate', [], 'nSharedNeurons', [], ...
+    'acc_trial', [], 'f1_trial', [], 'pval_acc', [], 'pval_f1', [], ...
+    'acc_time', [], 'f1_time', [], 'pval_time_acc', [], 'pval_time_f1', []);
 
+sharedTrain = sum(G(:,trainDays) > 0, 2) >= minTrainDays;
 
-  sharedTrain = sum(G(:,trainDays) > 0, 2) >= minTrainDays; %get index of cells present in at least minTrainDays
+Xtrain_all = [];
+ytrain_all = [];
+trainNeuronGlobalIDs = [];
 
-  Xtrain_all = [];
-  ytrain_all = [];
-  trainNeuronGlobalIDs = [];
+expectedFeatureCount = [];
 
-  for i = 1:numel(trainDays)
+for i = 1:numel(trainDays)
     d = trainDays(i);
     dateStr = dateList{d};
     [X, y] = getDayMatrixFromStruct(animal, dateStr, win, nBins, Fs);
     if isempty(X) || numel(unique(y)) < 2, continue; end
 
-    % --- Use G to directly get valid neuron indices for this training day ---
-    trainIDs = G(sharedTrain, d); %finds shared cells present in said day
-    validIdx = trainIDs > 0; %targets the cells that actually exist
-
-    globalNeuronIDs = find(sharedTrain & G(:, d) > 0);  % global neuron indices for this day
+    trainIDs = G(sharedTrain, d);
+    validIdx = trainIDs > 0;
+    globalNeuronIDs = find(sharedTrain & G(:, d) > 0);
     trainNeuronGlobalIDs = [trainNeuronGlobalIDs; globalNeuronIDs];
 
-    X = X(trainIDs(validIdx),:,:);  % Correctly index using global indices, identifies and sorts these cells
+    X = X(trainIDs(validIdx),:,:);
 
-    fprintf('  Day %s: using %d neurons for training', dateStr, sum(validIdx));
 
-    %removing NaNs
     trialMask = squeeze(all(all(~isnan(X),1),2));
     X = X(:,:,trialMask);
     y = y(trialMask);
@@ -74,62 +47,42 @@ function decodeResults = kernelDecoder_REFgrouped(animalName, trainDays, nPerms,
     X = X(:,:,valid);
     y = y(valid);
 
-% === Gather all global neuron IDs across training days ===
-trainNeuronGlobalIDs = [];
-for i = 1:numel(trainDays)
-    e = trainDays(i);
-    globalNeuronIDs = find(sharedTrain & G(:, e) > 0);
-    trainNeuronGlobalIDs = [trainNeuronGlobalIDs; globalNeuronIDs];
-end
-trainNeuronGlobalIDs = unique(trainNeuronGlobalIDs, 'stable');
-nNeuronsTrain = numel(trainNeuronGlobalIDs);
+    fprintf('  Day %s: using %d neurons for training\n', dateStr, sum(validIdx));
 
+    trainNeuronGlobalIDs = unique(trainNeuronGlobalIDs, 'stable');
+    nNeuronsTrain = numel(trainNeuronGlobalIDs);
 
-% Align training X to full shared neuron set (with padding for missing)
-X_aligned = nan(nNeuronsTrain, size(X,2), size(X,3));
-localIDs = G(trainNeuronGlobalIDs, d);
-validAlign = localIDs > 0 & localIDs <= size(X,1);
-X_aligned(validAlign,:,:) = X(localIDs(validAlign),:,:);
+    X_aligned = nan(nNeuronsTrain, size(X,2), size(X,3));
+    localIDs = G(trainNeuronGlobalIDs, d);
+    validAlign = localIDs > 0 & localIDs <= size(X,1);
+    X_aligned(validAlign,:,:) = X(localIDs(validAlign),:,:);
 
-% Use the aligned data now
-Xflat = reshape(X_aligned, [], size(X_aligned,3))';
+    Xflat = reshape(X_aligned, [], size(X_aligned,3))';
 
-
-% Check feature length AFTER alignment
-expectedCols = nNeuronsTrain * nBins;
-if size(Xflat, 2) ~= expectedCols
-    fprintf('⚠️ Skipping %s trial block: has %d features, expected %d\n', ...
-        dateStr, size(Xflat, 2), expectedCols);
-    continue;
-end
-
+    % Check and enforce consistent feature count
+    if isempty(expectedFeatureCount)
+        expectedFeatureCount = size(Xflat, 2);
+    elseif size(Xflat, 2) ~= expectedFeatureCount
+        fprintf('⚠️ Skipping %s trial block: has %d features, expected %d\n', ...
+            dateStr, size(Xflat, 2), expectedFeatureCount);
+        % Remove added neuron IDs for this skipped day
+        trainNeuronGlobalIDs = setdiff(trainNeuronGlobalIDs, globalNeuronIDs, 'stable');
+        continue;
+    end
 
     Xtrain_all = [Xtrain_all; Xflat];
     ytrain_all = [ytrain_all; y];
-  end
-
-  trainNeuronGlobalIDs = unique(trainNeuronGlobalIDs, 'stable');
+end
 
 
-% Enforce neuron order for Xtrain_all before timepoint reshaping
-  nNeuronsTrain = length(trainNeuronGlobalIDs);
-  Xtrain_all';  % shape: [nFeatures × nTrials] -- want to reshape to [nNeuronsTrain × nBins × nTrials]
-  Xtrain_reshaped = reshape(Xtrain_all', nNeuronsTrain, [], size(Xtrain_all,1));
-  Xtrain_time = reshape(permute(Xtrain_reshaped, [1 3 2]), nNeuronsTrain, [])';
-  ytrain_time = repmat(ytrain_all(:), nBins, 1);
+trainNeuronGlobalIDs = unique(trainNeuronGlobalIDs, 'stable');
+nNeuronsTrain = length(trainNeuronGlobalIDs);
 
-  % Preserve full training timepoint data
-    Xtrain_time_full = Xtrain_time;
-    ytrain_time_full = ytrain_time;
+lambdas = logspace(-6, -1, 10);
 
-
-
-
-  for testDay = 1:nDays
+for testDay = 1:nDays
     if ismember(testDay, trainDays), continue; end
-      % Keep full training matrix for timepoint SVM (do NOT prune by test neuron set)
-      Xtrain_time = Xtrain_time_full;
-      ytrain_time = ytrain_time_full;
+
     testStr = dateList{testDay};
     [Xtest, ytest] = getDayMatrixFromStruct(animal, testStr, win, nBins, Fs);
     if isempty(Xtest) || numel(unique(ytest)) < 2
@@ -149,201 +102,123 @@ end
     valid = testIdxOrder > 0;
     testIdxOrder = testIdxOrder(valid);
     alignedTrainNeurons = trainNeuronGlobalIDs(valid);
-    idxTest = testNeuronIDs(testIdxOrder);
-    idxTest = idxTest(:);  % ensure column vector
-    if isempty(idxTest) || any(idxTest <= 0 | isnan(idxTest))
-      error('Invalid or empty indices in idxTest. Some neurons may not be aligned correctly.');
-    end
-    if any(idxTest <= 0 | isnan(idxTest))
-      error('Invalid indices in idxTest. Some neurons may not be aligned correctly.');
-    end
 
-    % Align test data to match training neuron order, padding with NaNs if necessary
-    localIDs = G(trainNeuronGlobalIDs, testDay);  % local IDs of training neurons on this test day
+    localIDs = G(trainNeuronGlobalIDs, testDay);
+    XtestLocalIDs = G(G(:, testDay) > 0, testDay);
+    XtestRowMap = containers.Map(XtestLocalIDs, 1:numel(XtestLocalIDs));
 
-    % Build a reverse map from localID (as in G) to row index in Xtest
-    XtestLocalIDs = G(G(:, testDay) > 0, testDay);  % list of local neuron IDs in Xtest
-    XtestRowMap = containers.Map(XtestLocalIDs, 1:numel(XtestLocalIDs));  % localID → row in Xtest
-
-    % Initialize aligned Xtest matrix
     X_aligned = nan(nNeuronsTrain, size(Xtest,2), size(Xtest,3));
-
-    % Fill in aligned matrix using reverse lookup
     for i = 1:numel(trainNeuronGlobalIDs)
         lid = localIDs(i);
         if lid > 0 && isKey(XtestRowMap, lid)
             X_aligned(i,:,:) = Xtest(XtestRowMap(lid),:,:);
         end
     end
-
     Xtest = X_aligned;
 
     nanRows = all(all(isnan(Xtest),3),2);
     if any(nanRows)
-  %      fprintf('⚠️ Removing %d test neurons with all-NaN data\n', sum(nanRows));
         Xtest(nanRows,:,:) = [];
+        keepNeurons = ~nanRows;
 
 
-        keepNeurons = ~nanRows;  % logical index of neurons to keep
+        neuronMask = repmat(keepNeurons(:), nBins, 1);
+        neuronMask = neuronMask(:)';
 
-    % Rebuild Xtrain_all to match only these neurons
-    neuronMask = reshape(repmat(keepNeurons(:), 1, nBins)', [], 1);  % [neurons*bins x 1]
-    Xtrain_all_test = Xtrain_all(:, neuronMask);
+        if length(neuronMask) ~= size(Xtrain_all, 2)
+            error('Neuron mask size (%d) does not match training data features (%d).', length(neuronMask), size(Xtrain_all, 2));
+        end
 
-    % Also update Xtrain_time accordingly
-    nNeuronsKeep = sum(keepNeurons);
-    Xtrain_reshaped_test = reshape(Xtrain_all_test', nNeuronsKeep, nBins, []);
-
-
-
+        Xtrain_all_test = Xtrain_all(:, neuronMask);
+        nNeuronsKeep = sum(keepNeurons);
+        Xtrain_reshaped_test = reshape(Xtrain_all_test', nNeuronsKeep, nBins, []);
+    else
+        Xtrain_all_test = Xtrain_all;
     end
-
 
     trialMask = squeeze(all(all(~isnan(Xtest),1),2));
     Xtest = Xtest(:,:,trialMask);
     ytest = ytest(trialMask);
 
-    if size(Xtest, 3) == 0
+    if isempty(ytest) || size(Xtest,3) == 0
         fprintf('⚠️ Skipping %s: all test trials removed due to NaNs.\n', testStr);
         continue;
     end
 
     Xtest_flat = reshape(Xtest, [], size(Xtest,3))';
 
-
-%    fprintf('Training size: %d trials × %d features\n', size(Xtrain_all_test,1), size(Xtrain_all_test,2));
-
-    % Simple mean imputation across trials (column-wise)
     colMeans = nanmean(Xtrain_all_test, 1);
     nanMask = isnan(Xtrain_all_test);
     Xfill = repmat(colMeans, size(Xtrain_all_test,1), 1);
     Xtrain_all_test(nanMask) = Xfill(nanMask);
 
+    classes = unique(ytrain_all);
+    freq = histcounts(ytrain_all, [classes; max(classes)+1]);
+    weights = 1 ./ freq;
+    classWeights = containers.Map(classes, weights);
 
+    grid_results = table();
+    for l = lambdas
+        try
+            sampleWeights = arrayfun(@(c) classWeights(c), ytrain_all);
+            mdl = fitcsvm(Xtrain_all_test, ytrain_all, 'KernelFunction', 'linear', ...
+                'BoxConstraint', l, 'Standardize', true, 'ClassNames', classes, 'Weights', sampleWeights);
+            yhat = predict(mdl, Xtest_flat);
+            acc = mean(yhat == ytest);
+            f1 = f1score(ytest, yhat);
+            grid_results = [grid_results; table(l, acc, f1)];
+        catch
+            % skip errors
+        end
+    end
 
-    mdl = fitcsvm(Xtrain_all_test, ytrain_all, 'KernelFunction','linear', 'KernelScale','auto', 'Standardize',true);
-    yhat = predict(mdl, Xtest_flat);
-    acc = mean(yhat == ytest);
-    f1  = f1score(ytest, yhat);
-
-  av = length(find(yhat==1))/numel(yhat); %average
-  if av==1
-    fprintf('guessed all 1s')
-  end
-
-      nNeurons = size(Xtest,1);
-
-
-    Xtest_time = reshape(permute(Xtest, [1 3 2]), nNeurons, [])';
-    ytest_time = repmat(ytest(:), nBins, 1);
-
-
-    Xtrain_time_test = Xtrain_time_full;
-    ytrain_time_test = ytrain_time_full;
-
-    % Impute NaNs in training data using column-wise mean
-trainMeans = nanmean(Xtrain_time_test, 1);
-nanMaskTrain = isnan(Xtrain_time_test);
-XfillTrain = repmat(trainMeans, size(Xtrain_time_test, 1), 1);
-Xtrain_time_test(nanMaskTrain) = XfillTrain(nanMaskTrain);
-% Drop only test rows with NaNs (e.g., full missing neuron)
-validTest  = ~any(isnan(Xtest_time), 2);
-Xtest_time = Xtest_time(validTest,:);
-ytest_time = ytest_time(validTest);
-
-nTrainCols = size(Xtrain_time_test, 2);
-nTestCols = size(Xtest_time, 2);
-if nTestCols < nTrainCols
-    padSize = nTrainCols - nTestCols;
-    Xtest_time = [Xtest_time, nan(size(Xtest_time,1), padSize)];
-elseif nTestCols > nTrainCols
-    Xtest_time = Xtest_time(:, 1:nTrainCols); % truncate to match
-end
-
-
-
-    if isempty(Xtrain_time) || isempty(Xtest_time)
-        fprintf('⚠️ Skipping %s: no valid timepoint-aligned data\n', testStr);
+    if isempty(grid_results)
+        warning('No valid models trained on test day %s', testStr);
         continue;
     end
 
+    [~, idxBest] = max(grid_results.acc);
+    best_lambda = grid_results.l(idxBest);
+    best_acc = grid_results.acc(idxBest);
+    best_f1 = grid_results.f1(idxBest);
 
-    classFreqs_time = histcounts(ytrain_time_test, [0 1 2]);
-    classWeights_time = 1 ./ classFreqs_time;
+    sampleWeights = arrayfun(@(c) classWeights(c), ytrain_all);
+    mdl = fitcsvm(Xtrain_all_test, ytrain_all, 'KernelFunction', 'linear', ...
+        'BoxConstraint', best_lambda, 'Standardize', true, 'ClassNames', classes, 'Weights', sampleWeights);
+    yhat = predict(mdl, Xtest_flat);
+    acc = mean(yhat == ytest);
+    f1 = f1score(ytest, yhat);
 
-
-    % Permutation
-    perm_acc = nan(nPerms,1);
-    perm_f1  = nan(nPerms,1);
-    perm_acc_time = nan(nPerms,1);
-    perm_f1_time  = nan(nPerms,1);
-
-
-    % Mean imputation for training trial-level data
-    Xtrain_trial = Xtrain_all_test;  % This should match the test neuron subset
-    colMeans_trial = nanmean(Xtrain_trial, 1);
-    nanMask_trial = isnan(Xtrain_trial);
-    Xfill_trial = repmat(colMeans_trial, size(Xtrain_trial, 1), 1);
-    Xtrain_trial(nanMask_trial) = Xfill_trial(nanMask_trial);
-
-
-    % Predefine fixed training and test data for permutations
-    Xtrain_trial_perm   = Xtrain_all_test;
-    ytrain_all_perm     = ytrain_all;
-
-    Xtrain_time_perm    = Xtrain_time_test;
-    ytrain_time_perm    = ytrain_time_test;
-
-    Xtest_flat_perm     = Xtest_flat;
-    Xtest_time_perm     = Xtest_time;
-    ytest_perm          = ytest;
-    ytest_time_perm     = ytest_time;
-
-
-    if nPerms > 1 && isempty(gcp('nocreate'))
-        parpool('local');
+    perm_acc = nan(nPerms, 1);
+    perm_f1 = nan(nPerms, 1);
+    for p = 1:nPerms
+        yshuf = ytrain_all(randperm(numel(ytrain_all)));
+        mdl_shuf = fitcsvm(Xtrain_all_test, yshuf, 'KernelFunction', 'linear', ...
+            'BoxConstraint', best_lambda, 'Standardize', true, 'ClassNames', classes, 'Weights', sampleWeights);
+        yhat_shuf = predict(mdl_shuf, Xtest_flat);
+        perm_acc(p) = mean(yhat_shuf == ytest);
+        perm_f1(p) = f1score(ytest, yhat_shuf);
     end
 
-    if nPerms > 1
-      parfor p = 1:nPerms
-        try
-          % Shuffle labels ONLY (not rows of X)
-          yshuf = ytrain_all(randperm(numel(ytrain_all)));
-          mdl_shuf = fitcsvm(Xtrain_all_test, yshuf, 'KernelFunction','linear', 'KernelScale','auto', 'Standardize',true);
-          yhat_shuf = predict(mdl_shuf, Xtest_flat);
-          perm_acc(p) = mean(yhat_shuf == ytest);
-          perm_f1(p)  = f1score(ytest, yhat_shuf);
+    pval_acc = (sum(perm_acc >= acc) + 1) / (nPerms + 1);
+    pval_f1 = (sum(perm_f1 >= f1) + 1) / (nPerms + 1);
 
+    fprintf('Test %s — Trial-flat: Acc = %.2f, F1 = %.3f, Best Lambda = %.1e, pAcc = %.3f, pF1 = %.3f\n', ...
+        testStr, acc, f1, best_lambda, pval_acc, pval_f1);
 
-        catch err
-          warning('Permutation %d failed: %s', p, err.message);
-          perm_acc(p) = NaN;
-          perm_f1(p) = NaN;
-          perm_acc_time(p) = NaN;
-          perm_f1_time(p) = NaN;
-        end
-      end
-    end
-
-    validPerms = ~isnan(perm_acc);
-    % Include the observed value in the null to avoid p = 0
-    pval_acc = (sum(perm_acc(validPerms) >= acc) + 1) / (sum(validPerms) + 1);
-    pval_f1  = (sum(perm_f1(validPerms) >= f1) + 1) / (sum(validPerms) + 1);
-
-
-%    fprintf('[Train: %s → Test: %s] Neurons: %d\n', strjoin(dateList(trainDays), ','), testStr, sum(shared));
-%    fprintf('  Label balance: %d correct, %d incorrect\n', sum(ytest == 1), sum(ytest == 0));
-    fprintf('  Trial-flat:     Acc = %.2f%% (p=%.3f), F1 = %.3f (p=%.3f)\n', acc*100, mean(perm_acc >= acc, 'omitnan'), f1, mean(perm_f1 >= f1, 'omitnan'));
-  end
+    decodeResults(end+1) = struct('testDate', testStr, 'nSharedNeurons', nNeuronsTrain, ...
+        'acc_trial', acc, 'f1_trial', f1, 'pval_acc', pval_acc, 'pval_f1', pval_f1, ...
+        'acc_time', NaN, 'f1_time', NaN, 'pval_time_acc', NaN, 'pval_time_f1', NaN);
+end
 end
 
 function f1 = f1score(ytrue, ypred)
-  ytrue = double(ytrue(:));
-  ypred = double(ypred(:));
-  tp = sum((ytrue == 1) & (ypred == 1));
-  fp = sum((ytrue == 0) & (ypred == 1));
-  fn = sum((ytrue == 1) & (ypred == 0));
-  prec = tp / (tp + fp + eps);
-  rec  = tp / (tp + fn + eps);
-  f1 = 2 * (prec * rec) / (prec + rec + eps);
+    ytrue = double(ytrue(:));
+    ypred = double(ypred(:));
+    tp = sum((ytrue == 1) & (ypred == 1));
+    fp = sum((ytrue == 0) & (ypred == 1));
+    fn = sum((ytrue == 1) & (ypred == 0));
+    prec = tp / (tp + fp + eps);
+    rec  = tp / (tp + fn + eps);
+    f1 = 2 * (prec * rec) / (prec + rec + eps);
 end
