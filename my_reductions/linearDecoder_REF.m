@@ -1,5 +1,5 @@
 function baselineResults =  linearDecoder_REF(animalName, trainDays, testDays)
-    win = [0, 1.3];
+    win = [0, .75];
     Fs = 7.5;
     nBins = round((win(end) - win(1)) * Fs);
 

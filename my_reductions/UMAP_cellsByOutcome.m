@@ -2,6 +2,19 @@ function [Z_cells_corr alignment_data validDays svm_aurocs] = UMAP_cellsByOutcom
     % Performs UMAP embedding of cells based on their activity during
     % correct and incorrect trials separately, per day. Optionally aligns and overlays in common space.
     % ex    runUMAP_cellsByTrialOutcome('rat0314', 3, 190, .2, {'cosine'})
+
+
+%It performs neuron-level embedding, not trial-level.
+%For each day:
+%It averages over all correct trials, and separately over all incorrect trials.
+%So each condition (CR or no-CR) produces a single vector per neuron (its mean activity over time).
+%These neuron vectors are used as input to UMAP.
+%🧾 UMAP Input Matrix:
+%Shape = [2 × neurons] × timepoints
+%Then z-scored across time and passed to UMAP.
+%It’s neuron-flattened.
+
+
     if nargin < 2, latentDim = 3; end
     if nargin < 3, neighborVals = 15; end
     if nargin < 4, minDistVals = .5; end

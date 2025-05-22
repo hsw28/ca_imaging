@@ -4,7 +4,7 @@ if nargin < 3, nPerms = 1; end
 if nargin < 4, minTrainDays = numel(trainDays); end
 if nargin < 5, minTestDays = 1; end
 
-win = [0, 1.3];
+win = [0, .75];
 Fs = 7.5;
 nBins = round((win(end) - win(1)) * Fs);
 
@@ -143,16 +143,18 @@ for testDay = 1:nDays
   end
   weights = weights / mean(weights);
 
-  mdl = fitcsvm(Xtrain_summary, ytrain_all_use, ...
-      'KernelFunction', 'linear', ...
-      'KernelScale', 'auto', ...
-      'Standardize', true, ...
-      'Weights', weights, ...
-      'ClassNames', classes, ...
-      'Prior', ones(size(classes)) / numel(classes));  % uniform prior
+%  mdl = fitcsvm(Xtrain_summary, ytrain_all_use, ...
+%      'KernelFunction', 'linear', ...
+%      'KernelScale', 'auto', ...
+%      'Standardize', true, ...
+%      'Weights', weights, ...
+%      'ClassNames', classes, ...
+%      'Prior', ones(size(classes)) / numel(classes));  % uniform prior
 
   % Train with class weights
 %  mdl = fitcsvm(Xtrain_summary, ytrain_all_use, 'KernelFunction','linear', 'Standardize', true, 'Weights', weights);
+mdl = fitcsvm(Xtrain_summary, ytrain_all_use, 'KernelFunction','linear', 'Standardize', true);
+
   yhat = predict(mdl, Xtest_summary);
   acc = mean(yhat == ytest);
   f1 = f1score(ytest, yhat);
@@ -167,7 +169,9 @@ for testDay = 1:nDays
 
   for p = 1:nPerms
     yshuf = ytrain_all_use(randperm(numel(ytrain_all_use)));
-    mdl_shuf = fitcsvm(Xtrain_summary, yshuf, 'KernelFunction','linear', 'Standardize', true, 'Weights', weights);
+  %%%  mdl_shuf = fitcsvm(Xtrain_summary, yshuf, 'KernelFunction','linear', 'Standardize', true, 'Weights', weights);
+    mdl_shuf = fitcsvm(Xtrain_summary, yshuf, 'KernelFunction','linear', 'Standardize', true);
+
     yhat_shuf = predict(mdl_shuf, Xtest_summary);
     perm_acc(p) = mean(yhat_shuf == ytest);
     perm_f1(p)  = f1score(ytest, yhat_shuf);

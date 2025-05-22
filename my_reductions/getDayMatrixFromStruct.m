@@ -1,4 +1,6 @@
 function [X, y] = getDayMatrixFromStruct(animal, dateStr, win, nBins, Fs)
+% outputs traces as X and correct/incorrect as y
+
     csVar = ['CS_' dateStr];
     caVar = ['CA_traces_' dateStr];
     ftVar = ['CA_time_' dateStr];

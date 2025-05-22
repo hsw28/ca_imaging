@@ -13,7 +13,7 @@ if nargin < 3, nPerms = 1; end
 if nargin < 4, minTrainDays = 1; end
 if nargin < 5, minTestDays = 1; end
 
-win = [0, 1.3];
+win = [0, .75];
 Fs = 7.5;
 nBins = round((win(end) - win(1)) * Fs);
 
@@ -247,28 +247,27 @@ function [Xclean, keepCols] = removeZeroVarPerClass(X_in, y_in)
 end
 
 function acc = crossvalBayesAccuracy(Xtrain, ytrain, Xtest, ytest)
-    mdl = fitcnbWithVarCheck(Xtrain, ytrain);
-    Xtest_clean = Xtest(:, mdl.FeatureSelection);
-    yhat = predict(mdl.Model, Xtest_clean);
-
-    if all(yhat == 0) || all(yhat == 1)
-        fprintf('[Warning] All predicted acc labels are identical (%d)!\n', yhat(1));
-    end
-
+    mdlStruct = fitcnbWithVarCheck(Xtrain, ytrain);
+    Xtest_clean = Xtest(:, mdlStruct.FeatureSelection);
+    yhat = predict(mdlStruct.Model, Xtest_clean);
     acc = mean(yhat == ytest);
+
+  %  if all(yhat == yhat(1))
+  %      fprintf('[Warning] All predicted acc labels are identical (%d)!\n', yhat(1));
+  %  end
 end
 
 function f1 = crossvalBayesF1(Xtrain, ytrain, Xtest, ytest)
-    mdl = fitcnbWithVarCheck(Xtrain, ytrain);
-    Xtest_clean = Xtest(:, mdl.FeatureSelection);
-    yhat = predict(mdl.Model, Xtest_clean);
-
-    if all(yhat == 0) || all(yhat == 1)
-        fprintf('[Warning] All predicted f1 labels are identical (%d)!\n', yhat(1));
-    end
-
+    mdlStruct = fitcnbWithVarCheck(Xtrain, ytrain);
+    Xtest_clean = Xtest(:, mdlStruct.FeatureSelection);
+    yhat = predict(mdlStruct.Model, Xtest_clean);
     f1 = f1score(ytest, yhat);
+
+  %  if all(yhat == yhat(1))
+  %      fprintf('[Warning] All predicted f1 labels are identical (%d)!\n', yhat(1));
+  %  end
 end
+
 
 
 function mdlStruct = fitcnbWithVarCheck(X, y)
@@ -281,7 +280,9 @@ function mdlStruct = fitcnbWithVarCheck(X, y)
         keepCols(zeroVarCols) = false;
     end
     Xclean = X(:, keepCols);
-    mdl = fitcnb(Xclean, y);
+%    mdl = fitcnb(Xclean, y);
+    mdl = fitcnb(Xclean, y, 'DistributionNames', 'kernel', 'Prior', 'empirical');
+
     mdlStruct.Model = mdl;
     mdlStruct.FeatureSelection = keepCols;
 end
