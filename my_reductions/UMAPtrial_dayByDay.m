@@ -50,7 +50,9 @@ function UMAPtrial_dayByDay(animalName, win, plot3D, balanceClasses)
 
         try
             subplot(nRows, nCols, plotIdx);
-            [embedding, ~] = run_umap(trialVecs, 'n_components', 2, 'n_neighbors', 15, 'min_dist', 0.3, 'metric', 'cosine', 'randomize', true, 'verbose', false);
+        %    [embedding, ~] = run_umap(trialVecs, 'n_components', 2, 'n_neighbors', 15, 'min_dist', 0.3, 'metric', 'cosine', 'randomize', true, 'verbose', false);
+            [embedding, ~] = run_umap(trialVecs, 'n_components', 3, 'n_neighbors', 10, 'min_dist', 0.4, 'metric', 'cosine', 'randomize', true, 'verbose', false);
+
             scatter(embedding(y==0,1), embedding(y==0,2), 30, 'r', 'filled');
             hold on;
             scatter(embedding(y==1,1), embedding(y==1,2), 30, 'b', 'filled');
