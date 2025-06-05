@@ -7,6 +7,7 @@ function [X, y] = getDayMatrixFromStruct(animal, dateStr, win, nBins, Fs)
     ttVar = ['EMGts_' dateStr];
 
     if ~isfield(animal.CS_times, csVar) || ~isfield(animal.Ca_traces, caVar) || ~isfield(animal.Ca_ts, ftVar) || ~isfield(animal.CRs, ttVar)
+        error('do not have all fields or fields are misnamed')
         X = []; y = [];
         return
     end
@@ -38,6 +39,7 @@ function [X, y] = getDayMatrixFromStruct(animal, dateStr, win, nBins, Fs)
         if t0 < t(1) || t1 > t(end)
             fprintf('Skipping trial %d: outside valid time range (t0 = %.2f, t1 = %.2f)\n', ...
                 k, t0, t1);
+            display(t(end))
             continue;
         end
 
@@ -68,4 +70,6 @@ function [X, y] = getDayMatrixFromStruct(animal, dateStr, win, nBins, Fs)
         mu = mean(reshaped, 2, 'omitnan');
         X = bsxfun(@minus, X, mu);
     end
+
+
 end

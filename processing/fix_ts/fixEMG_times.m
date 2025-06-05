@@ -29,6 +29,7 @@ for i = 1:numel(fields_TS)
   if strcmp(TS_date, EMG_date)==1 && strcmp(TS_date, start_date)==1
 
     if EMG_ts(1,1)> 152985146928
+      fprintf('converting')
       EMG_ts(:,1) = EMG_ts(:,1)./1000000;
     end
 

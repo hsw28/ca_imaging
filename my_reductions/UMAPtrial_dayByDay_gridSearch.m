@@ -55,8 +55,10 @@ function [accMatrix, paramList] = UMAPtrial_dayByDay_gridSearch(animalName, win,
                         trialVecs = zscore(trialVecs);
                         y = y(:);
                         try
+
                             [embedding, ~] = run_umap(trialVecs, 'n_components', nc, 'n_neighbors', nn, ...
                                 'min_dist', md, 'metric', metric, 'randomize', true, 'verbose', false);
+
                         catch
                             fprintf('UMAP failed on %s\n', dateStr);
                             continue;

@@ -11,7 +11,7 @@ function [US_times_noise, noisy_trials] = flagNoisyBaselines(emg_data, timestamp
 %   US_times_noise - US_times with noisy trials NaN'ed out
 %   noisy_trials   - logical array, true = noisy
 
-noise_threshold = .5;
+noise_threshold = .5; %or .5
 baseline_duration = 0.5;
 cs_times = US_times - 0.750;
 

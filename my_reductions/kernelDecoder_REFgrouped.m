@@ -1,5 +1,5 @@
 function decodeResults = kernelDecoder_REFgrouped(animalName, trainDays, nPerms, winSize_start, winSize_end)
-%%trial point flattened, multiple training days, no binned time points
+%%trial  flattened, multiple training days, no binned time points
 % KERNELDECODER_GROUPED -- only trial flattened rn
 % ----------------------
 % Performs kernel-based (RBF SVM) decoding using trial- and timepoint-flattened representations.

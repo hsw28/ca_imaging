@@ -1,5 +1,28 @@
 function UMAPtrial_outcome(animalName, win, plot3D, balanceClasses)
-% one map for all days, trials compressed
+% one map for all days, trial flattened
+%UMAPtrial_outcome.m → how well can the whole UMAP space jointly classify trial type? → True decoding analysis.
+%%see also %plotAUROC_byUMAP.m → how informative is each UMAP dimension individually about trial type?
+%Good for visualization and understanding UMAP structure.
+%→ Always joint classification.
+%→ Even with 1 dim, this is a classifier trained on that dimension, not an AUROC.
+%%%
+%Purpose:
+%This script performs population-level decoding after dimensionality reduction (UMAP). It projects neural population activity into UMAP space and then performs classification.
+%
+%Approach:
+%For each day:
+%Aggregate all neuron activity across trials.
+%Perform UMAP dimensionality reduction (using either trial-averaged or trial-time window features).
+%Train a classifier (by default a linear SVM via fitcsvm) on the UMAP-projected data:
+%Train on some trials.
+%Test on other trials.
+%Compute classifier accuracy.
+%
+%What is decoded:
+%Trial outcome (correct vs incorrect), using the full neural population jointly in reduced space.
+%Key point:
+%This is a multivariate decoding using a supervised classifier (SVM), applied after UMAP reduction.
+
     if nargin < 3, plot3D = false; end
     if nargin < 4, balanceClasses = false; end
     Fs = 7.5;

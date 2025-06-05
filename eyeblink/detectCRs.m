@@ -22,6 +22,12 @@ function [EMG_cr_detected, percentCRs, EMG_cr_onset_times, EMG_cr_types] = detec
 %   EMG_cr_detected: Struct indicating presence of CR for each trial
 %   EMG_cr_onset_times: Struct of CR onset times (in seconds) for each trial
 
+%1. Alpha: response that began <35 ms after CS onset-   *
+
+%2. Non adaptive response: response that is present >35ms after CS onset but >200ms from US onset
+
+%3. Adaptive CR: response that is present <200ms from US onset
+
 
 
 EMG_struct = EMG_struct_unfiltered;
@@ -108,21 +114,22 @@ for i = 1:numel(fields_TS)
           trial_types = {};
 
           for j = find(valid_idx)'
+
               onset = times(j);
               rel_onset = onset - cs;
 
               if rel_onset < MIN_LATENCY
+                  trial_types{end+1} = "alpha";
                   continue;  % alpha
               end
 
               % Check adaptive: still above threshold in last 20 ms before US
-              %adaptive_idx = timestamps >= (cs) & timestamps < us;
               adaptive_idx = timestamps >= (us - 0.200) & timestamps < us;
               if any(emg_data(adaptive_idx) > threshold)
-                  trial_onsets(end+1) = onset;
+                  trial_onsets(end+1) = rel_onset;
                   trial_types{end+1} = "adaptive";
               else
-                  % Non-adaptive: skip
+                  trial_types{end+1} = "non-adaptive";
                   continue;
               end
           end

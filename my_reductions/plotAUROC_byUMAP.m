@@ -1,8 +1,18 @@
 function plotAUROC_byUMAP(ratName, refDaySpec, pcList)
+  %plotAUROC_byUMAP.m → how informative is each UMAP dimension individually about trial type?
+ %Good for visualization and understanding UMAP structure.
+
+%see also UMAPtrial_outcome.m → how well can the whole UMAP space jointly classify trial type? → True decoding analysis.
+
 % plotAUROC_byPC(ratName, refDaySpec, pcList)
 % Runs PCA alignment + decoding for a given rat and plots AUROC curves
 % across days using different numbers of principal components.
 % Also visualizes trial-level UMAPs colored by CR vs no-CR.
+
+%UMAP	Run on neural activity (trials x neurons)
+%AUROC	Computed on UMAP dimensions Z(:, iDim), 1 AUROC per dimension
+%Result	AUROC reflects how well each UMAP dimension separates trial types
+
 %
 % Inputs:
 %   ratName     - string, e.g. 'rat0314'

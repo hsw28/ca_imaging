@@ -21,7 +21,7 @@ function AUROC = runPCA_fromStruct(animalName, refSpec, latentDim)
     end
 
     Fs       = 7.5;          % frame rate (Hz)
-    win      = [0, 1.3];    % time window around CS (in seconds)
+    win      = [0, .75];    % time window around CS (in seconds)
     %latentDim = 25;          % number of principal components to keep
 
     % Access the structured data from the base workspace
@@ -59,7 +59,7 @@ function AUROC = runPCA_fromStruct(animalName, refSpec, latentDim)
         [X, y] = getDayMatrixFromStruct(animal, dateStr, win, nBins, Fs);
         if isempty(X), continue; end
 
-        %across cells (average across trials/time bins)
+        %average across trials/time bins)
         %What it does: Reduces the dimensionality of each cell’s temporal activity (e.g., average trace over time per condition).
         %Focus: How cells vary in temporal dynamics during a trial.
         %Use: Alignment across days using Procrustes or similar transforms to assess representational stability.
@@ -79,7 +79,7 @@ function AUROC = runPCA_fromStruct(animalName, refSpec, latentDim)
 
 
 
-        % PCA across cells (average across time for each trial)
+        %  (average across time for each trial)
         %What it does: Reduces dimensionality of the population vector per trial (spatial pattern across cells).
         %Focus: How trials differ in overall cell activation patterns.
         %Use: Trial-by-trial decoding (e.g., predict trial type or correctness).
