@@ -11,7 +11,6 @@ Data usage types: trial-flattened, time-flattened, neuron-flattened.
 
 **Description:** Checks baseline activity across trials/days (quality control).
 
-**Data used:** time-flattened (QC)
 
 
 ### bayesDecoder.m
@@ -196,9 +195,21 @@ Data usage types: trial-flattened, time-flattened, neuron-flattened.
 **Data used:** neuron-flattened
 
 
+### UMAPtrial_crossDayDecoder
+
+**Description:** Runs UMAP per day → visualizes day-to-day evolution of trial-level UMAP space using a reference day.
+
+**Data used:** trial-flattened
+
+### CrossDayDecoding_UMAP_gridSearch
+
+**Description:** Grid search version of UMAPtrial_crossDayDecoder: Runs UMAP per day → visualizes day-to-day evolution of trial-level UMAP space using a reference day.
+
+**Data used:** trial-flattened
+
 ### UMAPtrial_dayByDay.m
 
-**Description:** Runs UMAP per day → visualizes day-to-day evolution of trial-level UMAP space.
+**Description:** Runs UMAP per day → visualizes day-to-day evolution of trial-level UMAP space, using cross validated own day.
 
 **Data used:** trial-flattened
 
@@ -216,3 +227,40 @@ Data usage types: trial-flattened, time-flattened, neuron-flattened.
 
 **Data used:** trial-flattened
 
+
+# Function Data Type Chart
+
+| Function                                | Trial-flattened   | Time-flattened   | Neuron-flattened   |
+|:----------------------------------------|:------------------|:-----------------|:-------------------|
+| UMAP_cellsByOutcome.m                   |                   |                  | ✅                 |
+| UMAP_gridSearch.m                       | ✅                |                  |                    |
+| UMAP_trajectory_byOutcome.m             |                   | ✅               |                    |
+| UMAP_trajectory_significance.m          |                   | ✅               |                    |
+| UMAP_trajectory_variability.m           |                   | ✅               |                    |
+| UMAP_trajectory_variability_evolution.m |                   | ✅               |                    |
+| UMAPcells_gridSearch.m                  |                   |                  | ✅                 |
+| UMAPtrial_crossDayDecoder               | ✅                |                  |                    |
+| UMAPtrial_dayByDay.m                    | ✅                |                  |                    |
+| UMAPtrial_dayByDay_gridSearch.m         | ✅                |                  |                    |
+| UMAPtrial_outcome.m                     | ✅                |                  |                    |
+| baselineCheck.m                         |                   |                  |                    |
+| bayesDecoder.m                          | ✅                |                  |                    |
+| bayesDecoder_REFgrouped.m               | ✅                |                  |                    |
+| CrossDayDecoding_UMAP_gridSearch        | ✅                |                  |                    |
+| f1score.m                               |                   |                  |                    |
+| getDayMatrixFromStruct.m                |                   |                  |                    |
+| isBadDay.m                              |                   |                  |                    |
+| kernelDecoder.m                         | ✅                |                  |                    |
+| kernelDecoder2D.m                       | ✅                |                  |                    |
+| kernelDecoder_REF.m                     | ✅                |                  |                    |
+| kernelDecoder_REFgrouped.m              | ✅                |                  |                    |
+| kernelDecoder_REFgrouped_binned.m       |                   | ✅               |                    |
+| linearDecoder.m                         | ✅                |                  |                    |
+| linearDecoder_REF.m                     | ✅                |                  |                    |
+| plotAUROC_byPC.m                        | ✅                |                  |                    |
+| plotAUROC_byUMAP.m                      | ✅                |                  |                    |
+| quantifyUMAPManifolds.m                 | ✅                | ✅               |                    |
+| runPCA_fromStruct.m                     | ✅                |                  |                    |
+| runUMAP_fromStruct.m                    | ✅                |                  |                    |
+| sortgrid.m                              |                   |                  |                    |
+| testTrainingDayCombos.m                 | ✅                |                  |                    |

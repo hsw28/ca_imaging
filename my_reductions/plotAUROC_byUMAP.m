@@ -1,6 +1,8 @@
 function plotAUROC_byUMAP(ratName, refDaySpec, pcList)
   %plotAUROC_byUMAP.m → how informative is each UMAP dimension individually about trial type?
  %Good for visualization and understanding UMAP structure.
+% → No classifier
+%→ It computes ROC curve on the raw UMAP coordinate value.
 
 %see also UMAPtrial_outcome.m → how well can the whole UMAP space jointly classify trial type? → True decoding analysis.
 
