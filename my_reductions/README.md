@@ -6,32 +6,16 @@ Data usage types: trial-flattened, time-flattened, neuron-flattened.
 
 ============================================
 
+**INCLUDE**
 
 ### baselineCheck.m
 
 **Description:** Checks baseline activity across trials/days (quality control).
 
 
-
-### bayesDecoder.m
-
-**Description:** Bayesian classifier → decodes trial outcome from neural data.
-
-**Data used:** trial-flattened
-
-
-### bayesDecoder_REFgrouped.m
-
-**Description:** Bayesian decoder trained on reference day → tested on grouped days.
-
-**Data used:** trial-flattened
-
-
 ### f1score.m
 
 **Description:** Computes F1 score for binary classifier predictions.
-
-**Data used:** n/a (metric function)
 
 
 ### getDayMatrixFromStruct.m
@@ -45,105 +29,16 @@ Data usage types: trial-flattened, time-flattened, neuron-flattened.
 
 **Description:** Identifies bad days (insufficient data or quality).
 
-**Data used:** n/a (QC)
-
-
-### kernelDecoder.m
-
-**Description:** Kernel SVM → decodes trial outcome from neural data.
-
-**Data used:** trial-flattened
-
-
-### kernelDecoder2D.m
-
-**Description:** Kernel SVM using 2D PCA projection of neural data.
-
-**Data used:** trial-flattened (PCA 2D)
-
-
-### kernelDecoder_REF.m
-
-**Description:** Kernel decoder trained on reference day, tested on other days.
-
-**Data used:** trial-flattened
-
-
-### kernelDecoder_REFgrouped.m
-
-**Description:** Kernel decoder reference day → tested on grouped test days.
-
-**Data used:** trial-flattened
-
-
-### kernelDecoder_REFgrouped_binned.m
-
-**Description:** Same as above, but with time-binned data.
-
-**Data used:** time-flattened
-
-
-### linearDecoder.m
-
-**Description:** Linear SVM → decodes trial outcome from neural data.
-
-**Data used:** trial-flattened
-
-
-### linearDecoder_REF.m
-
-**Description:** Linear decoder trained on reference day → tested on other days.
-
-**Data used:** trial-flattened
-
-
-### plotAUROC_byPC.m
-
-**Description:** Computes AUROC per PCA dimension → visualizes discriminability in PCA space.
-
-**Data used:** trial-flattened (PCA space)
-
-
-### plotAUROC_byUMAP.m
-
-**Description:** Computes AUROC per UMAP dimension → visualizes discriminability in UMAP space.
-
-**Data used:** trial-flattened (UMAP space)
-
-
-### quantifyUMAPManifolds.m
-
-**Description:** Quantifies properties of UMAP manifolds (e.g. separation, overlap, stability).
-
-**Data used:** depends (often time-flattened or trial-flattened)
-
-
-### runPCA_fromStruct.m
-
-**Description:** Runs PCA on trial-level neural data → returns PCA space.
-
-**Data used:** trial-flattened
-
-
-### runUMAP_fromStruct.m
-
-**Description:** Runs UMAP on trial-level neural data → returns UMAP space + AUROC.
-
-**Data used:** trial-flattened
-
 
 ### sortgrid.m
 
 **Description:** Sorting utility for grid search results.
 
-**Data used:** n/a (utility)
+
+---
 
 
-### testTrainingDayCombos.m
-
-**Description:** Tests multiple training/testing day combinations for decoders.
-
-**Data used:** trial-flattened
+**NEURON FLATTENED**
 
 
 ### UMAP_cellsByOutcome.m
@@ -153,11 +48,24 @@ Data usage types: trial-flattened, time-flattened, neuron-flattened.
 **Data used:** neuron-flattened
 
 
-### UMAP_gridSearch.m
+### UMAPcells_gridSearch.m
 
-**Description:** Performs parameter grid search for UMAP hyperparameters (n_neighbors, min_dist).
+**Description:** Grid search for UMAP applied to neuron space (similar to UMAP_cellsByOutcome).
 
-**Data used:** trial-flattened
+**Data used:** neuron-flattened
+
+
+---
+
+
+**TIME FLATTENED**
+
+
+### kernelDecoder_REFgrouped_binned.m
+
+**Description:** Same as above, but with time-binned data.
+
+**Data used:** time-flattened
 
 
 ### UMAP_trajectory_byOutcome.m
@@ -188,11 +96,108 @@ Data usage types: trial-flattened, time-flattened, neuron-flattened.
 **Data used:** time-flattened
 
 
-### UMAPcells_gridSearch.m
+--
 
-**Description:** Grid search for UMAP applied to neuron space (similar to UMAP_cellsByOutcome).
 
-**Data used:** neuron-flattened
+**TRIAL FLATTENED**
+
+
+### bayesDecoder.m
+
+**Description:** Bayesian classifier → decodes trial outcome from neural data.
+
+**Data used:** trial-flattened
+
+
+### bayesDecoder_REFgrouped.m
+
+**Description:** Bayesian decoder trained on reference day → tested on grouped days.
+
+**Data used:** trial-flattened
+
+
+### kernelDecoder.m
+
+**Description:** Kernel SVM → decodes trial outcome from neural data.
+
+**Data used:** trial-flattened
+
+
+### kernelDecoder2D.m
+
+**Description:** Kernel SVM using 2D PCA projection of neural data.
+
+**Data used:** trial-flattened (PCA 2D)
+
+
+### kernelDecoder_REF.m
+
+**Description:** Kernel decoder trained on reference day, tested on other days.
+
+**Data used:** trial-flattened
+
+
+### kernelDecoder_REFgrouped.m
+
+**Description:** Kernel decoder reference day → tested on grouped test days.
+
+**Data used:** trial-flattened
+
+
+### linearDecoder.m
+
+**Description:** Linear SVM → decodes trial outcome from neural data.
+
+**Data used:** trial-flattened
+
+
+### linearDecoder_REF.m
+
+**Description:** Linear decoder trained on reference day → tested on other days.
+
+**Data used:** trial-flattened
+
+
+### plotAUROC_byPC.m
+
+**Description:** Computes AUROC per PCA dimension → visualizes discriminability in PCA space.
+
+**Data used:** trial-flattened (PCA space)
+
+
+### plotAUROC_byUMAP.m
+
+**Description:** Computes AUROC per UMAP dimension → visualizes discriminability in UMAP space.
+
+**Data used:** trial-flattened (UMAP space)
+
+
+### runPCA_fromStruct.m
+
+**Description:** Runs PCA on trial-level neural data → returns PCA space.
+
+**Data used:** trial-flattened
+
+
+### runUMAP_fromStruct.m
+
+**Description:** Runs UMAP on trial-level neural data → returns UMAP space + AUROC.
+
+**Data used:** trial-flattened
+
+
+### testTrainingDayCombos.m
+
+**Description:** Tests multiple training/testing day combinations for decoders.
+
+**Data used:** trial-flattened
+
+
+### UMAP_gridSearch.m
+
+**Description:** Performs parameter grid search for UMAP hyperparameters (n_neighbors, min_dist).
+
+**Data used:** trial-flattened
 
 
 ### UMAPtrial_crossDayDecoder
@@ -201,11 +206,13 @@ Data usage types: trial-flattened, time-flattened, neuron-flattened.
 
 **Data used:** trial-flattened
 
+
 ### CrossDayDecoding_UMAP_gridSearch
 
 **Description:** Grid search version of UMAPtrial_crossDayDecoder: Runs UMAP per day → visualizes day-to-day evolution of trial-level UMAP space using a reference day.
 
 **Data used:** trial-flattened
+
 
 ### UMAPtrial_dayByDay.m
 
@@ -226,6 +233,19 @@ Data usage types: trial-flattened, time-flattened, neuron-flattened.
 **Description:** UMAP on trial data → trains SVM to decode trial outcome → reports classifier accuracy.
 
 **Data used:** trial-flattened
+
+
+
+**OTHER**
+
+
+### quantifyUMAPManifolds.m
+
+**Description:** Quantifies properties of UMAP manifolds (e.g. separation, overlap, stability).
+
+**Data used:** depends (often time-flattened or trial-flattened)
+
+
 
 
 # Function Data Type Chart

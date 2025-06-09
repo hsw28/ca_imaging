@@ -5,6 +5,14 @@ function results = UMAPcells_gridSearch(animalName, latentDim, neighborVals, min
       %Centroid distance between correct and incorrect trial embeddings (want high)
       %SVM AUROC to quantify separability (want high)
       %Within-class variance (want low)
+  % Runs UMAP on these neuron feature vectors
+  %Grid search over UMAP hyperparams
+  %Then plots or measures separation between neuron groups
+    %What is the structure of neuron manifold on this day?
+    %Do neurons cluster by outcome, cell type, etc?
+
+
+
 
 
 
@@ -53,7 +61,7 @@ function results = UMAPcells_gridSearch(animalName, latentDim, neighborVals, min
               var_incorr = [];
 
               %for d = 1:nDays
-              for d = nDays-2:nDays
+              for d = nDays-4:nDays
 
                   dateStr = dateList{d};
                   if isBadDay(animal, dateStr), continue; end
@@ -114,7 +122,7 @@ function results = UMAPcells_gridSearch(animalName, latentDim, neighborVals, min
   for k = 1:nM
       figure;
       imagesc(squeeze(centroidDist(:,:,k))); colorbar;
-      title(sprintf('Centroid Distance (%s)', metricVals{k}));
+      title(sprintf('Centroid Distance between Correct and Incorrect (%s)', metricVals{k}));
       xlabel('min\_dist'); ylabel('n\_neighbors');
       xticks(1:nD); xticklabels(string(minDistVals));
       yticks(1:nN); yticklabels(string(neighborVals));

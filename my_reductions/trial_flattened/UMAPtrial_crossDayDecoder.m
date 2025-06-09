@@ -196,12 +196,12 @@ function [accMatrixXmat, accMatrixUMAP, pMatrixXmat, pMatrixUMAP] = UMAPtrial_cr
         end
     end
     %    fprintf('Plotting results...\n');
-    %     plotCrossDayMatrix(accMatrixXmat, dateList, 'Xmat Aligned Cross-Day Decoding', false);
-    %     plotCrossDayMatrix(accMatrixUMAP, dateList, 'UMAP Cross-Day Decoding', false);
+         plotCrossDayMatrix(accMatrixXmat, dateList, 'Xmat Aligned Cross-Day Decoding', false);
+         plotCrossDayMatrix(accMatrixUMAP, dateList, 'UMAP Cross-Day Decoding', false);
 
         if doPermutation
-    %        plotCrossDayMatrix(pMatrixXmat, dateList, 'Xmat P-value Matrix', true);
-    %        plotCrossDayMatrix(pMatrixUMAP, dateList, 'UMAP P-value Matrix', true);
+            plotCrossDayMatrix(pMatrixXmat, dateList, 'Xmat P-value Matrix', true);
+            plotCrossDayMatrix(pMatrixUMAP, dateList, 'UMAP P-value Matrix', true);
         end
 
     fprintf('Cross-day decoding done!\n');
