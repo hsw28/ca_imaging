@@ -42,6 +42,9 @@ function results = UMAPcells_gridSearch(animalName, latentDim, neighborVals, min
   centroidDist = nan(nN, nD, nM);
   meanAUROC    = nan(nN, nD, nM);
   withinVar    = nan(nN, nD, nM);
+  withinVar_corr = nan(nN, nD, nM);
+withinVar_incorr = nan(nN, nD, nM);
+
 
   results = struct();
   results.metrics = struct();
@@ -106,7 +109,10 @@ function results = UMAPcells_gridSearch(animalName, latentDim, neighborVals, min
 
               centroidDist(i,j,k) = mean(centroid_dists);
               meanAUROC(i,j,k)    = mean(svm_aurocs);
-              withinVar(i,j,k)    = mean([var_corr var_incorr]);
+              withinVar_corr(i,j,k) = mean(var_corr);
+              withinVar_incorr(i,j,k) = mean(var_incorr);
+              withinVar(i,j,k) = mean([var_corr var_incorr]);  % Optional: keep overall
+
 
               results.metrics(i,j,k).n_neighbors = n_neighbors;
               results.metrics(i,j,k).min_dist = min_dist;
@@ -120,25 +126,43 @@ function results = UMAPcells_gridSearch(animalName, latentDim, neighborVals, min
 
   %% Plotting per metric
   for k = 1:nM
-      figure;
+    figure
+    subplot(1,4,1)
+    imagesc(squeeze(withinVar_corr(:,:,k))); colorbar;
+    title(sprintf('Within-Class Variance (Correct only, %s)', metricVals{k}));
+    xlabel('min\_dist'); ylabel('n\_neighbors');
+    xticks(1:nD); xticklabels(string(minDistVals));
+    yticks(1:nN); yticklabels(string(neighborVals));
+
+    subplot(1,4,2)
+    imagesc(squeeze(withinVar_incorr(:,:,k))); colorbar;
+    title(sprintf('Within-Class Variance (Incorrect only, %s)', metricVals{k}));
+    xlabel('min\_dist'); ylabel('n\_neighbors');
+    xticks(1:nD); xticklabels(string(minDistVals));
+    yticks(1:nN); yticklabels(string(neighborVals));
+
+    subplot(1,4,3)
       imagesc(squeeze(centroidDist(:,:,k))); colorbar;
       title(sprintf('Centroid Distance between Correct and Incorrect (%s)', metricVals{k}));
       xlabel('min\_dist'); ylabel('n\_neighbors');
       xticks(1:nD); xticklabels(string(minDistVals));
       yticks(1:nN); yticklabels(string(neighborVals));
 
-      figure;
+    subplot(1,4,4)
       imagesc(squeeze(meanAUROC(:,:,k))); colorbar;
       title(sprintf('SVM AUROC (%s)', metricVals{k}));
       xlabel('min\_dist'); ylabel('n\_neighbors');
       xticks(1:nD); xticklabels(string(minDistVals));
       yticks(1:nN); yticklabels(string(neighborVals));
 
-      figure;
-      imagesc(squeeze(withinVar(:,:,k))); colorbar;
-      title(sprintf('Within-Class Variance (%s)', metricVals{k}));
-      xlabel('min\_dist'); ylabel('n\_neighbors');
-      xticks(1:nD); xticklabels(string(minDistVals));
-      yticks(1:nN); yticklabels(string(neighborVals));
+  %    figure;
+  %    imagesc(squeeze(withinVar(:,:,k))); colorbar;
+  %    title(sprintf('Within-Class Variance (%s)', metricVals{k}));
+  %    xlabel('min\_dist'); ylabel('n\_neighbors');
+  %    xticks(1:nD); xticklabels(string(minDistVals));
+  %    yticks(1:nN); yticklabels(string(neighborVals));
+
+
+
   end
   end

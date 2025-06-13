@@ -1,4 +1,4 @@
-function [Z_cells_corr alignment_data validDays svm_aurocs] = UMAP_cellsByOutcome(animalName, latentDim, neighborVals, minDistVals, metricVals)
+function [Z_cells alignment_data validDays svm_aurocs] = UMAP_cellsByOutcome(animalName, latentDim, neighborVals, minDistVals, metricVals)
     % Performs UMAP embedding of cells based on their activity during
     % correct and incorrect trials separately, per day. Optionally aligns and overlays in common space.
     % ex    runUMAP_cellsByTrialOutcome('rat0314', 3, 190, .2, {'cosine'})
@@ -186,5 +186,7 @@ function [Z_cells_corr alignment_data validDays svm_aurocs] = UMAP_cellsByOutcom
         grid on; view(3);
         scatter3(nan, nan, nan, 36, 'b', 'filled');
 %}
+
+Z_cells = [Z_cells_corr; Z_cells_incorr];
 
 quantifyUMAPManifolds(Z_corr_aligned, Z_incorr_aligned, validDays)
