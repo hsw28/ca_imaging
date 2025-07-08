@@ -1,5 +1,5 @@
-function f = mutualinfo_openfield_noCSUS(spike_structure, pos_structure, velthreshold, dim, CA_timestamps, CSUS_id_struct)
-%finds mutual info for a bunch of cells NOT including the CSUS period and the 2 seconds after
+function f = bitsper_openfield_noCSUS(spike_structure, pos_structure, velthreshold, dim, CA_timestamps, CSUS_id_struct)
+%finds bits per spike AND bits per second for a bunch of cells NOT including the CSUS period and the 2 seconds after
 
 tic
 
@@ -60,13 +60,11 @@ for i = 1:numel(fields_spikes)
         pos = convertpostoframe(pos, curr_CA_timestamps);
       end
 
-      mutinfo = NaN(size(peaks_time,1),1);
+      bitsper_info = NaN(size(peaks_time,1),2);
 
       tm = pos(:, 1);
       biggest = max(peaks_time(:));
       [minValue,closestIndex] = min(abs(biggest-tm));
-
-
 
 
       % Find all time points where CSUS_id > 0
@@ -78,7 +76,7 @@ for i = 1:numel(fields_spikes)
       % For each task time point, mark the current and next 15 points
       for i = 1:length(taskIdx)
           idx = taskIdx(i);
-          maxIdx = min(idx + 5, length(CSUS_id));  % avoid going out of bounds
+          maxIdx = min(idx + 15, length(CSUS_id));  % avoid going out of bounds
           keepIdx(idx:maxIdx) = true;
       end
 
@@ -93,7 +91,6 @@ for i = 1:numel(fields_spikes)
       goodtime = pos(goodvel, 1);
       goodpos = pos(goodvel,:);
       goodvel = setdiff(goodvel, goodCSUS);
-
 
 
       mintime = vel(2,1);
@@ -129,7 +126,6 @@ for i = 1:numel(fields_spikes)
 %want highspeedspikes
 
 
-
   set(0,'DefaultFigureVisible', 'off');
   if length(highspeedspikes)>0
   [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(highspeedspikes, goodpos, dim, 1.000);
@@ -139,14 +135,17 @@ for i = 1:numel(fields_spikes)
           if (size(occprob,1)) < (size(occprob,2))
             occprob = occprob';
           end
-  mutinfo(k) = mutualinfo([spikeprob, occprob]);
+  [bitsPerSpike, bitsPerSecond] = bits_per(spikeprob, occprob);
+  bitsper_info(k,1) = bitsPerSpike;
+  bitsper_info(k,2) = bitsPerSecond;
   else
-    mutinfo(k) = NaN;
+        bitsper_info(k,1) = NaN;
+    bitsper_info(k,2) = NaN;
   end
 
 end
 
-mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
+mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = bitsper_info';
 end
 end
 

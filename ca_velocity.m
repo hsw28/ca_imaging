@@ -10,10 +10,14 @@ end
 
 file = pos;
 
+
 t = file(1, :);
 xpos = (file(2, :))';
 ypos = (file(3, :))';
 
+ts = (t(end)-t(1))./length(t);
+
+pos = smoothpos(pos);
 
 
 velvector = [];
@@ -34,7 +38,7 @@ end
 %velvector = filloutliers(velvector, 'pchip', 'movmedian',10);
 
 %v = hampel(velvector, 30, 3);
-%v = smoothdata(velvector,'gaussian',7);
+
 v = velvector;
 v = v(1:length(timevector));
 

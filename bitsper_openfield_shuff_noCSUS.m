@@ -1,8 +1,10 @@
-function f = mutualinfo_openfield_shuff_noCSUS(spike_structure, pos_structure, velthreshold, dim, CA_timestamps, CSUS_id_struct, ca_MI, num_times_to_run)
+function f = bitsper_openfield_shuff_noCSUS(spike_structure, pos_structure, velthreshold, dim, CA_timestamps, CSUS_id_struct, ca_bitsper, num_times_to_run)
 %finds mutual info for a bunch of cells
 %little did I know i already had code for this: ca_mutualinfo_openfield.m
 %returns 95% cutoff, average MI, and rank of actual MI
 
+%IN PREP
+%need to input ca_bitsper instead of MI
 
 
 fprintf('running mutualinfo_CSUS_trace_shuff')
@@ -109,7 +111,8 @@ for i = 1:numel(fields_spikes)
       maxtime = vel(2,end);
 
       numunits = size(peaks_time,1);
-      mutinfo = NaN(3,numunits);
+      bitsPspike = NaN(4,numunits);
+      bitsPsec = NaN(4,numunits);
 
 
       fprintf('done loading')
@@ -128,8 +131,10 @@ for i = 1:numel(fields_spikes)
 
 
                 if isnan(MI(k))==1
-                  mutinfo(1, k) = NaN;
-                  mutinfo(2, k) = NaN;
+                  bitsPspike(1, k) = NaN;
+                  bitsPspike(2, k) = NaN;
+                  bitsPsec(1, k) = NaN;
+                  bitsPsec(2, k) = NaN;
                   continue
                 else
                   highspeedspikes = [];
@@ -147,7 +152,7 @@ for i = 1:numel(fields_spikes)
 
                 hertz = length(highspeedspikes)./(length(goodpos)/15);
 
-                shuf = NaN(num_times_to_run,1);
+                shuf = NaN(num_times_to_run,2);
                 %for l = 1:num_times_to_run
                 parfor l = 1:num_times_to_run
                       %fprintf('survived the great parfor loop trauma of jan 10')
@@ -180,41 +185,63 @@ for i = 1:numel(fields_spikes)
                           occprob = occprob';
                         end
 
-                        shuf(l) = mutualinfo([spikeprob, occprob]);
+                        [bitsPerSpike, bitsPerSecond] = bits_per([spikeprob, occprob]);
+
+                        shuf(l,1) = bitsPerSpike;
+                        shuf(l,2) = bitsPerSecond;
+
                       else
-                        shuf(l) = NaN;
+                        shuf(l,1) = NaN;
+                        shuf(l,2) = NaN;
                       end
                   end
+
 
 
                 topMI5 = floor(num_times_to_run*.95);
                 topMI1 = floor(num_times_to_run*.99);
                 shuf = sort(shuf);
                     if isnan(topMI5)==0
-                      mutinfo(1, k) = shuf(topMI5);
+                      bitsPspike(1, k) = shuf(topMI5,1);
+                      bitsPsec(1, k) = shuf(topMI5,2);
                     else
-                      mutinfo(1, k) = NaN;
+                      bitsPspike(1, k) = NaN;
+                      bitsPsec(1, k) = NaN;
+
                     end
                     if isnan(topMI1)==0
-                      mutinfo(2, k) = nanmean(shuf);
+                      bitsPspike(2, k) = nanmean(shuf(:,1));
+                      bitsPsec(2, k) = nanmean(shuf(:,2));
+
                     else
-                      mutinfo(2, k) = NaN;
+                      bitsPspike(2, k) = NaN;
+                      bitsPsec(2, k) = NaN;
+
                     end
 
-                  [c index] = (min(abs(MI(k)-shuf)));
+                  [c index1] = (min(abs(bitsPspike_OG(k)-shuf(:,1))));
+                  [c index2] = (min(abs(bitsPsec_OG(k)-shuf(:,2))));
                   if isnan(index)==0
-                    rank = index./length(shuf);
-                    mutinfo(3, k) = rank;
+                    rank1 = index1./length(shuf);
+                    bitsPspike(3, k) = rank1;
+                    rank1 = index2./length(shuf);
+                    bitsPsec(3, k) = rank;
+
                   else
-                    mutinfo(3,k) = NaN;
+                    bitsPspike(3,k) = NaN;
+                    bitsPsec(3,k) = NaN;
+
                   end
 
-                  mutinfo(4,k) = hertz;
+                  bitsPspike(4,k) = hertz;
+                  bitsPsec(4,k) = hertz;
+
 
 
               end
     fprintf('assigning MI')
-    mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
+    mutualinfo_struct.(sprintf('bitsPerSpike_%s', spikes_date)) = bitsPspike';
+        mutualinfo_struct.(sprintf('bitsPerSec_%s', spikes_date)) = bitsPsec';
     end
   end
 
@@ -231,18 +258,6 @@ for i = 1:numel(fields_spikes)
   save(filename, 'results_MI_shuff');
   fprintf('Save is a success\n');
 %}
-
-
-results_MI_shift = mutualinfo_struct;
-fprintf('saving\n');
-MI_trace_shift = mutualinfo_struct;
-fprintf('Get the current date and time as a string\n');
-currentDateTime = datestr(now, 'yyyymmdd_HHMMSS');
-fprintf('Create a filename with the timestamp\n');
-filename = ['results_MI_shift_', currentDateTime, '.mat'];
-fprintf('Save the output to the .mat file with the timestamped filename\n');
-save(filename, 'results_MI_shift');
-fprintf('Save is a success\n');
 
 
   f = mutualinfo_struct;

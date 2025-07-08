@@ -1,5 +1,5 @@
 function f = ca_bitsperspike(posData, clusters, dim)
-  %IN PREP
+  %DEPPPP
   %need to change velocity to own function with dimensions correct
   %right now firing/per takes a structure
 
@@ -15,7 +15,7 @@ output = {'cluster name'; 'bits/spike'; 'mean rate'};
 
 
   %Sum of (occprobs * mean firing rate per bin / overall mean rate) * log2 (mean firing rate per bin / overall mean rate)
-  psize = 2.5 * dim;
+  %psize = 2.5 * dim;
   xvals = posData(:,2);
   yvals = posData(:,3);
   xmin = min(posData(:,2));
@@ -32,9 +32,8 @@ output = {'cluster name'; 'bits/spike'; 'mean rate'};
   yinc = ymin +(0:ybins)*psize; %makes a vector of all the y values at each increment
 
   velthreshold = 6;
-  vel = velocity(posData);
+  vel = ca_velocity(posData);
   size(vel)
-  vel(1,:) = smoothdata(vel(1,:), 'gaussian', 30); %originally had this at 30, trying with 15 now
   fastvel = find(vel(1,:) > velthreshold);
   totaltime = length(fastvel)./7.5;
   posDataFast = posData(fastvel, :);
