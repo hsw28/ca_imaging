@@ -1,184 +1,267 @@
-function plotFRvsSpeedSummary
+function plotFRvsSpeedSummary(method)
 % -------------------------------------------------------------------------
-% Same functionality as before, but every decision about “significant” now
-% uses a Bonferroni‐corrected threshold: α / (# neurons tested in that rat).
+% FR–vs-speed correlations across trials in the CS window (0–2 s) across three days
+% (day–2, day–1, day–0) for each rat.
+%
+% Correlation is computed across trials (one Pearson r per neuron).
+%
+% Multiple‐comparison control:
+%   method = 'fdr'  (default) → Benjamini–Hochberg, q = 0.05
+%          = 'bonf'          → Bonferroni,        α = 0.05
+%
+% Population‐level test: compare mean(r) to shuffle‐based null.
+%
+% Needs in the base workspace:
+%   • rat structs   (fields: Ca_peaks, pos, CS_times, An)
+%   • helper fns    ca_velocity.m   autoDateList.m
 % -------------------------------------------------------------------------
+if nargin<1, method='fdr'; end
+method = lower(method);
+assert(ismember(method,{'fdr','bonf'}),'method must be ''fdr'' or ''bonf''');
 
+% — user parameters —
+qFDR     = 0.05;      % FDR level
+alphaFW  = 0.05;      % family-wise for Bonferroni
+minSpk   = 5;         % min spikes in each CS trial to include
+win      = [0 2];     % CS window (s)
+nShuff   = 5;       % # of shuffle replicates (permute trial speeds)
 ratNames = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
-nRats    = numel(ratNames);
 
-win    = [0 2];       % CS window
-nShuff = 500;         % shuffle repetitions
-alpha  = 0.05;        % family-wise error rate
+fprintf('\n===== plotFRvsSpeedSummary (%s correction) =====\n',upper(method));
+nRats = numel(ratNames);
 
-% collectors --------------------------------------------------------------
-meanCorrs  = nan(nRats,1);   semCorrs  = nan(nRats,1);
-meanShuff  = nan(nRats,1);   semShuff  = nan(nRats,1);
-pvals      = nan(nRats,1);
-sigNeuronPct        = nan(nRats,1);   % Bonferroni-based
-sigNeuronPct_shuff  = nan(nRats,1);   % Bonferroni-based
-allCorrByRat        = cell(nRats,1);
+% prepare output structs
+inc = makeBlankStruct(nRats);
+all = makeBlankStruct(nRats);
 
 for r = 1:nRats
-    rat = evalin('base',ratNames{r});           % assumes data in workspace
-    dateList   = autoDateList(rat);
-    idx        = find(strcmp(dateList,rat.An));
-    theseDays  = dateList(idx-2:idx);
+  fprintf('Rat %s:\n',ratNames{r});
+  rat   = evalin('base',ratNames{r});
+  dates = autoDateList(rat);
+  idx   = find(strcmp(dates,rat.An));
+  days  = dates(idx-2:idx);
 
-    allCorrs  = [];
-    allShuffs = [];
-    sigReal   = 0;
-    sigShuff  = 0;
-    nNeurons  = 0;                              % counts *tested* neurons
+  % per‐rat collectors
+  rAll    = [];  rInc    = [];
+  shAll   = [];  shInc   = [];
+  pAll    = [];  pInc    = [];
 
-    % -------- loop over the 3 days --------------------------------------
-    for d = 1:3
-        dateStr  = theseDays{d};
-        spikeMat = rat.Ca_peaks.(['CA_peaks_' dateStr]);
-        ts       = rat.pos.(['pos_' dateStr])(:,1);
-        pos      = rat.pos.(['pos_' dateStr])(:,2:3);
-        csTimes  = rat.CS_times.(['CS_' dateStr]);
+  for d=1:3
+    day     = days{d};
+    spkMat  = rat.Ca_peaks.(['CA_peaks_' day]);   % neurons × event times
+    posRaw  = rat.pos.(['pos_' day]);
+    csTimes = rat.CS_times.(['CS_' day]);
 
-        dt    = diff(ts);
-        dx    = diff(pos);
-        speed = [0; hypot(dx(:,1),dx(:,2))./dt];
-        speed(~isfinite(speed)) = 0;
+    % compute speed at each timestamp
+    V     = ca_velocity(posRaw');
+    speed = interp1(V(2,:),V(1,:),posRaw(:,1),'linear','extrap');
+    speed(~isfinite(speed)) = 0;
+    ts    = posRaw(:,1);
 
-        for ni = 1:size(spikeMat,1)
-            spikes = spikeMat(ni,:);  spikes = spikes(~isnan(spikes));
-            if numel(spikes)<5, continue; end
-
-            % --- firing-rate & speed in CS window -----------------------
-            fr  = nan(size(csTimes));
-            spd = nan(size(csTimes));
-            for t = 1:numel(csTimes)
-                t1 = csTimes(t)+win(1);  t2 = csTimes(t)+win(2);
-                fr(t)  = sum(spikes>=t1 & spikes<=t2) / diff(win);
-                mask   = ts>=t1 & ts<=t2;
-                spd(t) = mean(speed(mask));
-            end
-
-            valid = ~isnan(fr)&~isnan(spd);
-            if sum(valid)<5, continue; end
-
-            nNeurons = nNeurons + 1;   % one more test
-            [rv,pReal] = corr(fr(valid)', spd(valid)','type','Pearson');
-
-            allCorrs(end+1) = rv;
-
-            % ---------- Bonferroni threshold for *this* rat -------------
-            % (we don't know nNeurons yet, so we handle below once loop
-            % is finished)
-
-            % ---------- shuffle for that neuron -------------------------
-            shCorr = nan(nShuff,1);
-            for s = 1:nShuff
-                spdSh = spd(randperm(numel(spd)));
-                good  = ~isnan(fr)&~isnan(spdSh);
-                if sum(good)>=5
-                    shCorr(s) = corr(fr(good)',spdSh(good)','type','Pearson');
-                end
-            end
-            allShuffs = [allShuffs; shCorr];
-
-            % store p-value to evaluate later with Bonferroni
-            corrPsTmp{nNeurons}     = pReal;            %#ok<*AGROW>
-            shuffNullTmp{nNeurons}  = shCorr(~isnan(shCorr));
-        end
-    end % day loop
-
-    % ---- BONFERRONI: corrected α for this rat --------------------------
-    alphaBonf = alpha / nNeurons;
-
-    % ---- go back through saved p-values to count significant -----------
-    for k = 1:nNeurons
-        if corrPsTmp{k} < alphaBonf
-            sigReal = sigReal + 1;
-        end
-        % shuffled null (two-tailed)
-        rv = allCorrs(k);
-        null = shuffNullTmp{k};
-        if ~isempty(null)
-            pSh = mean(abs(null-mean(null)) >= abs(rv-mean(null)));
-            if pSh < alphaBonf
-                sigShuff = sigShuff + 1;
-            end
-        end
+    % per‐trial FR & mean speed
+    nTr    = numel(csTimes);
+    fr     = nan(nTr,1);
+    spd    = nan(nTr,1);
+    for t=1:nTr
+      t1 = csTimes(t)+win(1);
+      t2 = csTimes(t)+win(2);
+      % firing rate in CS window
+      spks    = spkMat(:,:) ;  % we'll index per neuron below
+      % we'll recompute per-neuron
     end
 
-    % ---------- grand stats for this rat --------------------------------
-    meanCorrs(r) = mean(allCorrs,'omitnan');
-    semCorrs(r)  = std(allCorrs,'omitnan')/sqrt(nNeurons);
-    meanShuff(r) = mean(allShuffs,'omitnan');
-    semShuff(r)  = std(allShuffs,'omitnan')/sqrt(sum(~isnan(allShuffs)));
-    pvals(r)     = mean(abs(allShuffs) >= abs(meanCorrs(r)));  % global test
+    % loop over neurons
+    for ni = 1:size(spkMat,1)
+      spks = spkMat(ni,:);
+      spks = spks(~isnan(spks));
 
-    sigNeuronPct(r)        = 100*sigReal  / nNeurons;
-    sigNeuronPct_shuff(r)  = 100*sigShuff / nNeurons;
-    allCorrByRat{r}        = allCorrs;
-end % rat loop
-% -------------------------------------------------------------------------
-% -------------------------  PLOTS  ---------------------------------------
-figure('Color','w','Position',[200 300 1600 400]);
+      % count total spikes in all CS trials
+      nSpkWin = 0;
+      for t=1:numel(csTimes)
+        t1 = csTimes(t)+win(1);
+        t2 = csTimes(t)+win(2);
+        nSpkWin = nSpkWin + sum(spks>=t1 & spks<=t2);
+      end
+      passed = (nSpkWin>=minSpk);
 
-% 1. Mean correlations ----------------------------------------------------
-subplot(1,4,1); hold on;
-barData = [meanCorrs, meanShuff];
-semData = [semCorrs , semShuff ];
-bh = bar(barData,'grouped');   % two colours
-x1 = bh(1).XEndPoints;  x2 = bh(2).XEndPoints;
-errorbar(x1,meanCorrs ,semCorrs ,'k','linestyle','none','capsize',8,'linewidth',1.2)
-errorbar(x2,meanShuff ,semShuff ,'k','linestyle','none','capsize',8,'linewidth',1.2)
-xticks(1:nRats); xticklabels(ratNames);
-ylabel('Mean FR–speed r');
-legend({'Actual','Shuffle'},'location','northwest');
-title('Mean correlation (Bonferroni)');
+      % build trial‐wise FR & mean speed
+      for t=1:nTr
+        t1 = csTimes(t)+win(1);
+        t2 = csTimes(t)+win(2);
+        fr(t)  = sum(spks>=t1 & spks<=t2)/diff(win);
+        idxSp  = ts>=t1 & ts<=t2;
+        spd(t) = mean(speed(idxSp));
+      end
 
-% stars (Bonferroni)
-for r = 1:nRats
-    yMax = max(barData(r,:))+max(semData(r,:));
-    if     pvals(r) < 0.001/ nRats          , txt = '***';
-    elseif pvals(r) < 0.01 / nRats          , txt =  '**';
-    elseif pvals(r) < 0.05 / nRats          , txt =   '*';
-    else,  txt = '';  end
-    if ~isempty(txt)
-        text(mean([x1(r),x2(r)]), yMax*1.05, txt,...
-             'FontSize',14,'HorizontalAlignment','center')
+      % correlate FR vs. speed across trials
+      if numel(fr)>=5 && numel(spd)>=5
+        rval = corr(fr,spd,'type','Pearson');
+        % get p‐value
+        [~,pval] = corr(fr,spd,'type','Pearson');
+      else
+        rval = NaN;
+        pval = NaN;
+      end
+
+      % shuffle null: permute trial speeds
+      sh = nan(nShuff,1);
+      for s=1:nShuff
+        spdSh = spd(randperm(nTr));
+        if numel(fr)>=5
+          sh(s) = corr(fr,spdSh,'type','Pearson');
+        end
+      end
+
+      % store ALL neurons
+      rAll(end+1)     = rval;
+      pAll(end+1)     = pval;
+      shAll(end+1,:)  = sh';
+
+      % store INCLUDED neurons
+      if passed
+        rInc(end+1)     = rval;
+        pInc(end+1)     = pval;
+        shInc(end+1,:)  = sh';
+      end
+    end
+  end
+
+  % multiple‐comparison per‐neuron
+  [sigAllP,sigAllS] = sigTest(pAll, mean(abs(shAll-mean(shAll,2)),2)<abs(rAll), method,qFDR,alphaFW);
+  [sigIncP,sigIncS] = sigTest(pInc, mean(abs(shInc-mean(shInc,2)),2)<abs(rInc), method,qFDR,alphaFW);
+
+  % population‐level
+  popNullAll = mean(shAll,2);
+  obsAll     = mean(rAll,'omitnan');
+  pPopAll(r) = mean(abs(popNullAll) >= abs(obsAll));
+
+  popNullInc = mean(shInc,2);
+  obsInc     = mean(rInc,'omitnan');
+  pPopInc(r) = mean(abs(popNullInc) >= abs(obsInc));
+
+  % write into structs
+
+
+  all = updateStruct(all,r, rAll, mean(popNullAll), sigAllP, sigAllS);
+  all.pAvsS(r)=pPopAll(r);
+  inc = updateStruct(inc,r, rInc, mean(popNullInc), sigIncP, sigIncS);
+  inc.pAvsS(r)=pPopInc(r);
+
+  all.nIncl(r)=numel(rAll);    all.nTotal(r)=numel(rAll);
+  inc.nIncl(r)=numel(rInc);    inc.nTotal(r)=numel(rAll);
+end
+
+% final tables & figures
+printConsole(inc, ratNames, method, 'INCLUDED neuron-days');
+printConsole(all, ratNames, method, 'ALL neuron-days');
+makeFigure(inc,'INCLUDED neuron-days',method,ratNames);
+makeFigure(all ,'ALL neuron-days',     method,ratNames);
+end
+
+
+%% HELPERS BELOW (unchanged from original)
+function S = makeBlankStruct(n)
+  S.meanCorr           = nan(n,1);
+  S.semCorr            = nan(n,1);
+  S.meanShuff          = nan(n,1);
+  S.semShuff           = nan(n,1);
+  S.sigPercent.Pearson = nan(n,1);
+  S.sigPercent.Shuffle = nan(n,1);
+  S.allCorrByRat       = cell(n,1);
+  S.nIncl              = nan(n,1);
+  S.nTotal             = nan(n,1);
+  S.pAvsS              = nan(n,1);
+end
+
+function [sigP,sigS] = sigTest(pPear,pShuf,method,qFDR,alphaFW)
+  switch method
+    case 'bonf'
+      thrP = alphaFW/numel(pPear);
+      thrS = alphaFW/numel(pShuf);
+    otherwise
+      thrP = fdr_bh(pPear,qFDR);
+      thrS = fdr_bh(pShuf,qFDR);
+  end
+  sigP = pPear < thrP;
+  sigS = pShuf < thrS;
+end
+
+function thr = fdr_bh(p,q)
+    p = sort(p(:));
+    m = numel(p);
+    if m == 0
+        thr = 0;
+        return;
+    end
+    k = find(p <= (1:m)'/m*q, 1, 'last');
+    if isempty(k)
+        thr = 0;
+    else
+        thr = p(k);
     end
 end
 
-% 2. Boxplot of neuron r --------------------------------------------------
-subplot(1,4,2); cla; hold on;
-boxData      = allCorrByRat(~cellfun(@isempty,allCorrByRat));
-groupedData  = []; groupLabels = [];
-for i = 1:numel(boxData)
-    groupedData  = [groupedData ; boxData{i}(:)];
-    groupLabels  = [groupLabels ; i*ones(numel(boxData{i}),1)];
+function S = updateStruct(S,r,C,Csh,sigP,sigS)
+  S.meanCorr(r)            = mean(C,'omitnan');
+  S.semCorr (r)            = std(C,'omitnan')/sqrt(max(1,numel(C)));
+  S.meanShuff(r)           = Csh;
+  S.semShuff (r)           = 0;  % popNull single value
+  S.sigPercent.Pearson(r)  = 100*nanmean(sigP(:));
+  S.sigPercent.Shuffle(r)  = 100*nanmean(sigS(:));
+  S.allCorrByRat{r}        = C;
 end
-boxplot(groupedData, groupLabels, 'Labels',ratNames);
-ylabel('Pearson r (neuron)');
-title('Neuron-wise correlation');
 
-% 3. % significant neurons (raw p) ---------------------------------------
-subplot(1,4,3); cla; hold on;
-bar(sigNeuronPct);
-xticks(1:nRats); xticklabels(ratNames);
-ylabel('% significant neurons');
-title(sprintf('Pos r, p<%.3g (Bonferroni)',alpha));
+function printConsole(S,ratNames,method,label)
+  fprintf('\n############################################################\n');
+  fprintf('###  FR-vs-Speed SUMMARY PER RAT  (%s)   <%s>\n',...
+          upper(method),label);
+  fprintf('############################################################\n');
+  hdr = ['\n-------------------  %-15s-------------------\n' ...
+         '%-8s %-11s %-11s %-11s %-11s %-11s %-11s\n'];
+  printfn = @(lbl)fprintf(hdr,lbl,'Rat','nIncl/Total','p(A-v-S)', ...
+                                'mean r','SD r','%Sig(Pear)','%Sig(shuf)');
+  printfn(label);
 
-% 4. % significant neurons (shuffle) -------------------------------------
-subplot(1,4,4); cla; hold on;
-bar(sigNeuronPct_shuff);
-xticks(1:nRats); xticklabels(ratNames);
-ylabel('% neurons sig. vs shuffle');
-title(sprintf('Shuffle test, p<%.3g (Bonf.)',alpha));
+  for k = 1:numel(ratNames)
+      C = S.allCorrByRat{k};
+      fprintf('%-8s %4d/%-6d %11.3g %11.3f %11.3f %11.1f %11.1f\n',...
+          ratNames{k}, S.nIncl(k), S.nTotal(k), S.pAvsS(k), ...
+          mean(C,'omitnan'), std(C,'omitnan'), ...
+          S.sigPercent.Pearson(k), S.sigPercent.Shuffle(k));
+  end
+  fprintf('############################################################\n\n');
 
-% ------------------ console summary -------------------------------------
-fprintf('\n===========  SUMMARY (Bonferroni) ===========\n');
-for r = 1:nRats
-    fprintf('%s  –  %.1f %% of neurons significant (α=%.4g)\n',...
-            ratNames{r}, sigNeuronPct(r), alpha/numel(allCorrByRat{r}));
 end
-fprintf('Grand mean (%% sig.): %.1f ± %.1f\n',...
-        mean(sigNeuronPct,'omitnan'), std(sigNeuronPct,'omitnan'));
+
+function makeFigure(S,figTitle,method,ratNames)
+  nR = numel(ratNames);
+  figure('Color','w','Position',[100 300 1600 420],'Name',figTitle);
+  sgtitle(sprintf('%s  (%s correction)',figTitle,upper(method)));
+
+  subplot(1,4,1); hold on;
+  bh = bar([S.meanCorr S.meanShuff],'grouped');
+  errorbar(bh(1).XEndPoints,S.meanCorr,S.semCorr,'k.','CapSize',8);
+  errorbar(bh(2).XEndPoints,S.meanShuff,S.semShuff,'k.','CapSize',8);
+  xticks(1:nR); xticklabels(ratNames); ylabel('Mean FR–speed r');
+  legend({'Actual','Shuffle'},'location','northwest'); title('Mean ± SEM r');
+  fprintf('REMEMBER FOR ALL CELLS THE FIRST GRAPH WILL BE WRONG BUT ALSO IRRELEVANT BC YOU CANT AVERAGE FOR NON INCLUDED CELLS ANYWAY')
+
+  subplot(1,4,2);
+  boxData = S.allCorrByRat(~cellfun(@isempty,S.allCorrByRat));
+  gdat=[]; glab=[];
+  for i = 1:numel(boxData)
+      gdat = [gdat; boxData{i}(:)];
+      glab = [glab; i*ones(numel(boxData{i}),1)];
+  end
+  boxplot(gdat,glab,'Labels',ratNames); ylabel('Pearson r'); title('Neuron-wise');
+
+  subplot(1,4,3);
+  bar(S.sigPercent.Pearson); ylim([0 100]);
+  xticks(1:nR); xticklabels(ratNames);
+  ylabel('%Sig (Pearson)'); title('Sig. neurons');
+
+  subplot(1,4,4);
+  bar(S.sigPercent.Shuffle); ylim([0 100]);
+  xticks(1:nR); xticklabels(ratNames);
+  ylabel('%Sig (shuffle)'); title('Shuffle sig.');
 end

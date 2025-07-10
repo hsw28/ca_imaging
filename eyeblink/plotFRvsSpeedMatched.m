@@ -279,8 +279,11 @@ xy = pos;
 % instantaneous speed ----------------------------------------------------
 dt    = diff(ts);
 dx    = diff(xy);
-speed = [0; hypot(dx(:,1),dx(:,2))./dt];
+
+velDat = ca_velocity([ ts.' ; pos(:,1).' ; pos(:,2).' ]);
+speed  = interp1(velDat(2,:),velDat(1,:),ts,'linear','extrap');
 speed(~isfinite(speed)) = 0;
+
 
 % parameters -------------------------------------------------------------
 nBins   = round(diff(win)/binSize);
