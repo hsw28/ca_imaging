@@ -1,94 +1,136 @@
 function plotFRvsSpeedMatched
-% Compare trial-window FR to speed-matched non-trial FR, one paired test per cell, FDR-corrected.
-% No inputs; expects in your workspace:
-%   ratNames, rat.Ca_peaks, rat.pos, rat.CS_times, etc.
+% Compare trial‐window FR to speed‐matched non‐trial FR, FDR correction,
+% and report stats both for ALL cells and for only the TESTED cells.
 
 ratNames = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
 nRats    = numel(ratNames);
 
 % parameters
-win      = [0 2];         % CS window (s)
-binSize  = 1/7.5;         % 133 ms bins
-alpha    = 0.05;          % omnibus FDR level
+win      = [0 2];          % CS window (s)
+binSize  = 1/7.5;          % 133 ms bins
+alpha    = 0.05;           % omnibus FDR level
 
 % preallocate
-pctPerDayFDR = nan(nRats,3);
-pctPerRatFDR = nan(nRats,1);
-allDeltaFR   = cell(nRats,1);
+pctPerDayAll     = nan(nRats,3);
+pctPerDayIncluded= nan(nRats,3);
+pctPerRatAll     = nan(nRats,1);
+pctPerRatIncluded= nan(nRats,1);
+allDeltaFRAll    = cell(nRats,1);
+allDeltaFRIncl   = cell(nRats,1);
 
 for r = 1:nRats
-  fprintf('Processing %s…\n', ratNames{r});
-  rat   = evalin('base', ratNames{r});
-  dates = autoDateList(rat);
-  idx   = find(strcmp(dates, rat.An));
-  days  = dates(idx-2:idx);
+    rat   = evalin('base', ratNames{r});
+    dates = autoDateList(rat);
+    idx   = find(strcmp(dates, rat.An));
+    days  = dates(idx-2:idx);  % day‐2, day‐1, day‐0
 
-  tmpDel = [];
-  for d=1:3
-    day = days{d};
-    spk   = rat.Ca_peaks.(['CA_peaks_' day]);  % [nCells x nBins]
-    pos   = rat.pos.   (['pos_'      day]);    % [nBins x 3] → [time x x y]
-    ts    = pos(:,1);
-    xy    = pos(:,2:3);
-    cs    = rat.CS_times.(['CS_'      day]);
+    delAll  = [];
+    delIncl = [];
+    for d=1:3
+        day   = days{d};
+        spk   = rat.Ca_peaks.(['CA_peaks_' day]);  % cell array
+        pos   = rat.pos.      (['pos_'      day]); % [time x x y]
+        ts    = pos(:,1);
+        xy    = pos(:,2:3);
+        cs    = rat.CS_times.  (['CS_'       day]);
 
-    S = trialVsSpeedMatched( ...
-        spk, ts, xy, cs, ...
-        'win',win,'binSize',binSize,'alpha',alpha,'test','signrank' );
 
-    pctPerDayFDR(r,d)  = S.pctSigDiffFDR;
-    tmpDel            = [tmpDel; S.deltaFR(S.sigDiffFDR)]; %#ok<AGROW>
-  end
+        %— run on ALL cells (no minPairs restriction) —
+%        Sall = trialVsSpeedMatched( spk, ts, xy, cs, ...
+%            'win',win,'binSize',binSize,'alpha',alpha,'test','ttest','minPairs',0);
+%        pctPerDayAll(r,d)   = Sall.pctSigDiffFDR;
+%        delAll              = [delAll; Sall.deltaFR(Sall.sigDiffFDR)]; %#ok<AGROW>
 
-  pctPerRatFDR(r) = mean(pctPerDayFDR(r,:),'omitnan');
-  allDeltaFR{r}   = tmpDel;
+        %— run on INCLUDED cells only (default minPairs=nTrials) —
+        Sincl = trialVsSpeedMatched( spk, ts, xy, cs, ...
+            'win',win,'binSize',binSize,'alpha',alpha,'test','ttest','minPairs',5);
+        pctPerDayIncluded(r,d) = Sincl.pctSigDiffFDR;
+        delIncl                = [delIncl; Sincl.deltaFR(Sincl.sigDiffFDR)]; %#ok<AGROW>
+    end
+
+    pctPerRatAll(r)      = mean(pctPerDayAll(r,:),'omitnan');
+    pctPerRatIncluded(r) = mean(pctPerDayIncluded(r,:),'omitnan');
+    allDeltaFRAll{r}     = delAll;
+    allDeltaFRIncl{r}    = delIncl;
 end
 
-%— Plotting —
-figure('Color','w','Position',[200 300 1400 400]);
+%% — PLOTTING —
+figure('Color','w','Position',[200 300 1400 800]);
 
-% (1) Day-by-day: now 5 rats × 3 days
+% BAR GROUP #1: ALL CELLS, per‐day
+%subplot(2,3,1); hold on;
+%bar(pctPerDayAll,'grouped');
+%xticks(1:nRats); xticklabels(ratNames);
+%ylabel('% sig (all cells)');
+%title('ALL CELLS — per day');
+%legend({'day−2','day−1','day−0'},'Location','northwest');
+
+% BAR GROUP #2: INCLUDED CELLS, per‐day
 subplot(1,3,1); hold on;
-bar(pctPerDayFDR,'grouped');        % <— drop the transpose here
+bar(pctPerDayIncluded,'grouped');
 xticks(1:nRats); xticklabels(ratNames);
-ylabel('% vel-mod cells (FDR)');
-legend({'day-2','day-1','day-0'},'Location','northwest');
-title('Per-day % sig (FDR)');
+ylabel('% sig (included)');
+title('INCLUDED CELLS — per day');
+legend({'day−2','day−1','day−0'},'Location','northwest');
 
-% (2) Rat means ± std over days
+%% BAR GROUP #3: ALL CELLS, per‐rat means
+%subplot(2,3,3); hold on;
+%bar(pctPerRatAll);
+%errorbar(1:nRats,pctPerRatAll, std(pctPerDayAll,[],2),'k.','LineWidth',1.5);
+%xticks(1:nRats); xticklabels(ratNames);
+%ylabel('mean % (all cells)');
+%title('ALL CELLS — per rat');
+
+% BAR GROUP #4: INCLUDED CELLS, per‐rat means
 subplot(1,3,2); hold on;
-errs = std(pctPerDayFDR,[],2,'omitnan');    % std across the 3 days, for each rat
-bar(1:nRats,pctPerRatFDR,'FaceColor',[.2 .6 .8]);
-errorbar(1:nRats,pctPerRatFDR,errs,'k.','LineWidth',1.5);
+bar(pctPerRatIncluded,'FaceColor',[.2 .6 .8]);
+errorbar(1:nRats,pctPerRatIncluded, std(pctPerDayIncluded,[],2),'k.','LineWidth',1.5);
 xticks(1:nRats); xticklabels(ratNames);
-ylabel('% vel-mod cells (FDR)');
-title('Mean ± STD per Rat');
+ylabel('mean % (included)');
+title('INCLUDED CELLS — per rat');
 
-% (3) ΔFR swarmchart
+% SWARM #1: ΔFR for ALL CELLS
+%subplot(2,3,5); hold on;
+%for r=1:nRats
+%    swarmchart(r*ones(size(allDeltaFRAll{r})), allDeltaFRAll{r}, ...
+%        5,'filled','MarkerFaceAlpha',.4);
+%end
+%plot(xlim,[0 0],'k--');
+%xticks(1:nRats); xticklabels(ratNames);
+%ylabel('\DeltaFR (all cells)');
+%title('ALL CELLS — \DeltaFR');
+
+% SWARM #2: ΔFR for INCLUDED CELLS
 subplot(1,3,3); hold on;
 for r=1:nRats
-    swarmchart(r*ones(size(allDeltaFR{r})), allDeltaFR{r}, ...
-               5,'filled','MarkerFaceAlpha',.4);
+    swarmchart(r*ones(size(allDeltaFRIncl{r})), allDeltaFRIncl{r}, ...
+        5,'filled','MarkerFaceAlpha',.4);
 end
 plot(xlim,[0 0],'k--');
 xticks(1:nRats); xticklabels(ratNames);
-ylabel('\DeltaFR (trial – matched)');
-title('\DeltaFR of FDR-sig cells');
+ylabel('\DeltaFR (included)');
+title('INCLUDED CELLS — \DeltaFR');
 
-%%%%%%% Console summary
-fprintf('\n=== FR vs Speed Matched (FDR α=%.2f) ===\n',alpha);
+%% — CONSOLE SUMMARY —
+fprintf('\n=== Included cells (FDR α=%.2f) ===\n',alpha);
 for r=1:nRats
-  m = pctPerRatFDR(r);
-  s = std(pctPerDayFDR(r,:),[],'omitnan');
+  m = pctPerRatIncluded(r);
+  s = std(pctPerDayIncluded(r,:),[],'omitnan');
   fprintf('%s: %.1f%% ± %.1f\n', ratNames{r}, m, s);
 end
+fprintf('Grand mean incl: %.1f%% ± %.1f\n\n',...
+        mean(pctPerRatIncluded,'omitnan'), std(pctPerRatIncluded,'omitnan'));
 
-
-
-fprintf('Grand mean: %.1f%% ± %.1f\n\n', ...
-        mean(pctPerRatFDR,'omitnan'), std(pctPerRatFDR,'omitnan'));
+fprintf('\n===      All cells (FDR α=%.2f) ===\n',alpha);
+for r=1:nRats
+  m = pctPerRatAll(r);
+  s = std(pctPerDayAll(r,:),[],'omitnan');
+  fprintf('%s: %.1f%% ± %.1f\n', ratNames{r}, m, s);
 end
+fprintf('Grand mean all : %.1f%% ± %.1f\n\n',...
+        mean(pctPerRatAll,'omitnan'), std(pctPerRatAll,'omitnan'));
 
+end
 
 %%===========================================================================%%
 function stats = trialVsSpeedMatched(spikeCell, ts, pos, csTimes, varargin)
@@ -169,7 +211,8 @@ for c=1:nCells
     error('spikeCell must be cell array or numeric matrix');
   end
 
-  if numel(st)<minPairs
+
+  if sum(~isnan(st))<minPairs
     continue;
   end
   isTested(c)=true;
@@ -214,7 +257,12 @@ for c=1:nCells
   rawP(end+1,1)    = p;              %#ok<AGROW>
   pVal(c)          = p;
   deltaFR(c)       = mean(FRt)-mean(FRm);
+
+
+
 end
+
+fprintf('  Processing %d cells; now tested %d after threshold\n', nCells, sum(isTested));
 
 % FDR correction
 [~,~,~,adjP]       = fdr_bh(rawP, alpha);
