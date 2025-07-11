@@ -1,323 +1,255 @@
 function plotFRvsSpeedMatched
+% Compare trial-window FR to speed-matched non-trial FR, one paired test per cell, FDR-corrected.
+% No inputs; expects in your workspace:
+%   ratNames, rat.Ca_peaks, rat.pos, rat.CS_times, etc.
 
-%for each point in a trial:
-% Look up its velocity
-%Find all background bins whose velocity is the same (velBinCand == vb).
-%Randomly sample the same number of background bins as there are trials (needN).
-%Count spikes inside those sampled bins (using the patched loop sum(sTimes >= t0 & sTimes < t0+binSize)).
-%Store those spike counts into FR_match.
-%
-%After we have looped over all velocity categories present in the trials,
-%FR_trial (spikes per bin inside the CS window) and
-%FR_match (spikes per velocity-matched non-trial bin) have the same length
-%and very similar speed distribution.
-
-%Statistics
-%Paired comparison (default) – we use a paired-samples t-test
-%between FR_trial and FR_match.
-%If p < α (default 0.05) the neuron is deemed “velocity-modulated within
-%trials”.
-
-%We also compute ΔFR = mean(FR_trial) – mean(FR_match) so you can see
-%the direction (positive = higher firing in trials).
-
-%returns
-%pctSigDiff:	percentage of neurons in that day whose paired test was significant (p < α)
-%deltaFR:	one ΔFR value per velocity-modulated neuron
-%pEach:	the t-test p-value for every neuron
-
-
-
-% -------------------------------------------------------------------------
-%  For each of the five rats:
-%     • walks through the same 3 “training-window” days you already use
-%     • calls trialVsSpeedMatched  (zero shuffling)
-%     • stores the % of velocity-modulated cells whose firing during trials
-%       STILL differs from velocity-matched non-trial bins
-%
-%  Generates three summary graphics:
-%    • For each rat and each of the 3 “training-window” days
-%      – counts how many velocity-modulated cells still differ in firing
-%        when compared with speed-matched non-trial epochs
-%    • Builds three graphics:
-%        (1) bar-plot per day              (all rats)
-%        (2) bar-plot of the rat means     (one bar / rat)
-%        (3) swarm of ΔFR  (trial – speed matched) for every cell
-%
-
-ratNames = {'rat0222','rat0307','rat0313','rat0314','rat0816'};      % <-- change back to full list if desired
+ratNames = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
 nRats    = numel(ratNames);
 
-% analysis parameters -----------------------------------------------------
-win      = [0 2];          % trial window [s] relative to CS
-binSize  = 1/7.5;          % 133 ms
-alpha    = 0.05;           % significance level
+% parameters
+win      = [0 2];         % CS window (s)
+binSize  = 1/7.5;         % 133 ms bins
+alpha    = 0.05;          % omnibus FDR level
 
-% collectors --------------------------------------------------------------
-pctPerDay   = nan(nRats,3);      % rat × day(-2,-1,0)
-pctPerRat   = nan(nRats,1);
-allDeltaFR  = cell(nRats,1);
+% preallocate
+pctPerDayFDR = nan(nRats,3);
+pctPerRatFDR = nan(nRats,1);
+allDeltaFR   = cell(nRats,1);
 
 for r = 1:nRats
-    rat = evalin('base',ratNames{r});      % assumes struct in base workspace
-    dateList = autoDateList(rat);          % helper from your pipeline
-    idx      = find(strcmp(dateList, rat.An));
-    theseDays = dateList(idx-2:idx);       % 3-day training window
+  fprintf('Processing %s…\n', ratNames{r});
+  rat   = evalin('base', ratNames{r});
+  dates = autoDateList(rat);
+  idx   = find(strcmp(dates, rat.An));
+  days  = dates(idx-2:idx);
 
-    deltaTmp = [];
+  tmpDel = [];
+  for d=1:3
+    day = days{d};
+    spk   = rat.Ca_peaks.(['CA_peaks_' day]);  % [nCells x nBins]
+    pos   = rat.pos.   (['pos_'      day]);    % [nBins x 3] → [time x x y]
+    ts    = pos(:,1);
+    xy    = pos(:,2:3);
+    cs    = rat.CS_times.(['CS_'      day]);
 
-    for d = 1:3
-        dateStr   = theseDays{d};
+    S = trialVsSpeedMatched( ...
+        spk, ts, xy, cs, ...
+        'win',win,'binSize',binSize,'alpha',alpha,'test','signrank' );
 
-        spikeMat  = rat.Ca_peaks.(['CA_peaks_' dateStr]);
-        ts        = rat.pos.(['pos_' dateStr])(:,1);
-        pos       = rat.pos.(['pos_' dateStr])(:,2:3);
-        csTimes   = rat.CS_times.(['CS_' dateStr]);
+    pctPerDayFDR(r,d)  = S.pctSigDiffFDR;
+    tmpDel            = [tmpDel; S.deltaFR(S.sigDiffFDR)]; %#ok<AGROW>
+  end
 
-        % ---------  single-day stats  ---------
-        S = trialVsSpeedMatched(spikeMat, ts, pos, csTimes, ...
-                'win',win,'binSize',binSize,'alpha',alpha);
-
-        pctPerDay(r,d)  = S.pctSigDiff;
-        deltaTmp        = [deltaTmp ; S.deltaFR(:)];   %#ok<AGROW>
-    end
-
-    pctPerRat(r)  = mean(pctPerDay(r, :), 'omitnan');
-    allDeltaFR{r} = deltaTmp;
+  pctPerRatFDR(r) = mean(pctPerDayFDR(r,:),'omitnan');
+  allDeltaFR{r}   = tmpDel;
 end
 
-%% -----------  plotting  --------------------------------------------------
+%— Plotting —
 figure('Color','w','Position',[200 300 1400 400]);
 
-% (1) every day
+% (1) Day-by-day: now 5 rats × 3 days
 subplot(1,3,1); hold on;
-bar(pctPerDay','grouped');
+bar(pctPerDayFDR,'grouped');        % <— drop the transpose here
 xticks(1:nRats); xticklabels(ratNames);
-ylabel('% vel-mod cells diff');
-title('% significant  –  every day');
+ylabel('% vel-mod cells (FDR)');
 legend({'day-2','day-1','day-0'},'Location','northwest');
+title('Per-day % sig (FDR)');
 
-% (2) rat means
+% (2) Rat means ± std over days
 subplot(1,3,2); hold on;
-bar(pctPerRat,'FaceColor',[0.2 0.6 0.8]);
+errs = std(pctPerDayFDR,[],2,'omitnan');    % std across the 3 days, for each rat
+bar(1:nRats,pctPerRatFDR,'FaceColor',[.2 .6 .8]);
+errorbar(1:nRats,pctPerRatFDR,errs,'k.','LineWidth',1.5);
 xticks(1:nRats); xticklabels(ratNames);
-ylabel('mean % across 3 days');
-title('Rat-wise mean');
+ylabel('% vel-mod cells (FDR)');
+title('Mean ± STD per Rat');
 
-% (3) ΔFR distribution
+% (3) ΔFR swarmchart
 subplot(1,3,3); hold on;
-for r = 1:nRats
+for r=1:nRats
     swarmchart(r*ones(size(allDeltaFR{r})), allDeltaFR{r}, ...
-               5,'filled','MarkerFaceAlpha',0.4);
+               5,'filled','MarkerFaceAlpha',.4);
 end
-plot(xlim, [0 0],'k--');
+plot(xlim,[0 0],'k--');
 xticks(1:nRats); xticklabels(ratNames);
-ylabel('\DeltaFR  (trial – matched) [spk/bin]');
-title('\DeltaFR distribution');
+ylabel('\DeltaFR (trial – matched)');
+title('\DeltaFR of FDR-sig cells');
 
-%% ------------ console summary -------------------------------------------
-fprintf('\n===========  SUMMARY  ===========\n');
-for r = 1:nRats
-    fprintf('%s  –  %.1f ± %.1f %% (across 3 days)\n',...
-        ratNames{r}, pctPerRat(r), std(pctPerDay(r,:),[],'omitnan'));
+%%%%%%% Console summary
+fprintf('\n=== FR vs Speed Matched (FDR α=%.2f) ===\n',alpha);
+for r=1:nRats
+  m = pctPerRatFDR(r);
+  s = std(pctPerDayFDR(r,:),[],'omitnan');
+  fprintf('%s: %.1f%% ± %.1f\n', ratNames{r}, m, s);
 end
-fprintf('Grand mean:  %.1f %% ± %.1f\n',...
-        mean(pctPerRat,'omitnan'), std(pctPerRat,'omitnan'));
+
+
+
+fprintf('Grand mean: %.1f%% ± %.1f\n\n', ...
+        mean(pctPerRatFDR,'omitnan'), std(pctPerRatFDR,'omitnan'));
 end
-% ======================================================================
-%                       Helper functions
-% ======================================================================
 
-function stats = trialVsSpeedMatched(spikeMat, ts, pos, csTimes, varargin)
-% Compare firing in trial bins with velocity-matched non-trial bins
-% (zero shuffling; purely deterministic matching).
-% ----------------------------------------------------------------------
 
-% ---- defaults --------------------------------------------------------
-p = inputParser;
-p.addParameter('win',      [0 2]);
-p.addParameter('binSize',   1/7.5);
-p.addParameter('nVelBins',  15);
-p.addParameter('alpha',     0.05);
-p.addParameter('test',     'signrank');
-p.parse(varargin{:});
-win      = p.Results.win;
-binSize  = p.Results.binSize;
-nVelBins = p.Results.nVelBins;
-alpha    = p.Results.alpha;
-testType = lower(p.Results.test);
+%%===========================================================================%%
+function stats = trialVsSpeedMatched(spikeCell, ts, pos, csTimes, varargin)
+% Compare trial FR to speed-matched non-trial FR, one paired test per cell, FDR-corrected.
+% spikeCell: either a {nCells×1} cell array of spike-time vectors OR an [nCells×nTime]
+%             numeric matrix of counts-per-frame.
+% ts:        [nTime×1] time stamps.
+% pos:       [nTime×2] positions.
+% csTimes:   [nTrials×1] CS onset times.
 
-% ---- instantaneous speed --------------------------------------------
-dt    = diff(ts);
-dx    = diff(pos);
-speed = [0; hypot(dx(:,1),dx(:,2))./dt];
-speed(~isfinite(speed)) = 0;
+ip = inputParser();
+ip.addParameter('win',     [0 2]);
+ip.addParameter('binSize',  1/7.5);
+ip.addParameter('minPairs', []);
+ip.addParameter('alpha',    0.05);
+ip.addParameter('test',     'ttest');
+ip.parse(varargin{:});
+win      = ip.Results.win;
+binSize  = ip.Results.binSize;
+alpha    = ip.Results.alpha;
+testType = lower(ip.Results.test);
 
-% ---- mask points NOT inside any trial -------------------------------
+% if caller passed a numeric counts‐matrix, wrap it into a cell array of per‐cell rows
+if ~iscell(spikeCell) && isnumeric(spikeCell)
+  % each row is one cell’s bin‐counts
+  spikeCell = mat2cell(spikeCell, ones(size(spikeCell,1),1), size(spikeCell,2));
+end
+
+
+nTrials = numel(csTimes);
+minPairs = nTrials;
+
+% instantaneous speed
+dt  = [diff(ts); binSize];
+dXY = [diff(pos); [0 0]];
+spd = hypot(dXY(:,1),dXY(:,2)) ./ dt;
+spd(~isfinite(spd)) = 0;
+
+% trial mask
 inTrial = false(size(ts));
-for t = 1:numel(csTimes)
-    inTrial = inTrial | (ts >= csTimes(t)+win(1) & ts <= csTimes(t)+win(2));
+for t=1:nTrials
+  inTrial = inTrial | (ts>=csTimes(t)+win(1) & ts<csTimes(t)+win(2));
 end
-outMask = ~inTrial;
-
-speedOut = speed(outMask);
+outMask  = ~inTrial;
 timeOut  = ts(outMask);
+speedOut = spd(outMask);
 
-velEdges = linspace(min(speed), max(speed), nVelBins+1);
+% precompute trial windows & speeds
+edgeMat  = csTimes(:) + win(:).';
+trialSpd = nan(nTrials,1);
+for t=1:nTrials
+  idxCS       = ts>=edgeMat(t,1) & ts<edgeMat(t,2);
+  trialSpd(t) = mean(spd(idxCS));
+end
 
-% ---- pre-bin trial speed --------------------------------------------
-nBins   = round(diff(win)/binSize);
-nTrials = numel(csTimes);
+% allocate outputs
+nCells   = numel(spikeCell);
+deltaFR  = nan(nCells,1);
+pVal     = nan(nCells,1);
+isTested = false(nCells,1);
+rawP     = [];
 
-binnedSpeed = nan(nTrials,nBins);
-edgeMat     = nan(nTrials,nBins+1);
-for t = 1:nTrials
-    edges          = linspace(csTimes(t)+win(1), csTimes(t)+win(2), nBins+1);
-    edgeMat(t,:)   = edges;
-    tk             = ts>=edges(1) & ts<edges(end);
-    spdT           = speed(tk);
-    [~,~,binIdx]   = histcounts(ts(tk),edges);
-    for b = 1:nBins
-        binnedSpeed(t,b) = mean(spdT(binIdx==b));
+for c=1:nCells
+  % build st = list of spike times
+  if iscell(spikeCell)
+    st = spikeCell{c}(:);
+  elseif isnumeric(spikeCell)
+    counts     = spikeCell(c,:);
+    frameTimes = ts;
+    st = [];
+    Ipos = find(counts>0);
+    for k=1:numel(Ipos)
+      t0   = frameTimes(Ipos(k));
+      nrep = round(counts(Ipos(k)));
+      st = [st; repmat(t0, nrep, 1)];
     end
-end
+  else
+    error('spikeCell must be cell array or numeric matrix');
+  end
 
-% ---- outputs ---------------------------------------------------------
-nCells    = size(spikeMat,1);
-deltaFR   = nan(nCells,1);
-pVal      = nan(nCells,1);
-isVelMod  = false(nCells,1);
-sigDiff   = false(nCells,1);
+  if numel(st)<minPairs
+    continue;
+  end
+  isTested(c)=true;
 
-% ---- main cell loop --------------------------------------------------
-for c = 1:nCells
-    sTimes = spikeMat(c,:);    sTimes = sTimes(~isnan(sTimes));
-    if numel(sTimes)<5, continue; end
-
-    % (1) velocity-modulation within trials
-    [isMod,~,~] = findVelocityModCells( ...
-        sTimes, ts, pos, csTimes, win, binSize, 0.05);
-
-    if ~isMod, continue; end
-    isVelMod(c) = true;
-
-    % (2) FR in trials & matched bins
-    FR_trial = [];
-    FR_match = [];
-
-    for t = 1:nTrials
-        edges      = edgeMat(t,:);
-        spdThis    = binnedSpeed(t,:);
-        good       = ~isnan(spdThis);
-
-        % spikes in real trial bins
-        FR_trial = [FR_trial histcounts(sTimes, edges)]; %#ok<AGROW>
-
-        % choose velocity-matched out-of-trial bins
-        [~,~,binID_trial] = histcounts(spdThis, velEdges);
-
-        badMask = timeOut>=edges(1) & timeOut<=edges(end);
-        candIdx = find(~badMask);
-        velBinCand = discretize(speedOut(candIdx), velEdges);
-
-        for vb = unique(binID_trial(good))
-            needN = sum(binID_trial==vb & good);
-            pool  = candIdx(velBinCand==vb);
-
-            if numel(pool)<needN         % sample with replacement
-                pool = [pool ; randsample(pool, needN-numel(pool), true)];
-            else                         % sample without replacement
-                pool = randsample(pool, needN, false);
-            end
-
-            for k = 1:numel(pool)
-                t0 = timeOut(pool(k));
-                FR_match(end+1,1) = sum(sTimes>=t0 & sTimes<t0+binSize); %#ok<AGROW>
-            end
-        end
+  % build FRt & FRm arrays
+  FRt = zeros(nTrials,1);
+  FRm = zeros(nTrials,1);
+  for t=1:nTrials
+    % count in CS window
+    edges   = edgeMat(t,:);
+    FRt(t)  = sum(st>=edges(1) & st<edges(2));
+    need    = FRt(t);
+    if need>0
+      v     = trialSpd(t);
+      diffs = abs(speedOut - v);
+      [~,I] = sort(diffs,'ascend');
+      take  = min(need,numel(I));
+      for k2=1:take
+        start    = timeOut(I(k2));
+        FRm(t)   = FRm(t) + sum(st>=start & st<start+binSize);
+      end
     end
+  end
 
-    if numel(FR_trial)<10 || numel(FR_match)<10, continue; end
+  % drop NaNs (shouldn't occur)
+  ok  = ~isnan(FRt)&~isnan(FRm);
+  FRt = FRt(ok);
+  FRm = FRm(ok);
 
-    m = min(numel(FR_trial), numel(FR_match));
-    switch testType
-        case 'ttest'
-            [~,p_] = ttest(FR_trial(1:m), FR_match(1:m));
-        otherwise
-            p_ = signrank(FR_trial(1:m), FR_match(1:m));
+  if numel(FRt)<minPairs
+    continue;
+  end
+
+  % paired test
+  switch testType
+    case 'ttest'
+      [~,p] = ttest(FRt,FRm);
+    otherwise
+      p     = signrank(FRt,FRm);
+  end
+
+  rawP(end+1,1)    = p;              %#ok<AGROW>
+  pVal(c)          = p;
+  deltaFR(c)       = mean(FRt)-mean(FRm);
+end
+
+% FDR correction
+[~,~,~,adjP]       = fdr_bh(rawP, alpha);
+hFDR               = adjP < alpha;
+sigDiffFDR         = false(nCells,1);
+sigDiffFDR(isTested)=hFDR;
+
+stats.deltaFR       = deltaFR;
+stats.pVal          = pVal;
+stats.isVelMod      = isTested;
+stats.sigDiffFDR    = sigDiffFDR;
+stats.pctSigDiffFDR = 100*mean(hFDR);
+end
+
+
+%% Simple Benjamini–Hochberg
+function [h, crit_p, adj_p, sorted_p] = fdr_bh(pvals, q)
+  p      = pvals(:);
+  m      = numel(p);
+  [sorted_p, ids] = sort(p);
+  thresh = (1:m)'/m * q;
+  rej    = find(sorted_p<=thresh,1,'last');
+  if isempty(rej)
+    crit_p = 0; h=false(m,1);
+  else
+    crit_p=sorted_p(rej);
+    h     = p<=crit_p;
+  end
+  adj_p = nan(m,1);
+  for i=m:-1:1
+    if i<m
+      adj_p(i) = min(sorted_p(i)*m/i, adj_p(i+1));
+    else
+      adj_p(i) = min(sorted_p(i)*m/i, 1);
     end
-
-    pVal(c)    = p_;
-    deltaFR(c) = mean(FR_trial) - mean(FR_match);
-    sigDiff(c) = p_ < alpha;
-end
-
-% ---- package stats ---------------------------------------------------
-stats.deltaFR     = deltaFR;
-stats.pVal        = pVal;
-stats.isVelMod    = isVelMod;
-stats.sigDiff     = sigDiff;
-stats.pctSigDiff  = 100*mean(sigDiff(isVelMod));
-
-fprintf('Velocity-mod cells: %d / %d\n', sum(isVelMod), nCells);
-fprintf('  …of those, %.1f %% differ (alpha %.2f)\n',...
-        stats.pctSigDiff, alpha);
-end
-% ---------------------------------------------------------------------
-function [isVelMod, meanR, pVal] = findVelocityModCells( ...
-         spikeTimes, ts, pos, csTimes, win, binSize, pThresh)
-% Test whether ONE neuron is speed-modulated inside trial epochs
-% -------------------------------------------------------------------------
-
-% defaults
-if nargin<5, win     = [0 2];   end
-if nargin<6, binSize = 1/7.5;   end
-if nargin<7, pThresh = 0.05;    end
-
-xy = pos;
-
-% instantaneous speed ----------------------------------------------------
-dt    = diff(ts);
-dx    = diff(xy);
-
-velDat = ca_velocity([ ts.' ; pos(:,1).' ; pos(:,2).' ]);
-speed  = interp1(velDat(2,:),velDat(1,:),ts,'linear','extrap');
-speed(~isfinite(speed)) = 0;
-
-
-% parameters -------------------------------------------------------------
-nBins   = round(diff(win)/binSize);
-nTrials = numel(csTimes);
-
-rPerTrial = nan(nTrials,1);
-
-for t = 1:nTrials
-    edges = linspace(csTimes(t)+win(1), csTimes(t)+win(2), nBins+1);
-
-    % assign every time-stamp to a bin (NaN if out of range)
-    inBin = discretize(ts, edges);
-
-    % ----------- speed per bin (exclude NaNs!) -----------
-    valid   = ~isnan(inBin);
-    spdMean = accumarray(inBin(valid), speed(valid), [nBins 1], @mean, NaN);
-
-    % ----------- spikes per bin --------------------------
-    spkCounts = histcounts(spikeTimes, edges);
-
-    good = ~isnan(spdMean) & ~isnan(spkCounts(:));
-    if sum(good) > 2
-        rPerTrial(t) = corr(spdMean(good), spkCounts(good)', 'type','Pearson');
-    end
-end
-
-rPerTrial = rPerTrial(~isnan(rPerTrial));
-if numel(rPerTrial) < 3
-    isVelMod = false; meanR = NaN; pVal = NaN;
-    return
-end
-
-[~,p]   = ttest(rPerTrial);
-meanR   = mean(rPerTrial);
-pVal    = p;
-isVelMod = p < pThresh;
+  end
+  tmp=adj_p; adj_p(ids)=tmp;
 end

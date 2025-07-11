@@ -30,8 +30,9 @@ function plotFRvsSpeedWithinTrials(varargin)
 ratNames = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
 win      = [0 2];          % trace window relative to CS onset (s)
 binSize  = 1/7.5;          % 133 ms Ca bins
-nShuff   = 5;            % speed shuffles per neuron
+nShuff   = 500;            % speed shuffles per neuron
 alphaFW  = 0.05;           % family-wise α (per rat)
+minSpk   = 10;
 %% ------------------------------------------------------------------------
 
 %% ---------- parse optional arguments -----------------------------------
