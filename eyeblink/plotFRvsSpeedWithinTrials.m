@@ -32,7 +32,7 @@ win      = [0 2];          % trace window relative to CS onset (s)
 binSize  = 1/7.5;          % 133 ms Ca bins
 nShuff   = 500;            % speed shuffles per neuron
 alphaFW  = 0.05;           % family-wise α (per rat)
-minSpk   = 10;
+minSpk   = 5;
 %% ------------------------------------------------------------------------
 
 %% ---------- parse optional arguments -----------------------------------

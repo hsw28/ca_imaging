@@ -1,221 +1,217 @@
 function traceVsSpeed_RESIDUAL(method,nPerm)
-% -------------------------------------------------------------------------
-%   Speed-corrected residual jump  (trace – baseline)  with *matching*
-%   15-bin baseline and 15-bin trace windows.
+%% NOTEE: doesnt work great bc:
+%your baseline and trace windows don’t have identical speed distributions AND
+%your bins have very few spikes (so residuals are dominated by noise)
+
+% traceVsSpeed_RESIDUAL  Speed-corrected ΔR per cell, with FDR/Bonferroni
 %
-%   – For every trial:  30 rows
-%         rows 1-15  : baseline  (-2 → 0 s, 133-ms bins)
-%         rows 16-30 : trace     (0 → 2 s, 133-ms bins)
-%   – Ordinary least-squares:  spk ~ speed   (row-wise)
-%   – Residual per row      :  r = spk – ŷ
-%   – ΔRtrial = mean(rTrace) – mean(rBase)
-%   – Per neuron (≥3 trials):
-%         • two-tailed paired-t  on ΔRtrial
-%         • sign-flip permutation (nPerm flips)
-%   – Per rat multiple-comparison:
-%         method = 'fdr'  (default, BH q = 0.05)
-%                = 'bonf' (Bonferroni α = 0.05)
-%   – Two pools:  ALL neurons  vs  INCLUDED (≥ minSpk spikes in **trace**)
+% USAGE:
+%    traceVsSpeed_RESIDUAL          % default: FDR, 500 perms
+%    traceVsSpeed_RESIDUAL('bonf',1000)
 %
-%   Figures (per pool):
-%         1. % significant (t vs flip) grouped bars
-%         2. Box-plots of mean ΔR per rat
-%         3. Swarm of all ΔR pooled
-%         4. Histogram of adjusted p / q values
-%
-%   Dependencies:  rat structs,  autoDateList,  ca_velocity,  mafdr
+% DEPENDENCIES: autoDateList, ca_velocity, mafdr
 % -------------------------------------------------------------------------
 
-if nargin < 1, method = 'fdr';   end, method = lower(method);
-if nargin < 2, nPerm  = 500;     end                       % flips / neuron
-alphaFW = 0.05;  qFDR = 0.05;                             % thresholds
+if nargin<1, method = 'fdr'; end
+if nargin<2, nPerm  = 5;   end
+method = lower(method);
 
-% ---------------- USER SETTINGS -----------------------------------------
+alphaFW = 0.05;    % family-wise Bonferroni
+qFDR    = 0.05;    % FDR threshold
+
 ratNames = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
-
-preWin   = [-2 0];    trcWin   = [0 2];
-binSize  = 1/7.5;     nBins    = round(diff(trcWin)/binSize); % 15
-minSpk   = 5;                                           % inclusion rule
-% ------------------------------------------------------------------------
+preWin   = [-2 0];    trcWin = [ 0 2];
+binSize  = 1/7.5;     nBins  = round(diff(trcWin)/binSize);
+minSpk   = 5;         % inclusion threshold
 
 nR = numel(ratNames);
 statsAll = repmat(emptyStats,nR,1);
 statsInc = repmat(emptyStats,nR,1);
-allDR = cell(nR,1);   incDR = cell(nR,1);                % for plots
+allDR    = cell(nR,1);
+incDR    = cell(nR,1);
 
-fprintf('\n=====  Residual trace-vs-baseline  (%s, %d flips)  =====\n',...
+fprintf('\n=== traceVsSpeed_RESIDUAL  (%s, %d perms) ===\n',...
         upper(method),nPerm);
 
-% ================= RAT LOOP =============================================
 for r = 1:nR
-  r
-    rat = evalin('base',ratNames{r});
-    dL  = autoDateList(rat);
-    days= dL(find(strcmp(dL,rat.An))-2 : find(strcmp(dL,rat.An)));
+  rat = evalin('base',ratNames{r});
+  dL  = autoDateList(rat);
+  days= dL(find(strcmp(dL,rat.An))-2 : find(strcmp(dL,rat.An)));
 
-    pT = [];      pPerm = [];      nSpk_all = [];  DR_all = [];
-    pT_i = [];    pPerm_i = [];    nSpk_inc = [];  DR_inc = [];
+  DRall = [];   spkAll = [];
+  DRinc = [];   spkInc = [];
 
-    % -------------- DAY LOOP -------------------------------------------
-    for d = 1:3
-      d
-        day   = days{d};
-        spkM  = rat.Ca_peaks.(['CA_peaks_' day]);
-        ts    = rat.pos.(['pos_' day])(:,1);
-        xy    = rat.pos.(['pos_' day])(:,2:3);
-        csT   = rat.CS_times.(['CS_' day]);
+  %— LOOP DAYS ----------------------------------------------------------
+  for d=1:3
+    day   = days{d};
+    spkM  = rat.Ca_peaks.(['CA_peaks_' day]);
+    pos   = rat.pos.     (['pos_'      day]);
+    csT   = rat.CS_times.(['CS_'       day]);
 
-        % speed trace
-        v     = ca_velocity([ts.';xy(:,1).';xy(:,2).']);
-        speed = interp1(v(2,:),v(1,:),ts,'linear','extrap'); speed(~isfinite(speed))=0;
+    ts    = pos(:,1);
+    xy    = pos(:,2:3);
 
-        nTr   = numel(csT);
+    % SPEED
+    v     = ca_velocity([ts.'; xy(:,1).'; xy(:,2).']);
+    speed = interp1(v(2,:),v(1,:),ts,'linear','extrap');
+    speed(~isfinite(speed)) = 0;
 
-        % Precompute edges ------------------------------------------------
-        baseE = arrayfun(@(t) linspace(csT(t)+preWin(1),csT(t)+preWin(2),nBins+1), ...
-                         1:nTr,'uni',0);  baseE = vertcat(baseE{:});  % nTr×(nBins+1)
-        trcE  = arrayfun(@(t) linspace(csT(t)+trcWin(1),csT(t)+trcWin(2),nBins+1), ...
-                         1:nTr,'uni',0);  trcE  = vertcat(trcE{:});
+    % PRUNE CS TIMES with incomplete windows
+    valid = csT+preWin(1) >= ts(1) & csT+trcWin(2) <= ts(end);
+    csT   = csT(valid);
+    nTr   = numel(csT);
+    if nTr==0, continue; end
 
-        % ---------------- NEURON LOOP ----------------------------------
-        for ni = 1:size(spkM,1)
-            spk = spkM(ni,:); spk = spk(~isnan(spk));
+    % PRECOMPUTE BIN‐EDGES
+    baseE = arrayfun(@(t) linspace(csT(t)+preWin(1), csT(t)+preWin(2), nBins+1), ...
+                     (1:nTr)','uni',false);
+    trcE  = arrayfun(@(t) linspace(csT(t)+trcWin(1),csT(t)+trcWin(2),nBins+1), ...
+                     (1:nTr)','uni',false);
 
-            dR = nan(nTr,1);   nSpkTrc = 0;
+    %— LOOP NEURONS -------------------------------------------------------
+    for ci = 1:size(spkM,1)
+      spk = spkM(ci,:);
+      spk = spk(~isnan(spk));
 
+      dR_trials = zeros(nTr,1)*nan;
+      trcSpks   = zeros(nTr,1);
 
-            for t = 1:nTr %% trial loop
-                % baseline rows
-                cntB = histcounts(spk,baseE(t,:));
-                spdB = arrayfun(@(b) ...
-                       mean(speed(ts>=baseE(t,b)&ts<baseE(t,b+1))),1:nBins);
-
-                % trace rows
-                cntT = histcounts(spk,trcE(t,:));
-                spdT = arrayfun(@(b) ...
-                       mean(speed(ts>=trcE(t,b)&ts<trcE(t,b+1))),1:nBins);
-
-                Y = [cntB cntT].';                         % 30 × 1
-                X = [ones(30,1) , [spdB spdT].'];          % 30 × 2
-
-                B = X\Y;             resid = Y - X*B;      % residuals
-
-                dR(t) = max(resid(nBins+1:end)) - max(resid(1:nBins));
-                nSpkTrc = nSpkTrc + sum(cntT);
-            end
-
-            if nnz(~isnan(dR)) < 3, continue, end
-            meanDR = mean(dR,'omitnan');
-
-            % parametric paired-t (two-tailed)
-            [~,p] = ttest(dR);
-
-            % permutation p (sign-flip)
-            flips = 2*(rand(nPerm,numel(dR))>0.5) - 1;     % ±1 mask
-            permMeans = mean(flips .* dR',2,'omitnan');
-            pSF = mean(abs(permMeans) >= abs(meanDR));
-
-            % ---- store ALL --------------------------------------------
-            pT      = [pT ; p];
-            pPerm   = [pPerm ; pSF];
-            nSpk_all= [nSpk_all ; nSpkTrc];
-            DR_all  = [DR_all  ; meanDR];
-
-            % ---- INCLUDED ---------------------------------------------
-            if nSpkTrc >= minSpk
-                pT_i    = [pT_i ; p];
-                pPerm_i = [pPerm_i ; pSF];
-                nSpk_inc= [nSpk_inc ; nSpkTrc];
-                DR_inc  = [DR_inc  ; meanDR];
-            end
+      %— LOOP TRIALS ------------------------------------------------------
+      for t = 1:nTr
+        edgesB = baseE{t};
+        edgesT = trcE{t};
+        % skip invalid edges
+        if numel(edgesB)<2 || any(~isfinite(edgesB)) || any(diff(edgesB)<=0) ...
+         || numel(edgesT)<2 || any(~isfinite(edgesT)) || any(diff(edgesT)<=0)
+          continue
         end
-    end % day
 
-    allDR{r} = DR_all;  incDR{r} = DR_inc;
+        cntB = histcounts(spk, edgesB);
+        cntT = histcounts(spk, edgesT);
+        spdB = arrayfun(@(b) mean(speed(ts>=edgesB(b)   & ts<edgesB(b+1))), 1:nBins);
+        spdT = arrayfun(@(b) mean(speed(ts>=edgesT(b)   & ts<edgesT(b+1))), 1:nBins);
 
-    statsAll(r) = packStats(pT ,pPerm ,method,alphaFW,qFDR,nSpk_all);
-    statsInc(r) = packStats(pT_i,pPerm_i,method,alphaFW,qFDR,nSpk_inc);
-end % rat
+        Y = [cntB cntT].';
+        X = [ones(2*nBins,1) [spdB spdT].'];
 
-% --------------- Figures & Console --------------------------------------
+        beta   = X\Y;
+        resid  = Y - X*beta;
+        dR_trials(t) = mean(resid(nBins+1:end)) - mean(resid(1:nBins));
+        trcSpks(t)   = sum(cntT);
 
+        [~, p] = ttest(dR_trials);      % two-tailed test of mean(dR_trials) ≠ 0
+
+
+      end
+
+      validIdx = ~isnan(dR_trials);
+      if nnz(validIdx)<3
+        continue
+      end
+
+      dRmean = mean(dR_trials(validIdx));
+      totalSp= sum(trcSpks(validIdx));
+
+      DRall = [DRall; dRmean];
+      spkAll= [spkAll; totalSp];
+      if totalSp>=minSpk
+        DRinc = [DRinc; dRmean];
+        spkInc= [spkInc; totalSp];
+      end
+    end
+  end % days
+
+  allDR{r} = DRall;
+  incDR{r} = DRinc;
+
+  %— SIGN-FLIP P-VALUES -----------------------------------------------
+  pSF_all = arrayfun(@(x) mean(abs((rand(nPerm,1)>0.5)*2-1 .* x)>=abs(x)), DRall);
+  pSF_inc = arrayfun(@(x) mean(abs((rand(nPerm,1)>0.5)*2-1 .* x)>=abs(x)), DRinc);
+
+  statsAll(r) = packStats(pSF_all,method,alphaFW,qFDR,spkAll);
+  statsInc(r) = packStats(pSF_inc,method,alphaFW,qFDR,spkInc);
+end
+
+%— SUMMARIZE & PLOT ------------------------------------------------------
 summarize(statsAll,ratNames,'ALL neurons');
 summarize(statsInc,ratNames,'INCLUDED neurons');
 makeFigures(statsAll,ratNames,'ALL neurons',    allDR);
 makeFigures(statsInc,ratNames,'INCLUDED neurons',incDR);
 end
-% ========================================================================
-%                               HELPERS
-% ========================================================================
+
+
+%% HELPERS ================================================================
 function [sig,adj] = mcCorrect(p,method,a,q)
-if isempty(p), sig=false(size(p)); adj=p; return, end
-switch method
-    case 'bonf',  thr = a/numel(p); sig = p<thr; adj=p;
-    otherwise,   adj = mafdr(p,'BHFDR',true); sig = adj<q;
+  if isempty(p)
+    sig = false(size(p));
+    adj = p;
+    return
+  end
+  switch method
+    case 'bonf'
+      thr    = a/numel(p);
+      sig    = p<thr;
+      adj    = p;
+    otherwise  % FDR
+      adj    = mafdr(p,'BHFDR',true);
+      sig    = adj<q;
+  end
 end
-end
-% ------------------------------------------------------------------------
-function S = packStats(pT,pSF,method,a,q,spk)
-[sigT ,adjT ] = mcCorrect(pT ,method,a,q);
-[sigSF,adjSF] = mcCorrect(pSF,method,a,q);
 
-S.sigT   = sigT;    S.sigSF = sigSF;
-S.pctT   = 100*mean(sigT);   S.pctSF = 100*mean(sigSF);
-S.nNeurons = numel(sigT);
-S.spikes   = spk;
-S.adjT   = adjT;    S.adjSF = adjSF;
+function S = packStats(pSF,method,a,q,spk)
+  [sigSF,adjSF]  = mcCorrect(pSF,method,a,q);
+  S.sigSF        = sigSF;
+  S.pctSF        = 100*mean(sigSF);
+  S.nNeurons     = numel(sigSF);
+  S.spikes       = spk;
+  S.adjSF        = adjSF;
 end
-% ------------------------------------------------------------------------
+
 function S = emptyStats
-S = struct('sigT',[],'sigSF',[], ...
-           'pctT',NaN,'pctSF',NaN, ...
-           'nNeurons',0,'spikes',[], ...
-           'adjT',[],'adjSF',[]);
+  S = struct('sigSF',[],'pctSF',NaN,'nNeurons',0,'spikes',[],'adjSF',[]);
 end
-% ------------------------------------------------------------------------
-function makeFigures(st,ratN,ttl,deltaRcell)
-nR = numel(ratN);
-pctT  = arrayfun(@(s)s.pctT ,st);
-pctSF = arrayfun(@(s)s.pctSF,st);
 
-figure('color','w','Name',ttl,'Position',[100 300 1400 520]);
-sgtitle(sprintf('%s  (baseline 15 bins)',ttl),'FontWeight','bold');
+function makeFigures(st,ratN,titleStr,DRcell)
+  nR = numel(ratN);
+  pct= arrayfun(@(x)x.pctSF,st);
 
-% 1. % significant grouped bar
-subplot(3,1,1); bar([pctT(:) pctSF(:)],'grouped');
-ylim([0 100]); ylabel('% significant'); grid on
-xticks(1:nR); xticklabels(ratN);
-legend({'t-test','sign-flip'},'location','northwest'); title('%Sig');
+  figure('Name',titleStr,'Color','w','Position',[200 300 1200 380]);
+  sgtitle(titleStr,'FontWeight','bold');
 
-% 2. Box-plot ΔR per rat
-subplot(3,1,2); hold on
-g=[];lab=[];
-for k=1:nR
-  g=[g;deltaRcell{k}(:).*7.5];
-  lab=[lab;k*ones(numel(deltaRcell{k}),1)];
+  % 1: % sig
+  subplot(1,3,1)
+  bar(pct)
+  ylim([0 100]), ylabel('% sig'), xticks(1:nR), xticklabels(ratN)
+  title('% significant'), grid on
+
+  % 2: box of ΔR
+  subplot(1,3,2), hold on
+  allV=[];grp=[];
+  for k=1:nR
+    allV=[allV; DRcell{k}];
+    grp  =[grp;   k*ones(numel(DRcell{k}),1)];
+  end
+  if ~isempty(allV)
+    boxplot(allV,grp,'Labels',ratN,'Symbol','k.')
+  end
+  yline(0,'k--'), ylabel('ΔR (spk/bin)'), title('per neuron ΔR'), grid on
+
+  % 3: swarm
+  subplot(1,3,3), hold on
+  pool = vertcat(DRcell{:});
+  if ~isempty(pool)
+    swarmchart(ones(size(pool)),pool,'filled','MarkerFaceAlpha',0.4)
+  end
+  yline(0,'k--'), set(gca,'XTick',[])
+  ylabel('ΔR (spk/bin)'), title('all neurons'), box on
 end
-if ~isempty(g), boxplot(g,lab,'Labels',ratN,'Symbol','k.'); end
-yline(0,'k--'); ylabel('mean Δ residual (hz)'); grid on
-title('Per-neuron ΔR');
 
-% 3. Swarm pooled ΔR
-subplot(3,1,3); hold on
-pool = vertcat(deltaRcell{:}).*7.5;
-if ~isempty(pool), swarmchart(ones(size(pool)),pool,'filled','MarkerFaceAlpha',0.4); end
-yline(0,'k--'); xlim([0.5 1.5]); set(gca,'XTick',[]);
-ylabel('mean Δ residual (hz)'); box on; title('All neurons pooled');
-
-end
-% ------------------------------------------------------------------------
-function summarize(st,ratN,hdr)
-fprintf('\n--- %s ---\n',hdr);
-for k=1:numel(ratN)
-    fprintf('%s : %4d / %4d  (T %4.1f%% | SF %4.1f%%)\n',ratN{k}, ...
-        sum(st(k).sigT), st(k).nNeurons, st(k).pctT, st(k).pctSF);
-end
-pT  = arrayfun(@(s)s.pctT ,st);
-pSF = arrayfun(@(s)s.pctSF,st);
-fprintf('Grand mean  T = %.1f ± %.1f %%   |   SF = %.1f ± %.1f %%\n\n',...
-        mean(pT,'omitnan'), std(pT,'omitnan'), ...
-        mean(pSF,'omitnan'),std(pSF,'omitnan'));
+function summarize(st,ratN,header)
+  fprintf('\n--- %s ---\n',header);
+  for i=1:numel(st)
+    fprintf('%s: %3d / %3d   (%%SF = %4.1f%%)\n',ratN{i}, ...
+            sum(st(i).sigSF),st(i).nNeurons,st(i).pctSF);
+  end
+  m=mean([st.pctSF]); sd=std([st.pctSF]);
+  fprintf('Mean%%SF = %.1f ± %.1f%%\n\n',m,sd);
 end

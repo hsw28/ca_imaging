@@ -22,7 +22,7 @@ assert(ismember(method,{'fdr','bonf'}),'method must be ''fdr'' or ''bonf''');
 % — user parameters —
 qFDR     = 0.05;      % FDR level
 alphaFW  = 0.05;      % family-wise for Bonferroni
-minSpk   = 10;         % min spikes in each CS trial to include
+minSpk   = 5;         % min spikes in each CS trial to include
 win      = [0 2];     % CS window (s)
 nShuff   = 500;       % # of shuffle replicates (permute trial speeds)
 ratNames = {'rat0222','rat0307','rat0313','rat0314','rat0816'};

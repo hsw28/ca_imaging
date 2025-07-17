@@ -52,18 +52,14 @@ for r = 1:nRats
     pctPerRatIncluded(r) = mean(pctPerDayIncluded(r,:),'omitnan');
     allDeltaFRAll{r}     = delAll;
     allDeltaFRIncl{r}    = delIncl;
+    nanmean(delIncl)
+    nanstd(delIncl)
 end
+
+
 
 %% — PLOTTING —
 figure('Color','w','Position',[200 300 1400 800]);
-
-% BAR GROUP #1: ALL CELLS, per‐day
-%subplot(2,3,1); hold on;
-%bar(pctPerDayAll,'grouped');
-%xticks(1:nRats); xticklabels(ratNames);
-%ylabel('% sig (all cells)');
-%title('ALL CELLS — per day');
-%legend({'day−2','day−1','day−0'},'Location','northwest');
 
 % BAR GROUP #2: INCLUDED CELLS, per‐day
 subplot(1,3,1); hold on;
@@ -73,14 +69,6 @@ ylabel('% sig (included)');
 title('INCLUDED CELLS — per day');
 legend({'day−2','day−1','day−0'},'Location','northwest');
 
-%% BAR GROUP #3: ALL CELLS, per‐rat means
-%subplot(2,3,3); hold on;
-%bar(pctPerRatAll);
-%errorbar(1:nRats,pctPerRatAll, std(pctPerDayAll,[],2),'k.','LineWidth',1.5);
-%xticks(1:nRats); xticklabels(ratNames);
-%ylabel('mean % (all cells)');
-%title('ALL CELLS — per rat');
-
 % BAR GROUP #4: INCLUDED CELLS, per‐rat means
 subplot(1,3,2); hold on;
 bar(pctPerRatIncluded,'FaceColor',[.2 .6 .8]);
@@ -88,17 +76,6 @@ errorbar(1:nRats,pctPerRatIncluded, std(pctPerDayIncluded,[],2),'k.','LineWidth'
 xticks(1:nRats); xticklabels(ratNames);
 ylabel('mean % (included)');
 title('INCLUDED CELLS — per rat');
-
-% SWARM #1: ΔFR for ALL CELLS
-%subplot(2,3,5); hold on;
-%for r=1:nRats
-%    swarmchart(r*ones(size(allDeltaFRAll{r})), allDeltaFRAll{r}, ...
-%        5,'filled','MarkerFaceAlpha',.4);
-%end
-%plot(xlim,[0 0],'k--');
-%xticks(1:nRats); xticklabels(ratNames);
-%ylabel('\DeltaFR (all cells)');
-%title('ALL CELLS — \DeltaFR');
 
 % SWARM #2: ΔFR for INCLUDED CELLS
 subplot(1,3,3); hold on;

@@ -1,5 +1,4 @@
-function alignEMGandVelocity(ratName, spreadType)
-    % alignEMGandVelocity(ratName, spreadType)
+function [t_interp, mean_emg, spread_emg, mean_vel, spread_vel] = alignEMGandVelocity(ratName, spreadType)
     % spreadType: 'sem' (default) or 'std'
 
     if nargin < 2
@@ -23,8 +22,9 @@ function alignEMGandVelocity(ratName, spreadType)
 
     learnedDays = dateList(finalIdx-2:finalIdx);
 
-    win = [0 2];
-    Fs_interp = 7.5;
+    win = [-1 2];
+  %  Fs_interp = 7.5;
+    Fs_interp = 2000;
     t_interp = win(1):1/Fs_interp:win(2);
     t_interp = round(t_interp, 6);
     nTimepoints = length(t_interp);
@@ -90,4 +90,6 @@ function alignEMGandVelocity(ratName, spreadType)
         otherwise
             error('spreadType must be "sem" or "std"');
     end
+
+size(t_interp)
 end

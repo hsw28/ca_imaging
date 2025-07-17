@@ -1,5 +1,6 @@
 function plotEMGandVelocity_PerAnimal(t_interp, mean_emg, sem_or_std_emg, mean_vel, sem_or_std_vel, ratName, spreadType)
-    % spreadType: 'sem' or 'std' (default = 'sem')
+    %takes input from alignEMGandVelocity 
+    %spreadType: 'sem' or 'std' (default = 'sem')
 
     if nargin < 7
         spreadType = 'sem';
@@ -21,14 +22,16 @@ function plotEMGandVelocity_PerAnimal(t_interp, mean_emg, sem_or_std_emg, mean_v
     velColor = [0.1 0.6 0.9];
     traceColor = [0.9 0.9 0.9];
 
-    figure('Color', 'w', 'Position', [300 300 600 400]);
+%    figure('Color', 'w', 'Position', [300 300 600 400]);
+
 
     % === Panel 1: EMG ===
-    subplot(2,1,1); hold on;
-    fill([t_interp fliplr(t_interp)], ...
-         [mean_emg + sem_or_std_emg, fliplr(mean_emg - sem_or_std_emg)], ...
-         emgColor, 'FaceAlpha', 0.3, 'EdgeColor', 'none');
-    plot(t_interp, mean_emg, 'Color', emgColor, 'LineWidth', 2);
+    hold on;
+    yyaxis right
+    size([t_interp fliplr(t_interp)])
+    size([mean_emg + sem_or_std_emg, fliplr(mean_emg - sem_or_std_emg)])
+    fill([t_interp fliplr(t_interp)], [mean_emg + sem_or_std_emg, fliplr(mean_emg - sem_or_std_emg)], emgColor, 'FaceAlpha', 0.3, 'EdgeColor', 'none');
+    plot(t_interp, mean_emg, 'Color', emgColor, 'LineWidth', 1);
     yLimits = ylim;
     fill([0 0.75 0.75 0], [yLimits(1) yLimits(1) yLimits(2) yLimits(2)], ...
          traceColor, 'EdgeColor', 'none', 'FaceAlpha', 0.2);
@@ -42,15 +45,17 @@ function plotEMGandVelocity_PerAnimal(t_interp, mean_emg, sem_or_std_emg, mean_v
     else
         ylim([ymin*0.9, ymax*1.1]);
     end
+    ylim([-30000,30000])
     line([0 0], ylim, 'Color', 'k', 'LineStyle', '--');
     set(gca, 'Box', 'off', 'FontSize', 12);
 
     % === Panel 2: Velocity ===
-    subplot(2,1,2); hold on;
+    yyaxis left
+    ylim([-5 90])
     fill([t_interp fliplr(t_interp)], ...
          [mean_vel + sem_or_std_vel, fliplr(mean_vel - sem_or_std_vel)], ...
          velColor, 'FaceAlpha', 0.3, 'EdgeColor', 'none');
-    plot(t_interp, mean_vel, 'Color', velColor, 'LineWidth', 2);
+    plot(t_interp, mean_vel, 'Color', velColor, 'LineWidth', 1);
     yLimits = ylim;
     fill([0 0.75 0.75 0], [yLimits(1) yLimits(1) yLimits(2) yLimits(2)], ...
          traceColor, 'EdgeColor', 'none', 'FaceAlpha', 0.2);
@@ -66,6 +71,7 @@ function plotEMGandVelocity_PerAnimal(t_interp, mean_emg, sem_or_std_emg, mean_v
     end
     line([0 0], ylim, 'Color', 'k', 'LineStyle', '--');
     set(gca, 'Box', 'off', 'FontSize', 12);
+        ylim([-5 90])
 
     linkaxes(findall(gcf,'Type','axes'), 'x');
 end

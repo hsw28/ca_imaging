@@ -1,4 +1,4 @@
-function compareVels_allRats(ratNames,winSecs)
+function compareVels_allRats(ratNames,winSecs, type)
 % compareVels_allRats  Call compareVels_perRat for several animals and plot together
 %
 %   compareVels_allRats({'rat0222','rat0307',...},[0 2])
@@ -11,6 +11,11 @@ function compareVels_allRats(ratNames,winSecs)
 
 if nargin<1, error('Pass a cell array of rat names'); end
 if nargin<2, winSecs = [0 2]; end
+if nargin<3
+  type=1 %compares to all non trial times
+else
+  type = 2 %compares to 2 seconds before trial
+end
 
 nRats      = numel(ratNames);
 velInCell  = cell(nRats,1);
@@ -21,7 +26,11 @@ pvals      = nan(nRats,1);
 
 % ---------- gather data ---------------------------------------------------
 for r = 1:nRats
-    [mIn,mOut,p,vin,vout] = compareVels_perRat(ratNames{r},winSecs);
+    if type ==1
+      [mIn,mOut,p,vin,vout] = compareVels_perRat(ratNames{r},winSecs);
+    else
+      [mIn,mOut,p,vin,vout] = compareVels_perRat2(ratNames{r},winSecs);
+    end
     velInCell{r}  = vin;
     velOutCell{r} = vout;
     meanIn(r)     = mIn;

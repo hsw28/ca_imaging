@@ -12,6 +12,9 @@ holdvalues2 = zeros(length(vector2),1);
 holdvalues1(want1) = 1;
 holdvalues2(want2) = 1;
 
-CT = crosstab(holdvalues1,holdvalues2);
+
+
+[tbl,chi2,p,labels] = crosstab(holdvalues1,holdvalues2);
+
 
 [h p stats] = fishertest(CT)

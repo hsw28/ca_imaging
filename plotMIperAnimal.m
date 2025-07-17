@@ -20,7 +20,13 @@ for r = 1:length(ratNames)
     theseDays = dateList(idx-2:idx);
 
     for d = 1:3
-        miVec = rat.MI_noCSUS.(['MI_' theseDays{d}]);
+      miVec = rat.MI_noCSUS.(['MI_' theseDays{d}]);
+      miVec2 = rat.MI_CSUS15.(['MI_' theseDays{d}]);
+
+      nanny = isnan(miVec2);
+      miVec(nanny) = NaN;
+
+
         x = d + (r-1)*4;  % space between animals
         scatter(repmat(x, size(miVec)), miVec, 10, [0.1 0.6 0.9], 'filled', 'jitter','on', 'jitterAmount',0.2);
         boxchart(repmat(x, size(miVec)), miVec, 'BoxFaceColor', 'black', 'BoxWidth', 0.5, 'MarkerStyle', 'none');
@@ -40,6 +46,7 @@ for r = 1:length(ratNames)
     end
 end
 
+figure
 set(gca, 'XTick', xticks, 'XTickLabel', xticklabels);
 
 % Add rat labels centered across their 3 days
@@ -62,6 +69,7 @@ hold on
 animalMeans = zeros(length(ratNames), 1);
 animalSEMs = zeros(length(ratNames), 1);
 animalSTDs = zeros(length(ratNames), 1);
+animalMED = zeros(length(ratNames), 1);
 
 for r = 1:length(ratNames)
     rat = evalin('base', ratNames{r});
@@ -73,15 +81,23 @@ for r = 1:length(ratNames)
     allMI = [];
     for d = 1:3
         miVec = rat.MI_noCSUS.(['MI_' theseDays{d}]);
+        miVec2 = rat.MI_CSUS15.(['MI_' theseDays{d}]);
+        nanny = isnan(miVec2);
+        miVec(nanny) = NaN;
+
+
         allMI = [allMI; miVec(:)];
     end
     animalMeans(r) = nanmean(allMI);
     animalSEMs(r) = nanstd(allMI) / sqrt(numel(allMI));
     animalSTDs(r) = nanstd(allMI);
+    animalMED(r)=nanmedian(allMI);
 end
 
-animalMeans
-animalSTDs
+animalMeans = animalMeans
+animalSTDs = animalSTDs
+animalMED = animalMED
+
 
 hBar = bar(1:length(ratNames), animalMeans, 'FaceColor', [0.5 0.5 0.5]);
 errorbar(1:length(ratNames), animalMeans, animalSEMs, 'k', 'LineStyle', 'none', 'LineWidth', 1);
