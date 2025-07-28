@@ -116,6 +116,7 @@ for ni = 1:nNeurons
   %  numrate = numrate(1:idx-1);
   %  minratefive = max(numrate(floor(length(numrate)*0.9):end));
     imagesc(rate, [mean(numrate), maxratefive]);
+    imagesc(rate, [0.0, .4]);
     colormap('parula'); colorbar;
     title(sprintf('Neuron %d (CSUS)', neuronIdx));
 

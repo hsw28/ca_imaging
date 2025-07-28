@@ -24,10 +24,12 @@ for i = 1:numel(ratNames)
     spike_struct = filterFieldsByDay(rat.Ca_peaks, daysToUse);
     pos_struct   = filterFieldsByDay(rat.pos, daysToUse);
     ts_struct    = filterFieldsByDay(rat.Ca_ts, daysToUse);
-    csus_struct  = filterFieldsByDay(rat.CSUS_id, daysToUse);
+    csus_struct  = filterFieldsByDay(rat.csus15, daysToUse);
     mi_struct    = filterFieldsByDay(rat.MI_noCSUS, daysToUse);
 
     % Run the shuffle function
+
+
     MIshuff = mutualinfo_openfield_shuff_noCSUS(spike_struct, pos_struct, Fs, dim, ts_struct, csus_struct, mi_struct, nShuff);
 
     % Store back into rat structure

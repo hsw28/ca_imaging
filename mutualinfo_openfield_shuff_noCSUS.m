@@ -187,36 +187,28 @@ for i = 1:numel(fields_spikes)
                   end
 
 
-                topMI5 = floor(num_times_to_run*.95);
-                topMI1 = floor(num_times_to_run*.99);
-                shuf = sort(shuf);
-                    if isnan(topMI5)==0
-                      mutinfo(1, k) = shuf(topMI5);
-                    else
-                      mutinfo(1, k) = NaN;
-                    end
-                    if isnan(topMI1)==0
-                      mutinfo(2, k) = nanmean(shuf);
-                    else
-                      mutinfo(2, k) = NaN;
-                    end
+                  % remove NaNs from the shuffle distribution
+                shOK = shuf(~isnan(shuf));
 
-                  [c index] = (min(abs(MI(k)-shuf)));
-                  if isnan(index)==0
-                    rank = index./length(shuf);
-                    mutinfo(3, k) = rank;
-                  else
-                    mutinfo(3,k) = NaN;
-                  end
+                % 95-th percentile and mean of shuffle
+                p95cut  = prctile(shOK,95);
+                muShuff = mean(shOK);
 
-                  mutinfo(4,k) = hertz;
+                % p-value (upper-tail) and percentile rank
+                pVal = mean(shOK >= MI(k));
+                perc = mean(shOK <= MI(k));     % 0 = worst, 1 = best
 
+                % store
+                mutinfo(1,k) = p95cut;     % 95-th-percentile threshold
+                mutinfo(2,k) = muShuff;    % shuffle mean
+                mutinfo(3,k) = perc;       % percentile of actual MI
+                mutinfo(4,k) = hertz;      % firing rate
 
-              end
+          end
     fprintf('assigning MI')
     mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
-    end
   end
+end
 
 
 %{
@@ -230,7 +222,7 @@ for i = 1:numel(fields_spikes)
   fprintf('Save the output to the .mat file with the timestamped filename\n');
   save(filename, 'results_MI_shuff');
   fprintf('Save is a success\n');
-%}
+
 
 
 results_MI_shift = mutualinfo_struct;
@@ -243,6 +235,8 @@ filename = ['results_MI_shift_', currentDateTime, '.mat'];
 fprintf('Save the output to the .mat file with the timestamped filename\n');
 save(filename, 'results_MI_shift');
 fprintf('Save is a success\n');
-
+%}
 
   f = mutualinfo_struct;
+
+end

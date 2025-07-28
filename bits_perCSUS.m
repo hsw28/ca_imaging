@@ -1,4 +1,4 @@
-function [bitsPerSpike, bitsPerSecond] = bits_per(rateMap, occMap)
+function [bitsPerSpike, bitsPerSecond] = bits_perCSUS(rateMap, occMap)
 % Computes spatial information content
 %bits/spike: Sum of (occprobs * mean firing rate per bin / meanrate) * log2 (mean firing rate per bin / meanrate)
 %bits/sec: Sum of (occprobs * mean firing rate per bin) * log2 (mean firing rate per bin / meanrate)
@@ -26,21 +26,11 @@ occSum = nansum(occMap(:));
 assert(abs(occSum - 1) < 1e-6, 'occMap must sum to 1 (got %.3g)', occSum);
 
 
-% -------------------------------------------------------------------------
-% 2. mask out invalid bins (zero occ or NaN rate)
-% -------------------------------------------------------------------------
-validMask = occMap > 0 & ~isnan(rateMap);          % logical matrix
-pOcc      = occMap(validMask);                     % column vector
-rBin      = rateMap(validMask);                    % column vector
+
+pOcc      = occMap;     % column vector
+rBin      = rateMap;        % column vector
 
 
-% guard against empty or silent sessions
-if isempty(rBin) || all(rBin == 0, 'all')
-    bitsPerSpike  = NaN;
-    bitsPerSecond = NaN;
-    warning('bits_per:NoData','No valid firing detected — returning NaNs.');
-    return
-end
 
 % -------------------------------------------------------------------------
 % 3. compute information terms (vectorised)

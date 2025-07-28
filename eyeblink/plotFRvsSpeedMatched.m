@@ -24,6 +24,7 @@ for r = 1:nRats
     idx   = find(strcmp(dates, rat.An));
     days  = dates(idx-2:idx);  % day‐2, day‐1, day‐0
 
+
     delAll  = [];
     delIncl = [];
     for d=1:3
@@ -33,17 +34,19 @@ for r = 1:nRats
         ts    = pos(:,1);
         xy    = pos(:,2:3);
         cs    = rat.CS_times.  (['CS_'       day]);
+        ratemask = rat.ratemask.(['ratemask_' day]);
+
 
 
         %— run on ALL cells (no minPairs restriction) —
-%        Sall = trialVsSpeedMatched( spk, ts, xy, cs, ...
+%        Sall = trialVsSpeedMatched( spk, ts, xy, cs,rateMask, ...
 %            'win',win,'binSize',binSize,'alpha',alpha,'test','ttest','minPairs',0);
 %        pctPerDayAll(r,d)   = Sall.pctSigDiffFDR;
 %        delAll              = [delAll; Sall.deltaFR(Sall.sigDiffFDR)]; %#ok<AGROW>
 
         %— run on INCLUDED cells only (default minPairs=nTrials) —
-        Sincl = trialVsSpeedMatched( spk, ts, xy, cs, ...
-            'win',win,'binSize',binSize,'alpha',alpha,'test','ttest','minPairs',5);
+        Sincl = trialVsSpeedMatched( spk, ts, xy, cs, ratemask, ...
+            'win',win,'binSize',binSize,'alpha',alpha,'test','ttest','minPairs',0);
         pctPerDayIncluded(r,d) = Sincl.pctSigDiffFDR;
         delIncl                = [delIncl; Sincl.deltaFR(Sincl.sigDiffFDR)]; %#ok<AGROW>
     end
@@ -110,7 +113,7 @@ fprintf('Grand mean all : %.1f%% ± %.1f\n\n',...
 end
 
 %%===========================================================================%%
-function stats = trialVsSpeedMatched(spikeCell, ts, pos, csTimes, varargin)
+function stats = trialVsSpeedMatched(spikeCell, ts, pos, csTimes, ratemask, varargin)
 % Compare trial FR to speed-matched non-trial FR, one paired test per cell, FDR-corrected.
 % spikeCell: either a {nCells×1} cell array of spike-time vectors OR an [nCells×nTime]
 %             numeric matrix of counts-per-frame.
@@ -192,6 +195,9 @@ for c=1:nCells
   if sum(~isnan(st))<minPairs
     continue;
   end
+
+  if ratemask(c) == 0, continue; end
+
   isTested(c)=true;
 
   % build FRt & FRm arrays

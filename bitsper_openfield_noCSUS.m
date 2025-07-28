@@ -1,6 +1,7 @@
 function f = bitsper_openfield_noCSUS(spike_structure, pos_structure, velthreshold, dim, CA_timestamps, CSUS_id_struct)
 %finds bits per spike AND bits per second for a bunch of cells NOT including the CSUS period and the 2 seconds after
 
+
 tic
 
 
@@ -45,6 +46,8 @@ for i = 1:numel(fields_spikes)
 
       fieldName_cats = fields_cats{i};
       curr_CA_timestamps = CA_timestamps.(fieldName_cats);
+
+
 
 
 
@@ -99,12 +102,22 @@ for i = 1:numel(fields_spikes)
 
       numunits = size(peaks_time,1);
 
+      timelength = curr_CA_timestamps(end)-curr_CA_timestamps(1);
+
       if numunits<=1
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
         warning('you have no spikes')
       else
       for k=1:numunits
         highspeedspikes = [];
+        numspikes = peaks_time(k,:);
+
+        rate = numspikes./timelength;
+        if rate < 0.05
+          bitsper_info(k,1) = NaN;
+          bitsper_info(k,2) = NaN;
+          continue
+        end
 
         [c indexmin] = (min(abs(peaks_time(k,:)-mintime))); %
         [c indexmax] = (min(abs(peaks_time(k,:)-maxtime))); %
@@ -135,7 +148,7 @@ for i = 1:numel(fields_spikes)
           if (size(occprob,1)) < (size(occprob,2))
             occprob = occprob';
           end
-  [bitsPerSpike, bitsPerSecond] = bits_per(spikeprob, occprob);
+  [bitsPerSpike, bitsPerSecond] = bits_per(rate, occprob);
   bitsper_info(k,1) = bitsPerSpike;
   bitsper_info(k,2) = bitsPerSecond;
   else

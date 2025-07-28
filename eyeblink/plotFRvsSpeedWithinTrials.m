@@ -32,7 +32,7 @@ win      = [0 2];          % trace window relative to CS onset (s)
 binSize  = 1/7.5;          % 133 ms Ca bins
 nShuff   = 500;            % speed shuffles per neuron
 alphaFW  = 0.05;           % family-wise α (per rat)
-minSpk   = 5;
+minSpk   = 0;
 %% ------------------------------------------------------------------------
 
 %% ---------- parse optional arguments -----------------------------------
@@ -41,7 +41,7 @@ p.addParameter('correction','fdr',@(s)ischar(s)&&ismember(lower(s),{'fdr','bonfe
 p.addParameter('minSpk',5,@(x)isempty(x)||(isscalar(x)&&x>=0));
 p.parse(varargin{:});
 corrMethod = lower(p.Results.correction);
-minSpk     = p.Results.minSpk;
+minSpk     = 0;
 
 fprintf('\n>>> Multiple-comparison: %s  (α = %.3g)\n',upper(corrMethod),alphaFW);
 if isempty(minSpk)
@@ -79,6 +79,7 @@ for r = 1:nRats
         spkMat = rat.Ca_peaks.(['CA_peaks_' day]);
         posRaw = rat.pos.(['pos_'       day]);  % [t x y]
         csT    = rat.CS_times.(['CS_'   day]);  % CS onsets
+        rateMask = rat.ratemask.(['ratemask_' day]);
 
         % build speed trace
         vDat   = ca_velocity(posRaw');
@@ -151,7 +152,7 @@ for r = 1:nRats
             shMat_all(end+1,:) = shMean;
 
             % store INCLUDED
-            if isempty(minSpk) || nSpk>=minSpk
+            if  (rateMask(ni) == 1);
                 r_inc(end+1)      = rMu;
                 p_inc(end+1)      = pPear;
                 shMat_inc(end+1,:) = shMean;

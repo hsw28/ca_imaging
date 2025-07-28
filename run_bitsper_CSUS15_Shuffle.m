@@ -1,11 +1,13 @@
-function run_bitsper_noCSUS_Shuffle
+function run_bitsper_CSUS15_Shuffle
 % Wrapper to run MI shuffle for only An and 2 days before for all 5 rats
 %returns top 5%, mean, shuffled percent (want 0.95 or higher), and hertz during running periods
 
 %IN PREP
 %need to input ca_bitsper instead of MI
 
-ratNames = {'rat0222', 'rat0307', 'rat0313', 'rat0314', 'rat0816'};
+ratNames = {'rat0816'};
+
+%ratNames = {'rat0222', 'rat0307', 'rat0313', 'rat0314', 'rat0816'};
 Fs = 4;
 dim = 2.5;
 nShuff = 500;
@@ -26,26 +28,26 @@ for i = 1:numel(ratNames)
 
     % Filter each structure to only include those days
     spike_struct = filterFieldsByDay(rat.Ca_peaks, daysToUse);
-    pos_struct   = filterFieldsByDay(rat.pos, daysToUse);
+    CSUS_structure   = filterFieldsByDay(rat.csus15, daysToUse);
     ts_struct    = filterFieldsByDay(rat.Ca_ts, daysToUse);
-    csus_struct  = filterFieldsByDay(rat.csus15, daysToUse);
-    bitsper_struct    = filterFieldsByDay(rat.bitsper, daysToUse);
+    bitsper_struct   = filterFieldsByDay(rat.bitsperCSUS, daysToUse)
 
     % Run the shuffle function
 
-    [per_spike per_sec] = bitsper_openfield_shuff_noCSUS(spike_struct, pos_struct, Fs, dim, ts_struct, csus_struct, bitsper_struct, nShuff);
+
+    [per_spike per_sec] = bitsper_CSUS15_shuff(spike_struct, CSUS_structure, 0, 500, bitsper_struct);
 
     % Store back into rat structure
-    if ~isfield(rat, 'per_spike_shuff')
-        rat.per_spike_shuff = struct();
+    if ~isfield(rat, 'per_spike_shuffCSUS')
+        rat.per_spike_shuffCSUS = struct();
     end
-    if ~isfield(rat, 'per_sec_shuff')
-        rat.per_sec_shuff = struct();
+    if ~isfield(rat, 'per_sec_shuffCSUS')
+        rat.per_sec_shuffCSUS = struct();
     end
 
     % Merge shuffled results in
-    rat.per_spike_shuff = structmerge(rat.per_spike_shuff, per_spike);
-    rat.per_sec_shuff = structmerge(rat.per_sec_shuff, per_sec);
+    rat.per_spike_shuffCSUS = structmerge(rat.per_spike_shuffCSUS, per_spike);
+    rat.per_sec_shuffCSUS = structmerge(rat.per_sec_shuffCSUS, per_sec);
 
     assignin('base', ratVar, rat);
 end

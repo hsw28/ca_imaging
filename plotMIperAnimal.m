@@ -20,11 +20,14 @@ for r = 1:length(ratNames)
     theseDays = dateList(idx-2:idx);
 
     for d = 1:3
-      miVec = rat.MI_noCSUS.(['MI_' theseDays{d}]);
-      miVec2 = rat.MI_CSUS15.(['MI_' theseDays{d}]);
+  %   miVec = rat.MI_noCSUS.(['MI_' theseDays{d}]);
+    miVec = rat.MI_CSUS15.(['MI_' theseDays{d}]);
+    % miVec = rat.bitsperCSUS.(['MI_' theseDays{d}]);
+      %        miVec = miVec(1,:); %%% ONLY FOR BITS PER -- THIS IS BITS PER SPIKE
+    %         miVec = miVec(2,:); %%% ONLY FOR BITS PER -- THIS IS BITS PER SEC
 
-      nanny = isnan(miVec2);
-      miVec(nanny) = NaN;
+    %  nanny = isnan(miVec2);
+    %  miVec(nanny) = NaN;
 
 
         x = d + (r-1)*4;  % space between animals
@@ -80,10 +83,15 @@ for r = 1:length(ratNames)
 
     allMI = [];
     for d = 1:3
-        miVec = rat.MI_noCSUS.(['MI_' theseDays{d}]);
-        miVec2 = rat.MI_CSUS15.(['MI_' theseDays{d}]);
-        nanny = isnan(miVec2);
-        miVec(nanny) = NaN;
+        rate = rat.ratemask.(['ratemask_' theseDays{d}]);
+        %   miVec = rat.MI_noCSUS.(['MI_' theseDays{d}]);
+          miVec = rat.MI_CSUS15.(['MI_' theseDays{d}]);
+        %  miVec = rat.bitsperCSUS.(['MI_' theseDays{d}]);
+        %        miVec = miVec(1,:); %%% ONLY FOR BITS PER -- THIS IS BITS PER SPIKE
+        %        miVec = miVec(2,:); %%% ONLY FOR BITS PER -- THIS IS BITS PER SEC
+
+
+        miVec(rate==0) = NaN;
 
 
         allMI = [allMI; miVec(:)];

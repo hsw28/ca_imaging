@@ -8,7 +8,7 @@ function plotTraceFRDist()
 % USER PARAMETERS
 ratNames  = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
 win       = [0 2];        % CS trace window (s)
-minSpikes = 5;            % min total spikes in CS windows per cell
+minSpikes = 0;            % min total spikes in CS windows per cell
 
 %— aggregate per‐cell rates —%
 FRt_all = [];
@@ -20,10 +20,15 @@ for r = 1:numel(ratNames)
     idx   = find(strcmp(dates, rat.An),1);
     days  = dates(idx-2:idx);
     for d = 1:3
-        spk     = rat.Ca_peaks.(sprintf('CA_peaks_%s',days{d}));
-        posMat  = rat.pos.(sprintf('pos_%s',days{d}));
-        ts      = posMat(:,1);
-        csTimes = rat.CS_times.(sprintf('CS_%s',days{d}));
+        spk      = rat.Ca_peaks.(sprintf('CA_peaks_%s',days{d}));
+        posMat   = rat.pos.(sprintf('pos_%s',days{d}));
+        ts       = posMat(:,1);
+        csTimes  = rat.CS_times.(sprintf('CS_%s',days{d}));
+        ratemask = rat.ratemask.(sprintf('ratemask_%s',days{d}));
+
+        % --- apply ratemask: keep only cells with ratemask==1 -------------
+        keep = (ratemask == 1);
+        spk  = spk(keep,:);
 
         [FRt, FRr] = popVecSim(spk, ts, csTimes, win, minSpikes);
 
@@ -214,9 +219,6 @@ if p < 0.05
 end
 
 
-
-
-
 %— ROC & AUC —%
 labels = [ ones(size(FRt_all)), zeros(size(FRr_all)) ];
 scores = [ FRt_all,            FRr_all           ];
@@ -231,6 +233,32 @@ hold on; plot([0 1],[0 1],'k--');
 xlabel('False positive rate'); ylabel('True positive rate');
 title(sprintf('ROC curve (AUC = %.3f)', AUC));
 axis square;
+
+% --- Permutation Test for AUC ---
+nShuff = 500;
+permAUCs = nan(nShuff,1);
+
+fprintf('\nRunning permutation test for AUC (n=%d)...\n', nShuff);
+
+for s = 1:nShuff
+    permLabels = labels(randperm(length(labels)));
+    [~,~,~,permAUCs(s)] = perfcurve(permLabels, scores, 1);
+end
+
+% Plot histogram of shuffled AUCs
+figure('Color','w','Position',[400 400 500 400]);
+histogram(permAUCs, 30, 'FaceColor',[.7 .7 .7], 'EdgeColor','k', 'Normalization', 'probability');
+hold on;
+xline(AUC, 'r--', 'LineWidth', 2);
+xlabel('AUC'); ylabel('Frequency');
+title(sprintf('Permutation Test for AUC (Actual = %.3f)', AUC));
+legend('Shuffled AUCs', 'Actual AUC', 'Location','best');
+
+mean(permAUCs)
+% Compute p-value
+permP = mean(permAUCs >= AUC);
+fprintf('Permutation p-value for AUC = %.4f\n', permP);
+
 
 end
 

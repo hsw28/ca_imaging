@@ -22,7 +22,7 @@ assert(ismember(method,{'fdr','bonf'}),'method must be ''fdr'' or ''bonf''');
 % — user parameters —
 qFDR     = 0.05;      % FDR level
 alphaFW  = 0.05;      % family-wise for Bonferroni
-minSpk   = 5;         % min spikes in each CS trial to include
+minSpk   = 0;         % min spikes in each CS trial to include
 win      = [0 2];     % CS window (s)
 nShuff   = 500;       % # of shuffle replicates (permute trial speeds)
 ratNames = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
@@ -51,6 +51,7 @@ for r = 1:nRats
     spkMat  = rat.Ca_peaks.(['CA_peaks_' day]);   % neurons × event times
     posRaw  = rat.pos.(['pos_' day]);
     csTimes = rat.CS_times.(['CS_' day]);
+    rateMask = rat.ratemask.(['ratemask_' day]);
 
     % compute speed at each timestamp
     V     = ca_velocity(posRaw');
@@ -82,7 +83,8 @@ for r = 1:nRats
         t2 = csTimes(t)+win(2);
         nSpkWin = nSpkWin + sum(spks>=t1 & spks<=t2);
       end
-      passed = (nSpkWin>=minSpk);
+      %passed = (nSpkWin>=minSpk);
+      passed = (rateMask(ni) == 1);
 
       % build trial‐wise FR & mean speed
       for t=1:nTr
@@ -127,8 +129,14 @@ for r = 1:nRats
   end
 
   % multiple‐comparison per‐neuron
-  [sigAllP,sigAllS] = sigTest(pAll, mean(abs(shAll-mean(shAll,2)),2)<abs(rAll), method,qFDR,alphaFW);
-  [sigIncP,sigIncS] = sigTest(pInc, mean(abs(shInc-mean(shInc,2)),2)<abs(rInc), method,qFDR,alphaFW);
+pShufAll = mean( abs(shAll) >= abs(rAll(:)), 2 );   % rAll(:) → column
+pShufInc = mean( abs(shInc) >= abs(rInc(:)), 2 );   % rInc(:) → column
+
+
+[sigAllP, sigAllS] = sigTest(pAll, pShufAll, method, qFDR, alphaFW);
+[sigIncP, sigIncS] = sigTest(pInc, pShufInc, method, qFDR, alphaFW);
+
+
 
   % population‐level
   popNullAll = mean(shAll,2);

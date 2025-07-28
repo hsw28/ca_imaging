@@ -1,4 +1,5 @@
-function f = mutualinfo_CSUS15(spike_structure, CSUS_structure, do_you_want_pretrial)
+
+function f = bitsper_CSUS15(spike_structure, CSUS_structure, do_you_want_pretrial)
 %finds 'mutual info' for CS/US/ non CS/US
 %CSUS_structure should come from BULKconverttoframe.m
 %do_you_want_pretrial: 0 for only cs us, 1 for cs us pretrial
@@ -36,7 +37,8 @@ for i = 1:numel(fields_spikes)
 
 
 
-      mutinfo = NaN(size(peaks_time,1),1);
+      bitsper_info = NaN(size(peaks_time,1),2);
+
 
       numunits = size(peaks_time,1);
 
@@ -116,7 +118,9 @@ for i = 1:numel(fields_spikes)
                 if (size(occprob,1)) < (size(occprob,2))
                   occprob = occprob';
                 end
-                mutinfo(k) = mutualinfo([spikeprob./nansum(spikeprob), occprob]) %is this oriented the right way
+                [bitsPerSpike, bitsPerSecond]= bits_per(spikeprob./((1/7.5)*50), occprob); %is this oriented the right way
+                bitsper_info(k,1) = bitsPerSpike;
+                bitsper_info(k,2) = bitsPerSecond;
               else
                 occprob = occ_in_CS_US.*(1/7.5);
                 occprob = occprob./nansum(occprob);
@@ -132,16 +136,20 @@ for i = 1:numel(fields_spikes)
                 if (size(occprob,1)) < (size(occprob,2))
                   occprob = occprob';
                 end
-                mutinfo(k) = mutualinfo([spikeprob./nansum(spikeprob), occprob]); %is this oriented the right way
+
+                [bitsPerSpike, bitsPerSecond]= bits_per(spikeprob./((1/7.5)*50), occprob); %is this oriented the right way
+                bitsper_info(k,1) = bitsPerSpike;
+                bitsper_info(k,2) = bitsPerSecond;
               end
 
             else
-              mutinfo(k) = NaN;
+              bitsper_info(k,1) = NaN;
+              bitsper_info(k,2) = NaN;
             end
           end
       end
 
-      mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
+      mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = bitsper_info';
       end
 
 

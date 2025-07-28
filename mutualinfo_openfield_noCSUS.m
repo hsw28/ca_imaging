@@ -102,12 +102,16 @@ for i = 1:numel(fields_spikes)
 
       numunits = size(peaks_time,1);
 
+      timelength = curr_CA_timestamps(end)-curr_CA_timestamps(1);
+
       if numunits<=1
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
         warning('you have no spikes')
       else
       for k=1:numunits
         highspeedspikes = [];
+        numspikes = peaks_time(k,:);
+
 
         [c indexmin] = (min(abs(peaks_time(k,:)-mintime))); %
         [c indexmax] = (min(abs(peaks_time(k,:)-maxtime))); %
@@ -131,7 +135,7 @@ for i = 1:numel(fields_spikes)
 
 
   set(0,'DefaultFigureVisible', 'off');
-  if length(highspeedspikes)>0
+  if length(highspeedspikes)>0 && (length(peaks_time)-length(highspeedspikes))>5
   [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(highspeedspikes, goodpos, dim, 1.000);
           if (size(spikeprob,1)) < (size(spikeprob,2))
             spikeprob = spikeprob';

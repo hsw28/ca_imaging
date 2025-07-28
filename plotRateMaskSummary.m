@@ -33,10 +33,12 @@ for r = 1:nRats
     for d = 1:3
         dateStr = theseDays{d};
         spikeMat = rat.Ca_peaks.(['CA_peaks_' dateStr]);
+        rateMask = rat.ratemask.(['ratemask_' dateStr]);
         nNeurons = size(spikeMat,1);
 
         for ni = 1:nNeurons
             spikes = spikeMat(ni,:); spikes = spikes(~isnan(spikes));
+            if rateMask(ni) == 0, continue; end
             if numel(spikes) < 3, continue; end
 
             [rt1, rt2, rp1, rp2] = RateMaskVsTask_summary(rat, ni, dateStr, N);

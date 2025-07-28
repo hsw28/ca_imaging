@@ -1,4 +1,5 @@
-function [mutualinfo_struct, shuf_all] = mutualinfo_CSUS_shuff15(spike_structure, CSUS_structure, do_you_want_pretrial, num_times_to_run, MI_CSUS)
+
+function [per_spike per_sec] = bitsper_CSUS15_shuff(spike_structure, CSUS_structure, do_you_want_pretrial, num_times_to_run, ca_bitsper)
 %finds 'mutual info' for CS/US/ non CS/US
 %CSUS_structure should come from BULKconverttoframe.m
 %do_you_want_pretrial: 0 for only cs us, 1 for cs us pretrial
@@ -13,7 +14,7 @@ fprintf('running mutualinfo_CSUS_shuff')
 divisions = 15;
 fields_spikes = fieldnames(spike_structure);
 fields_CSUS = fieldnames(CSUS_structure);
-fields_MI = fieldnames(MI_CSUS);
+fields_MI = fieldnames(ca_bitsper)
 
 if numel(fields_spikes) ~= numel(fields_CSUS)
   error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
@@ -30,10 +31,16 @@ for i = 1:numel(fields_spikes)
 
       fieldName_CSUS = fields_CSUS{i};
       fieldValue_CSUS = CSUS_structure.(fieldName_CSUS);
+
+      if startsWith(spikes_date, '2022')
+          CSUS = fieldValue_CSUS(:,15:end);
+      end
+
+      numtrials = sum(fieldValue_CSUS(1,:)==1);
       CSUS = fieldValue_CSUS;
 
       fieldName_MI = fields_MI{i};
-      fieldValue_MI = MI_CSUS.(fieldName_MI);
+      fieldValue_MI = ca_bitsper.(fieldName_MI);
       MI = fieldValue_MI;
 
       index = strfind(fieldName_spikes, '_');
@@ -95,7 +102,7 @@ for i = 1:numel(fields_spikes)
 
 
               set(0,'DefaultFigureVisible', 'off');
-              shuf = NaN(num_times_to_run,1);
+              shuf = NaN(num_times_to_run,2);
             if length(currspikes)>0  %finding how many spikes in each time bin
                 parfor l = 1:num_times_to_run
                   spikes_in_CS_US = zeros(1,15);
@@ -140,7 +147,8 @@ for i = 1:numel(fields_spikes)
                                     if (size(occprob,1)) < (size(occprob,2))
                                       occprob = occprob';
                                     end
-                                    shuf(l) = mutualinfo([spikeprob./nansum(spikeprob), occprob]); %is this oriented the right way
+                                    [bitsPerSpike, bitsPerSecond] = bits_perCSUS(spikeprob./(numtrials/7.5), occprob);
+                                    shuf(l,:) = [bitsPerSpike, bitsPerSecond];
                               else
                                     occprob = occ_in_CS_US.*(1/7.5);
                                     occprob = occprob./nansum(occprob);
@@ -151,37 +159,43 @@ for i = 1:numel(fields_spikes)
                                     if (size(occprob,1)) < (size(occprob,2))
                                       occprob = occprob';
                                     end
-
-                                    shuf(l) = mutualinfo([spikeprob./nansum(spikeprob), occprob]); %is this oriented the right way
+                                    [bitsPerSpike, bitsPerSecond] = bits_perCSUS(spikeprob./(numtrials/7.5), occprob);
+                                    shuf(l,:) = [bitsPerSpike, bitsPerSecond];
                               end
                       end
 
 
 
-                      %% ---------- shuffle statistics ---------------------------------
-                      shOK   = shuf(~isnan(shuf));
-                      if numel(shOK) < 5       % need some shuffles
-                          continue
-                      end
-                      p95    = prctile(shOK,95);
-                      muSh   = nanmean(shOK);
-                      pctile = nanmean(shOK <= mutinfo(k));  % percentile rank 0–1
+                      shSort1 = sort(shuf(:,1),'ascend');
+                      shSort2 = sort(shuf(:,2),'ascend');
 
-                      %% ---------- store ----------------------------------------------
-                      mutinfoMat(:,k) = [p95; muSh; pctile];
+                      % 95-th percentile and shuffle mean
+                      p95_idx = round(0.95 * num_times_to_run);
+                      bitsPspike(1,k) = shSort1(p95_idx);
+                      bitsPsec  (1,k) = shSort2(p95_idx);
 
+                      bitsPspike(2,k) = nanmean(shSort1);
+                      bitsPsec  (2,k) = nanmean(shSort2);
 
-            shuf_all = [shuf_all, shuf];
+                      % Rank (percent of shuffle ≥ observed)
+                      % Rank (percent of shuffle ≥ observed)
+                      obsSpk = MI(1,k);
+                      obsSec = MI(2,k);
+                      rankSpk = mean(shSort1 >= obsSpk);
+                      rankSec = mean(shSort2 >= obsSec);
+                      bitsPspike(3,k) = rankSpk;
+                      bitsPsec  (3,k) = rankSec;
 
             end %for k=1:size(peaks_time,1)
 
         end %if numunits<=1
 
-
-            mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
+        fprintf('assigning MI')
+        per_spike.(sprintf('bitsPerSpike_%s', spikes_date)) = bitsPspike';
+        per_sec.(sprintf('bitsPerSec_%s', spikes_date)) = bitsPsec';
     end
 
-
+%{
       f = mutualinfo_struct;
       fprintf('saving\n');
 
@@ -194,7 +208,7 @@ for i = 1:numel(fields_spikes)
           suffix = '_pt';
       end
 
-%{
+
       % Create the dynamic variable name with the suffix
       variableName = sprintf('MI_CSUS5_shuff%s', suffix);
 
