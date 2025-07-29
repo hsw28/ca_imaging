@@ -114,10 +114,54 @@ for r = 1:nRats+1
 
   if r<=nRats, fracRat(r) = mean(h,'omitnan'); end
 
-  maxFold = nanmax(obsFold);
-  edges   = linspace(0, ceil(maxFold), 30);
-  histogram(obsFold(~h), edges, 'Normalization','probability'); hold on;
-  histogram(obsFold(h),  edges, 'Normalization','probability');
+
+  %% FOR NOT LOG PLOT
+  %maxFold = nanmax(obsFold);
+  %edges   = linspace(0, ceil(maxFold), 30);
+  %histogram(obsFold(~h), edges, 'Normalization','probability'); hold on;
+  %histogram(obsFold(h),  edges, 'Normalization','probability');
+
+  %FOR LOG PLOT
+  % --- assume obsFold is your data (vector) and h is logical mask for sig ---
+  dataAll = obsFold(:);      % make sure it’s a column
+  sigMask = h(:);
+
+  % 1) only positives
+  posData = dataAll(dataAll>0);
+  if isempty(posData)
+      error('No positive fold-changes to plot on log scale.');
+  end
+
+  % 2) define min & max in log domain
+  minF = max(min(posData), realmin);  % at least realmin
+  maxF = max(posData);
+
+  % 3) make log-spaced edges
+  nLogBins = 20;
+  logEdges = logspace(log10(minF), log10(maxF), nLogBins+1);
+
+  % 4) plot
+  clf; hold on;
+  h1 = histogram(dataAll(~sigMask & dataAll>0), logEdges, ...
+                 'Normalization','probability');
+  h2 = histogram(dataAll( sigMask & dataAll>0), logEdges, ...
+                 'Normalization','probability');
+
+  set(gca, 'XScale','log');
+  xlabel('Fold-change (log scale)');
+  ylabel('Probability');
+  legend('ns','sig','Location','best');
+
+  % 5) tweak appearance
+  h1.FaceColor = [0.2 0.6 1];
+  h2.FaceColor = [1 0.4 0.2];
+  h2.FaceAlpha = 0.6;
+  xlim([minF maxF]);
+
+%%%
+
+
+
   xlabel('Fold‐change'); ylabel('Probability');
   title(titleTxt);
   legend('ns','sig','Location','Best');
@@ -129,4 +173,8 @@ for r = 1:nRats
 end
 fracAll = mean(fracRat,'omitnan');
 fprintf('All rats combined: %.3f\n', fracAll);
+
+
+
+
 end
