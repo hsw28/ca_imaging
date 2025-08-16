@@ -69,35 +69,32 @@ for i = 1:numel(fields_spikes)
       biggest = max(peaks_time(:));
       [minValue,closestIndex] = min(abs(biggest-tm));
 
-
-      % Find all time points where CSUS_id > 0
-      taskIdx = find(CSUS_id(1,:) > 0);
-
-      % Initialize logical mask the same size as CSUS_id
-      keepIdx = false(size(CSUS_id));
-
-      % For each task time point, mark the current and next 15 points
-      for i = 1:length(taskIdx)
-          idx = taskIdx(i);
-          maxIdx = min(idx + 15, length(CSUS_id));  % avoid going out of bounds
-          keepIdx(idx:maxIdx) = true;
+      if abs(length(CSUS_id)-length(pos))>3
+        error('your ID and pos have different lengths')
       end
 
-      % Now find the full range of indices to keep
-      goodCSUS = find(keepIdx);
-      good_CSUStime = pos(goodCSUS,1);
-      good_CSUSpos = pos(goodCSUS,:);
 
+      % Find all time points where CSUS_id <0
+      keepIdx = find(CSUS_id(1,:) <= 0);
+      goodCSUS = keepIdx;
+      CSUS_time = find(CSUS_id(1,:) > 0);
+      CSUS_time = pos(CSUS_time, 1);
+
+
+
+      % Now find the full range of indices to keep
 
       vel = ca_velocity(pos);
       goodvel = find(vel(1,:)>=velthreshold);
+      goodvel = intersect(goodvel, goodCSUS);
+
       goodtime = pos(goodvel, 1);
       goodpos = pos(goodvel,:);
-      goodvel = setdiff(goodvel, goodCSUS);
 
 
       mintime = vel(2,1);
       maxtime = vel(2,end);
+
       tm = vel(2,:);
 
       numunits = size(peaks_time,1);
@@ -125,15 +122,15 @@ for i = 1:numel(fields_spikes)
 
 
         for ii=1:length(currspikes) %finding if in good vel
-          [minValue_CSUS,closestIndex] = min(abs(currspikes(ii)-good_CSUStime));
+          [minValue_CSUS,closestIndex] = min(abs(currspikes(ii)-CSUS_time));
           [minValue_vel,closestIndex] = min(abs(currspikes(ii)-goodtime));
-          if minValue_CSUS <= 1/15 & isnan(currspikes(ii))==0 %being CSUS takes precedence
+
+          if minValue_CSUS <= 1/7.5 %being CSUS takes precedence
             continue;
-          elseif minValue_vel <= 1/15 & isnan(currspikes(ii))==0
+          elseif minValue_vel <= 1/7.5 & isnan(currspikes(ii))==0
             highspeedspikes(end+1) = currspikes(ii);
           end
         end
-
 
 
 %want highspeedspikes

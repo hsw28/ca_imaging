@@ -33,6 +33,9 @@ for i = 1:numel(fields_spikes)
       index = strfind(fieldName_spikes, '_');
       CSUS_date = fieldName_spikes(index(2)+1:end)
 
+      if startsWith(CSUS_date, '2022')
+          CSUS(1,1:15) = zeros(1,15);
+      end
 
 
 

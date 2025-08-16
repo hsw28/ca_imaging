@@ -30,8 +30,8 @@ for i = 1:numel(ratNames)
     bitspersec = filterFieldsByDay(rat.per_sec_shuff, daysToUse);
 
     % Filter MI struct -- FOR CSUS
-    bitsperspike = filterFieldsByDay(rat.per_spike_shuffCSUS, daysToUse);
-    bitspersec = filterFieldsByDay(rat.per_sec_shuffCSUS, daysToUse);
+%    bitsperspike = filterFieldsByDay(rat.per_spike_shuffCSUS, daysToUse);
+%    bitspersec = filterFieldsByDay(rat.per_sec_shuffCSUS, daysToUse);
 
 
     ratemask_struct = filterFieldsByDay(rat.ratemask, daysToUse);

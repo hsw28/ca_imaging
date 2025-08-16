@@ -1,4 +1,4 @@
-function CS_US_id_struct = BULKconverttoframe15(US_time_structure, Ca_timestamps)
+function CS_US_id_struct = BULKconverttoframe90(US_time_structure, Ca_timestamps)
 
 %8 divisions
 %converts from a timestamp to a frame #.
@@ -27,6 +27,8 @@ for i = 1:numel(fields_US)
 
       index = strfind(field_name, '_');
       date = field_name(index(2)+1:end)
+
+
 
 
             timestamps = Ca_ts;
@@ -72,11 +74,16 @@ for i = 1:numel(fields_US)
                 %allframes(US_frame-5:US_frame-1)=10;
                 %allframes(US_frame+0:US_frame+4)=20;
 
-                if US_frame-5>0 && US_frame+8<=length(allframes)
-                  if US_frame-10>1
+                checklength = length(2:2:length(timestamps));
+
+                if US_frame-16>0 && US_frame+83<=length(allframes)
+                  if US_frame-16>1 <= length(allframes)
                     allframes(US_frame-16:US_frame-7)=[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1];
                     allframes(US_frame-6:US_frame-1)=[1,2,3,4,5,6];
-                    allframes(US_frame+0:US_frame+8)=[7,8,9,10,11,12,13,14,15];
+                    allframes(US_frame+0:US_frame+83)=[7:90];
+                    if length(allframes) ~= checklength
+                      error('error 1')
+                    end
                   else
                     allframes(1:US_frame-6)=ones(length(allframes(1:US_frame-6)),1);
                     if US_frame-6 <1
@@ -85,17 +92,31 @@ for i = 1:numel(fields_US)
                     else
                     allframes(US_frame-6:US_frame-1)=[1,2,3,4,5,6];
                     end
-                    allframes(US_frame+0:US_frame+8)=[7,8,9,10,11,12,13,14,15];
+                    allframes(US_frame+0:US_frame+97)=[7:90];
+                    if length(allframes) ~= checklength
+                      error('error 2')
+                    end
                   end
-                elseif US_frame-15<=0
+                elseif US_frame-16<=0
+
                   startpoint = 15+(US_frame-15);
                   allframes(1:startpoint) = [15-startpoint+1:1:15];
-                elseif US_frame+8>length(allframes)
-                  allframes(US_frame:allframes(end))=[7:1:length(allframes)-US_frame];
+                  if length(allframes) ~= checklength
+                    error('error 3')
+                  end
+                elseif US_frame+87>length(allframes) && length(allframes(US_frame:allframes(end)))>0
+                  allframes(US_frame:allframes(end))=[7:1:length(allframes)-US_frame-1];
+                  if length(allframes) ~= checklength
+                    error('error 4')
+                  end
+                else
+                  continue
                 end
 
 
             end
+
+
 
             tsindex = 2:2:length(timestamps);
             timestamps = timestamps(tsindex);
@@ -107,6 +128,7 @@ for i = 1:numel(fields_US)
               timestamps(end+1) = timestamps(end)+1/7.5;
               warning('your timestamps and frames arent same length')
             end
+
 
 
         CS_US_id_struct.(sprintf('CSUS_id_%s', date)) = [allframes' timestamps]';

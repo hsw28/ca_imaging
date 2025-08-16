@@ -1,4 +1,4 @@
-function run_bitsper_noCSUS_Shuffle
+function run_bitsper_wCSUS_Shuffle
 % Wrapper to run MI shuffle for only An and 2 days before for all 5 rats
 %returns top 5%, mean, shuffled percent (want 0.95 or higher), and hertz during running periods
 
@@ -35,7 +35,7 @@ for i = 1:numel(ratNames)
 
     % Run the shuffle function
 
-    [per_spike per_sec] = bitsper_openfield_shuff_noCSUS(spike_struct, pos_struct, Fs, dim, ts_struct, csus_struct, bitsper_struct, nShuff);
+    [per_spike per_sec] = bitsper_openfield_shuff_wCSUS(spike_struct, pos_struct, Fs, dim, ts_struct, csus_struct, bitsper_struct, nShuff);
 
     % Store back into rat structure
     if ~isfield(rat, 'per_spike_shuff')

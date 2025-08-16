@@ -39,15 +39,24 @@ for i = 1:numel(fields_spikes)
       index = strfind(fieldName_spikes, '_');
       CSUS_date = fieldName_spikes(index(2)+1:end)
 
-      if length(peaks_time) <1
-        mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
-        continue
-      end
+    %  if length(peaks_time) <1
+    %    mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+    %    p95    = NaN;
+    %    muSh   = NaN;
+    %    pctile = NaN;
+    %    continue
+    %  end
 
       numunits = size(peaks_time,1);
 
+
+      if startsWith(CSUS_date, '2022')
+          CSUS(1,1:15) = zeros(1,15);
+      end
+
       time = CSUS(2,:);
       CSUS = CSUS(1,:);
+
 
       biggest = max([peaks_time(:)]);
       [minValue,closestIndex] = min(abs(biggest-time));
@@ -84,12 +93,10 @@ for i = 1:numel(fields_spikes)
           mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
           warning('you have no cells or no spikes or no CS/US')
       else
+        mutinfoMat = NaN(3,size(peaks_time,1));
         for k=1:size(peaks_time,1) %selecting cell
                 currspikes = peaks_time(k,:);
                 if isnan(MI(k))==1
-                    mutinfo(1, k) = NaN;
-                    mutinfo(2, k) = NaN;
-                    mutinfo(3, k) = NaN;
                     continue
                 end
 
@@ -115,11 +122,11 @@ for i = 1:numel(fields_spikes)
                   end
 
                                 for q =1:length(currspikes)
-                                  if isnan(currspikes(q))==1
-                                    continue
-                                  end
-                                [c index] = (min(abs(currspikes(q)-time))); %
-                                spikebin = shuffCSUS(index);
+                                        if isnan(currspikes(q))==1
+                                          continue
+                                        end
+                                      [c index] = (min(abs(currspikes(q)-time))); %
+                                      spikebin = shuffCSUS(index);
                                         if spikebin == 0
                                           spikes_intertrial = spikes_intertrial+1;
                                         elseif spikebin == -1
@@ -159,17 +166,21 @@ for i = 1:numel(fields_spikes)
 
 
                       %% ---------- shuffle statistics ---------------------------------
+
+
                       shOK   = shuf(~isnan(shuf));
                       if numel(shOK) < 5       % need some shuffles
+                        mutinfoMat(1, k) = NaN;
+                        mutinfoMat(2, k) = NaN;
+                        mutinfoMat(3, k) = NaN;
                           continue
                       end
                       p95    = prctile(shOK,95);
                       muSh   = nanmean(shOK);
-                      pctile = nanmean(shOK <= mutinfo(k));  % percentile rank 0–1
+                      pctile = nanmean(shOK <= MI(k));  % percentile rank 0–1
 
                       %% ---------- store ----------------------------------------------
                       mutinfoMat(:,k) = [p95; muSh; pctile];
-
 
             shuf_all = [shuf_all, shuf];
 
@@ -178,7 +189,7 @@ for i = 1:numel(fields_spikes)
         end %if numunits<=1
 
 
-            mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
+            mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfoMat';
     end
 
 

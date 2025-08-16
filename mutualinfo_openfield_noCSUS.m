@@ -35,6 +35,8 @@ for i = 1:numel(fields_spikes)
       fieldValue_pos = pos_structure.(fieldName_pos);
       pos = fieldValue_pos;
 
+
+
       if size(pos,2)>3
         error('you are not using a fixed position')
       end
@@ -63,37 +65,23 @@ for i = 1:numel(fields_spikes)
       mutinfo = NaN(size(peaks_time,1),1);
 
       tm = pos(:, 1);
-      biggest = max(peaks_time(:));
-      [minValue,closestIndex] = min(abs(biggest-tm));
-
-
 
 
       % Find all time points where CSUS_id > 0
       taskIdx = find(CSUS_id(1,:) > 0);
+      taskTime = pos(taskIdx, 1);
 
-      % Initialize logical mask the same size as CSUS_id
-      keepIdx = false(size(CSUS_id));
+      % Find all time points where CSUS_id <=0
+      keepIdx = find(CSUS_id(1,:) <= 0);
 
-      % For each task time point, mark the current and next 15 points
-      for i = 1:length(taskIdx)
-          idx = taskIdx(i);
-          maxIdx = min(idx + 5, length(CSUS_id));  % avoid going out of bounds
-          keepIdx(idx:maxIdx) = true;
-      end
 
       % Now find the full range of indices to keep
-      goodCSUS = find(keepIdx);
-      good_CSUStime = pos(goodCSUS,1);
-      good_CSUSpos = pos(goodCSUS,:);
-
-
       vel = ca_velocity(pos);
       goodvel = find(vel(1,:)>=velthreshold);
+      goodvel = intersect(goodvel, keepIdx);
+
       goodtime = pos(goodvel, 1);
       goodpos = pos(goodvel,:);
-      goodvel = setdiff(goodvel, goodCSUS);
-
 
 
       mintime = vel(2,1);
@@ -101,8 +89,6 @@ for i = 1:numel(fields_spikes)
       tm = vel(2,:);
 
       numunits = size(peaks_time,1);
-
-      timelength = curr_CA_timestamps(end)-curr_CA_timestamps(1);
 
       if numunits<=1
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
@@ -112,18 +98,17 @@ for i = 1:numel(fields_spikes)
         highspeedspikes = [];
         numspikes = peaks_time(k,:);
 
-
         [c indexmin] = (min(abs(peaks_time(k,:)-mintime))); %
         [c indexmax] = (min(abs(peaks_time(k,:)-maxtime))); %
         currspikes = peaks_time(k,indexmin:indexmax);
 
 
+
+
         for ii=1:length(currspikes) %finding if in good vel
-          [minValue_CSUS,closestIndex] = min(abs(currspikes(ii)-good_CSUStime));
+          [minValue_CSUS,closestIndex] = min(abs(currspikes(ii)-taskTime));
           [minValue_vel,closestIndex] = min(abs(currspikes(ii)-goodtime));
-          if minValue_CSUS <= 1/15 & isnan(currspikes(ii))==0 %being CSUS takes precedence
-            continue;
-          elseif minValue_vel <= 1/15 & isnan(currspikes(ii))==0
+          if minValue_vel <= 1/7.5 & isnan(currspikes(ii))==0
             highspeedspikes(end+1) = currspikes(ii);
           end
         end

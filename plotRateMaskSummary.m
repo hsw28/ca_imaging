@@ -1,8 +1,10 @@
-function plotRateMaskSummary(N)
+function plotRateMaskSummary(N, normalized)
 % Summary plot using rate masks defined as N std above mean
 % For An-2, An-1, and An across all rats
+%if you want data to be normalized by mean rate, normalized == 1
 
 if nargin < 1, N = 1; end  % std threshold
+if nargin < 2, normalized = 0; end  % std threshold
 
 ratNames = {'rat0222', 'rat0307', 'rat0313', 'rat0314', 'rat0816'};
 nRats = numel(ratNames);
@@ -36,18 +38,26 @@ for r = 1:nRats
         rateMask = rat.ratemask.(['ratemask_' dateStr]);
         nNeurons = size(spikeMat,1);
 
+        if normalized==1
+          meanrate = rat.rates.(['rates_' dateStr]);
+        else
+          meanrate = ones(1,nNeurons);
+        end
+
+
         for ni = 1:nNeurons
-            spikes = spikeMat(ni,:); spikes = spikes(~isnan(spikes));
+            spikes = spikeMat(ni,:);
+            spikes = spikes(~isnan(spikes));
             if rateMask(ni) == 0, continue; end
             if numel(spikes) < 3, continue; end
 
             [rt1, rt2, rp1, rp2] = RateMaskVsTask_summary(rat, ni, dateStr, N);
             if any(isnan([rt1, rt2, rp1, rp2])), continue; end
 
-            rt1_all(end+1) = rt1;
-            rt2_all(end+1) = rt2;
-            rp1_all(end+1) = rp1;
-            rp2_all(end+1) = rp2;
+            rt1_all(end+1) = rt1./meanrate(ni);
+            rt2_all(end+1) = rt2./meanrate(ni);
+            rp1_all(end+1) = rp1./meanrate(ni);
+            rp2_all(end+1) = rp2./meanrate(ni);
         end
     end
 
@@ -125,6 +135,75 @@ for r = 1:nRats
 
     end
 end
+
+
+figure
+
+% --- Scatter of per‐cell rates in task‐defined mask ---
+subplot(1,2,1); hold on; axis square
+allX = rt1_all;    % in‐mask task
+allY = rt2_all;    % out‐of‐mask task
+scatter(allX, allY, 20, 'filled');
+
+% unity line
+m = max( [ allX(:); allY(:) ] );   % reshape into one big column, then take the max
+plot([0 m],[0 m],'k--','LineWidth',1);
+
+% best‐fit line
+b  = polyfit(allX, allY, 1);
+xx = linspace(0, m, 100);
+plot(xx, polyval(b,xx), 'r-', 'LineWidth',1.5);
+
+% stats
+x = allX(:);    % make N×1
+y = allY(:);    % make N×1
+[R,P] = corr(x, y, 'Rows','complete')
+text(0.05, 0.90, sprintf('r=%.2f, p=%.3f', R, P), ...
+     'Units','normalized', ...
+     'FontSize', 12, ...
+     'VerticalAlignment','top');
+
+xlabel('In‐trial event rate (task mask)');
+ylabel('Out‐of‐trial event rate (task mask)');
+if normalized
+  xlabel('In‐trial rate (norm.)');
+  ylabel('Out‐of‐trial rate (norm.)');
+end
+title('Per‐cell: Task mask');
+
+% --- Scatter of per‐cell rates in non‐task‐mask ---
+subplot(1,2,2); hold on; axis square
+allX = rp1_all;    % in non‐task mask
+allY = rp2_all;    % out non‐task mask
+scatter(allX, allY, 20, 'filled');
+
+% unity line
+m = max( [ allX(:); allY(:) ] );   % reshape into one big column, then take the max
+plot([0 m],[0 m],'k--','LineWidth',1);
+
+% best‐fit line
+b  = polyfit(allX, allY, 1);
+xx = linspace(0, m, 100);
+plot(xx, polyval(b,xx), 'r-', 'LineWidth',1.5);
+
+% stats
+x = allX(:);    % make N×1
+y = allY(:);    % make N×1
+[R,P] = corr(x, y, 'Rows','complete');
+text(0.05, 0.90, sprintf('r=%.2f, p=%.3f', R, P), ...
+     'Units','normalized', ...
+     'FontSize', 12, ...
+     'VerticalAlignment','top');
+
+
+xlabel('In‐trial event rate (spatial mask)');
+ylabel('Out‐of‐trial event rate (spatial mask)');
+if normalized
+  xlabel('In‐trial rate (norm.)');
+  ylabel('Out‐of‐trial rate (norm.)');
+end
+title('Per‐cell: Spatial mask');
+
 
 
 end

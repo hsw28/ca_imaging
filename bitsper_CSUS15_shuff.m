@@ -33,7 +33,7 @@ for i = 1:numel(fields_spikes)
       fieldValue_CSUS = CSUS_structure.(fieldName_CSUS);
 
       if startsWith(spikes_date, '2022')
-          CSUS = fieldValue_CSUS(:,15:end);
+          fieldValue_CSUS(1,1:15) = zeros(1,15);
       end
 
       numtrials = sum(fieldValue_CSUS(1,:)==1);
@@ -84,6 +84,7 @@ for i = 1:numel(fields_spikes)
               previousz = z;
             end
           end
+
 
 
       mutinfo = NaN(3,numunits);

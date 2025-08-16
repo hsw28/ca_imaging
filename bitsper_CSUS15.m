@@ -45,6 +45,11 @@ for i = 1:numel(fields_spikes)
       time = CSUS(2,:);
       CSUS = CSUS(1,:);
 
+      if startsWith(CSUS_date, '2022')
+          CSUS(1,1:15) = zeros(1,15);
+      end
+
+
       biggest = max([peaks_time(:)]);
       [minValue,closestIndex] = min(abs(biggest-time));
       CSUS = CSUS(1:closestIndex);
@@ -75,6 +80,8 @@ for i = 1:numel(fields_spikes)
               previousz = z;
             end
           end
+
+          numtrials = occ_in_CS_US(1);
 
       if numunits<=1
           mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
@@ -118,7 +125,7 @@ for i = 1:numel(fields_spikes)
                 if (size(occprob,1)) < (size(occprob,2))
                   occprob = occprob';
                 end
-                [bitsPerSpike, bitsPerSecond]= bits_per(spikeprob./((1/7.5)*50), occprob); %is this oriented the right way
+                [bitsPerSpike, bitsPerSecond]= bits_per(spikeprob./((1/7.5)*numtrials), occprob); %is this oriented the right way
                 bitsper_info(k,1) = bitsPerSpike;
                 bitsper_info(k,2) = bitsPerSecond;
               else
@@ -137,7 +144,8 @@ for i = 1:numel(fields_spikes)
                   occprob = occprob';
                 end
 
-                [bitsPerSpike, bitsPerSecond]= bits_per(spikeprob./((1/7.5)*50), occprob); %is this oriented the right way
+
+                [bitsPerSpike, bitsPerSecond]= bits_per(spikeprob./((1/7.5)*numtrials), occprob); %is this oriented the right way
                 bitsper_info(k,1) = bitsPerSpike;
                 bitsper_info(k,2) = bitsPerSecond;
               end

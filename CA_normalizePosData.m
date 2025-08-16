@@ -23,6 +23,7 @@ if size(eventData, 1)>size(eventData,2)
 end
 
 %eventData = cutclosest(posData(1,1), posData(end,1), eventData, eventData);
+
 ls = ca_placeevent(eventData,posData);
 if size(ls,2)~=3
 	ls = ls';

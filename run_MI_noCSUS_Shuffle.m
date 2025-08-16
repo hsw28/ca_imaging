@@ -24,21 +24,30 @@ for i = 1:numel(ratNames)
     spike_struct = filterFieldsByDay(rat.Ca_peaks, daysToUse);
     pos_struct   = filterFieldsByDay(rat.pos, daysToUse);
     ts_struct    = filterFieldsByDay(rat.Ca_ts, daysToUse);
-    csus_struct  = filterFieldsByDay(rat.csus15, daysToUse);
-    mi_struct    = filterFieldsByDay(rat.MI_noCSUS, daysToUse);
+    %csus_struct  = filterFieldsByDay(rat.csus15, daysToUse);
+    %mi_struct    = filterFieldsByDay(rat.MI_noCSUS, daysToUse);
+
+    csus_struct  = filterFieldsByDay(rat.csus60, daysToUse);
+    mi_struct    = filterFieldsByDay(rat.MI_noCSUS60, daysToUse);
+    %mi_struct    = filterFieldsByDay(rat.MI_wCSUS, daysToUse);
+
 
     % Run the shuffle function
 
 
     MIshuff = mutualinfo_openfield_shuff_noCSUS(spike_struct, pos_struct, Fs, dim, ts_struct, csus_struct, mi_struct, nShuff);
+  %  MIshuff = mutualinfo_openfield_shuff_wCSUS(spike_struct, pos_struct, Fs, dim, ts_struct, csus_struct, mi_struct, nShuff);
 
     % Store back into rat structure
-    if ~isfield(rat, 'MI_noCSUS_shuff')
-        rat.MI_noCSUS_shuff = struct();
+    if ~isfield(rat, 'MI_noCSUS_shuff60')
+        rat.MI_noCSUS_shuff60 = struct();
     end
 
     % Merge shuffled results in
-    rat.MI_noCSUS_shuff = structmerge(rat.MI_noCSUS_shuff, MIshuff);
+    rat.MI_noCSUS_shuff60 = structmerge(rat.MI_noCSUS_shuff60, MIshuff);
+
+  %  rat.MI_wCSUS_shuff = structmerge(rat.MI_wCSUS_shuff, MIshuff);
+
 
     assignin('base', ratVar, rat);
 end

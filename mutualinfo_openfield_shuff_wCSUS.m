@@ -1,4 +1,4 @@
-function f = mutualinfo_openfield_shuff(spike_structure, pos_structure, velthreshold, dim, CA_timestamps, num_times_to_run, ca_MI)
+function f = mutualinfo_openfield_shuff_wCSUS(spike_structure, pos_structure, velthreshold, dim, CA_timestamps, CSUS_id_struct, ca_MI, num_times_to_run)
 %finds mutual info for a bunch of cells
 %little did I know i already had code for this: ca_mutualinfo_openfield.m
 %returns 95% cutoff, average MI, and rank of actual MI
@@ -24,6 +24,9 @@ fprintf('loading TS')
 fields_cats = fieldnames(CA_timestamps);
 fprintf('all loaded')
 
+fields_CSUS = fieldnames(CSUS_id_struct);
+
+
 if numel(fields_spikes) ~= numel(fields_pos)
   fprintf('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
   error('your spike and US structures do not have the same number of values. you may need to pad your US structure for exploration days')
@@ -35,6 +38,9 @@ for i = 1:numel(fields_spikes)
       fieldName_MI = fields_MI{i};
       fieldValue_MI = ca_MI.(fieldName_MI);
       MI = fieldValue_MI;
+
+      fieldName_CSUS = fields_CSUS{i};
+      CSUS_id = CSUS_id_struct.(fieldName_CSUS);
 
       fieldName_spikes = fields_spikes{i};
       fieldValue_spikes = spike_structure.(fieldName_spikes);
@@ -52,6 +58,7 @@ for i = 1:numel(fields_spikes)
       curr_CA_timestamps = CA_timestamps.(fieldName_cats);
 
 
+
       fprintf('trimming date')
       tm = pos(:, 1);
       biggest = max(peaks_time(:));
@@ -61,19 +68,19 @@ for i = 1:numel(fields_spikes)
       index = strfind(fieldName_spikes, '_');
       pos_date = fieldName_spikes(index(2)+1:end)
 
-      if length(peaks_time) <5
-        mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
-        continue
-      end
+    %  if length(peaks_time) <5
+    %    mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
+    %    continue
+    %  end
 
 
             if (pos(1,1)-pos(end,1))./length(pos) < 1
               pos = convertpostoframe(pos, curr_CA_timestamps);
             end
 
-%      pos = smoothpos(pos);
-
       fprintf('trimming velocity')
+
+
       vel = ca_velocity(pos);
       goodvel = find(vel(1,:)>=velthreshold);
       goodtime = pos(goodvel, 1);
@@ -107,15 +114,25 @@ for i = 1:numel(fields_spikes)
                   continue
                 else
                   highspeedspikes = [];
+                  highspeedspikes2 = [];
                 end
 
                 for ii=1:length(currspikes) %finding if in good vel
-                    [minValue,closestIndex] = min(abs(currspikes(ii)-goodtime));
-                    if minValue <= 1/15 %if spike is within 1 second of moving. no idea if good time
-                      highspeedspikes(end+1) = currspikes(ii);
-                    end
+                  [minValue_vel,closestIndex] = min(abs(currspikes(ii)-goodtime));
+                  if minValue_vel <= 1/15
+                    highspeedspikes(end+1) = currspikes(ii);
+                  end
+                  if minValue_vel <= 1/7.5
+                    highspeedspikes2(end+1) = currspikes(ii);
+                  end
                 end
 
+                fprintf('1/15')
+                length(highspeedspikes)
+                fprintf('1/7.5')
+                length(highspeedspikes2)
+
+                hertz = length(highspeedspikes)./(length(goodpos)/15);
 
                 shuf = NaN(num_times_to_run,1);
                 %for l = 1:num_times_to_run
@@ -128,6 +145,7 @@ for i = 1:numel(fields_spikes)
                         %shuffled_indices = randperm(size(shuff_pos, 1));
                         %shuff_pos(:, 2:3) = shuff_pos(shuffled_indices, 2:3);
                         %end random post shuffle
+
 
                         % code for circular shift
                         pos_only = goodpos(:, 2:3);
@@ -156,35 +174,28 @@ for i = 1:numel(fields_spikes)
                   end
 
 
-                topMI5 = floor(num_times_to_run*.95);
-                topMI1 = floor(num_times_to_run*.99);
-                shuf = sort(shuf);
-                    if isnan(topMI5)==0
-                      mutinfo(1, k) = shuf(topMI5);
-                    else
-                      mutinfo(1, k) = NaN;
-                    end
-                    if isnan(topMI1)==0
-                      mutinfo(2, k) = nanmean(shuf);
-                    else
-                      mutinfo(2, k) = NaN;
-                    end
+                  % remove NaNs from the shuffle distribution
+                shOK = shuf(~isnan(shuf));
 
-                  [c index] = (min(abs(MI(k)-shuf)));
-                  if isnan(index)==0
-                    rank = index./length(shuf);
-                    mutinfo(3, k) = rank;
-                  else
-                    mutinfo(3,k) = NaN;
-                  end
+                % 95-th percentile and mean of shuffle
+                p95cut  = prctile(shOK,95);
+                muShuff = mean(shOK);
 
+                % p-value (upper-tail) and percentile rank
+                pVal = mean(shOK >= MI(k));
+                perc = mean(shOK <= MI(k));     % 0 = worst, 1 = best
 
+                % store
+                mutinfo(1,k) = p95cut;     % 95-th-percentile threshold
+                mutinfo(2,k) = muShuff;    % shuffle mean
+                mutinfo(3,k) = perc;       % percentile of actual MI
+                mutinfo(4,k) = hertz;      % firing rate
 
-              end
+          end
     fprintf('assigning MI')
     mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
-    end
   end
+end
 
 
 %{
@@ -198,7 +209,7 @@ for i = 1:numel(fields_spikes)
   fprintf('Save the output to the .mat file with the timestamped filename\n');
   save(filename, 'results_MI_shuff');
   fprintf('Save is a success\n');
-%}
+
 
 
 results_MI_shift = mutualinfo_struct;
@@ -211,6 +222,8 @@ filename = ['results_MI_shift_', currentDateTime, '.mat'];
 fprintf('Save the output to the .mat file with the timestamped filename\n');
 save(filename, 'results_MI_shift');
 fprintf('Save is a success\n');
+%}
 
+  f = mutualinfo_struct;
 
-  f = mutualinfo_struct
+end
