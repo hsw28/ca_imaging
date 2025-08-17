@@ -11,7 +11,10 @@ function rates  = rateinfo(peaks_time, goodcells, pos, dim)
   goodpos = pos(goodvel,:);
 
   mintime = vel(2,1);
-  maxtime = vel(2,end);
+  maxtime = vel(2,end);      vel = ca_velocity(pos);
+        vel_time = vel(2,:)';
+        vel_mag  = vel(1,:)';
+
 
   numunits = size(peaks_time,1);
 

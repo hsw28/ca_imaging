@@ -172,13 +172,6 @@ Data usage types: trial-flattened, time-flattened, neuron-flattened.
 **Data used:** trial-flattened (UMAP space)
 
 
-### runPCA_fromStruct.m
-
-**Description:** Runs PCA on trial-level neural data → returns PCA space.
-
-**Data used:** trial-flattened
-
-
 ### runUMAP_fromStruct.m
 
 **Description:** Runs UMAP on trial-level neural data → returns UMAP space + AUROC.
@@ -246,6 +239,12 @@ Data usage types: trial-flattened, time-flattened, neuron-flattened.
 **Data used:** depends (often time-flattened or trial-flattened)
 
 
+### runPCA_fromStruct.m
+
+**Description:** Runs PCA on trial-level neural data → returns PCA space.
+
+**Data used:** trial-flattened and time-flattened
+
 
 
 # Function Data Type Chart
@@ -280,7 +279,7 @@ Data usage types: trial-flattened, time-flattened, neuron-flattened.
 | plotAUROC_byPC.m                        | ✅                |                  |                    |
 | plotAUROC_byUMAP.m                      | ✅                |                  |                    |
 | quantifyUMAPManifolds.m                 | ✅                | ✅               |                    |
-| runPCA_fromStruct.m                     | ✅                |                  |                    |
+| runPCA_fromStruct.m                     | ✅                | ✅                 |                    |
 | runUMAP_fromStruct.m                    | ✅                |                  |                    |
 | sortgrid.m                              |                   |                  |                    |
 | testTrainingDayCombos.m                 | ✅                |                  |                    |

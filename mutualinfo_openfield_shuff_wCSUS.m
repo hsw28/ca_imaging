@@ -82,12 +82,17 @@ for i = 1:numel(fields_spikes)
 
 
       vel = ca_velocity(pos);
-      goodvel = find(vel(1,:)>=velthreshold);
+      vel_time = vel(2,:)';
+      vel_mag  = vel(1,:)';
+
+      goodvel = find(vel_mag>=velthreshold);
       goodtime = pos(goodvel, 1);
       goodpos = pos(goodvel,:);
 
+
       mintime = vel(2,1);
       maxtime = vel(2,end);
+
 
       numunits = size(peaks_time,1);
       mutinfo = NaN(3,numunits);
@@ -114,23 +119,11 @@ for i = 1:numel(fields_spikes)
                   continue
                 else
                   highspeedspikes = [];
-                  highspeedspikes2 = [];
                 end
 
-                for ii=1:length(currspikes) %finding if in good vel
-                  [minValue_vel,closestIndex] = min(abs(currspikes(ii)-goodtime));
-                  if minValue_vel <= 1/15
-                    highspeedspikes(end+1) = currspikes(ii);
-                  end
-                  if minValue_vel <= 1/7.5
-                    highspeedspikes2(end+1) = currspikes(ii);
-                  end
-                end
+                spike_vel = interp1(vel_time, vel_mag, currspikes, 'linear');
+                highspeedspikes = currspikes(spike_vel >= velthreshold & ~isnan(spike_vel) & ~isnan(currspikes));
 
-                fprintf('1/15')
-                length(highspeedspikes)
-                fprintf('1/7.5')
-                length(highspeedspikes2)
 
                 hertz = length(highspeedspikes)./(length(goodpos)/15);
 

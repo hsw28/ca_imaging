@@ -84,12 +84,17 @@ for i = 1:numel(fields_spikes)
 
       % Now find the full range of indices to keep
 
-      vel = ca_velocity(pos);
-      goodvel = find(vel(1,:)>=velthreshold);
-      goodvel = intersect(goodvel, goodCSUS);
 
+      vel = ca_velocity(pos);
+      vel_time = vel(2,:)';
+      vel_mag  = vel(1,:)';
+
+      goodvel = find(vel_mag>=velthreshold);
+      goodvel = intersect(goodvel, goodCSUS);
       goodtime = pos(goodvel, 1);
       goodpos = pos(goodvel,:);
+
+
 
 
       mintime = vel(2,1);
@@ -120,14 +125,15 @@ for i = 1:numel(fields_spikes)
         [c indexmax] = (min(abs(peaks_time(k,:)-maxtime))); %
         currspikes = peaks_time(k,indexmin:indexmax);
 
+        spike_vel = interp1(vel_time, vel_mag, currspikes, 'linear');
+        currspikes = currspikes(spike_vel >= velthreshold & ~isnan(spike_vel) & ~isnan(currspikes));
+
 
         for ii=1:length(currspikes) %finding if in good vel
           [minValue_CSUS,closestIndex] = min(abs(currspikes(ii)-CSUS_time));
-          [minValue_vel,closestIndex] = min(abs(currspikes(ii)-goodtime));
-
-          if minValue_CSUS <= 1/7.5 %being CSUS takes precedence
+          if minValue_CSUS <= 1/7.5 | %being CSUS takes precedence
             continue;
-          elseif minValue_vel <= 1/7.5 & isnan(currspikes(ii))==0
+          else
             highspeedspikes(end+1) = currspikes(ii);
           end
         end

@@ -68,9 +68,13 @@ for i = 1:numel(fields_spikes)
       pos = pos(1:closestIndex, :);
 
       vel = ca_velocity(pos);
-      goodvel = find(vel(1,:)>=velthreshold);
+      vel_time = vel(2,:)';
+      vel_mag  = vel(1,:)';
+
+      goodvel = find(vel_mag>=velthreshold);
       goodtime = pos(goodvel, 1);
       goodpos = pos(goodvel,:);
+
 
 
       mintime = vel(2,1);
@@ -93,23 +97,14 @@ for i = 1:numel(fields_spikes)
         [c indexmax] = (min(abs(peaks_time(k,:)-maxtime))); %
         currspikes = peaks_time(k,indexmin:indexmax);
 
-
-        for ii=1:length(currspikes) %finding if in good vel
-          [minValue_vel,closestIndex] = min(abs(currspikes(ii)-goodtime));
-          if minValue_vel <= 1/7.5 & isnan(currspikes(ii))==0
-            highspeedspikes(end+1) = currspikes(ii);
-          end
-        end
+        spike_vel = interp1(vel_time, vel_mag, currspikes, 'linear');
+        highspeedspikes = currspikes(spike_vel >= velthreshold & ~isnan(spike_vel) & ~isnan(currspikes));
 
 
 
-%want highspeedspikes
-
-
-
-  set(0,'DefaultFigureVisible', 'off');
-  if length(highspeedspikes)>0
-  [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(highspeedspikes, goodpos, dim, 1.000);
+          set(0,'DefaultFigureVisible', 'off');
+          if length(highspeedspikes)>0
+            [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(highspeedspikes, goodpos, dim, 1.000);
           if (size(spikeprob,1)) < (size(spikeprob,2))
             spikeprob = spikeprob';
           end
