@@ -24,7 +24,7 @@ for i = 1:numel(ratNames)
     daysToUse = dateList(idx-2:idx);
 
     % Filter MI struct
-    mi_struct = filterFieldsByDay(rat.MI_noCSUS_shuff, daysToUse);
+    mi_struct = filterFieldsByDay(rat.MI_noCSUS15_shuff, daysToUse);
     %mi_struct = filterFieldsByDay(rat.MI_wCSUS_shuff, daysToUse);
     ratemask_struct = filterFieldsByDay(rat.ratemask, daysToUse);
 
@@ -68,8 +68,10 @@ for i = 1:numel(ratNames)
 end
 
 fprintf('ALL RATS -- all cells')
-mean(meantot)
-std(meantot)
+mean(allval)
+allval = reshape(allval, 3,5);
+
+std(mean(allval))
 
 %fprintf('ALL RATS -- 0.05 cells')
 %mean(meantot5)

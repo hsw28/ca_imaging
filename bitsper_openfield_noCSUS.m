@@ -74,26 +74,36 @@ for i = 1:numel(fields_spikes)
       end
 
 
-      % Find all time points where CSUS_id <0
-      keepIdx = find(CSUS_id(1,:) <= 0);
-      goodCSUS = keepIdx;
-      CSUS_time = find(CSUS_id(1,:) > 0);
-      CSUS_time = pos(CSUS_time, 1);
+      % Find all time points where CSUS_id > 0
+      taskIdx = find(CSUS_id(1,:) > 0);
+      CSUS_time = pos(taskIdx, 1);
 
-
+      % Find all time points where CSUS_id <=0
+      goodCSUS = find(CSUS_id(1,:) <= 0);
 
       % Now find the full range of indices to keep
-
-
+      %get vel
       vel = ca_velocity(pos);
       vel_time = vel(2,:)';
       vel_mag  = vel(1,:)';
 
-      goodvel = find(vel_mag>=velthreshold);
-      goodvel = intersect(goodvel, goodCSUS);
-      goodtime = pos(goodvel, 1);
-      goodpos = pos(goodvel,:);
+      % Interpolate CSUS labels to velocity timestamps
+      interp_CSUS = interp1(CSUS_id(2,:), CSUS_id(1,:), vel_time, 'nearest', 0);
 
+
+      [~, uniqueIdx] = unique(pos(:,1), 'stable');
+      pos = pos(uniqueIdx, :);
+
+      % Interpolate X and Y position to velocity timestamps too
+      interp_x = interp1(pos(:,1), pos(:,2), vel_time, 'linear', NaN);
+      interp_y = interp1(pos(:,1), pos(:,3), vel_time, 'linear', NaN);
+
+      % Build mask based on velocity, CSUS period, and valid position values
+      validIdx = (vel_mag >= velthreshold) & (interp_CSUS == 0) & ...
+                 ~isnan(interp_x) & ~isnan(interp_y);
+
+      % Now build the posDat used downstream
+        goodpos = [vel_time(validIdx), interp_x(validIdx), interp_y(validIdx)];
 
 
 
@@ -111,38 +121,18 @@ for i = 1:numel(fields_spikes)
         warning('you have no spikes')
       else
       for k=1:numunits
-        highspeedspikes = [];
-        numspikes = peaks_time(k,:);
-
-        rate = numspikes./timelength;
-        if rate < 0.05
-          bitsper_info(k,1) = NaN;
-          bitsper_info(k,2) = NaN;
-          continue
-        end
-
+        currspikes = peaks_time(k,:);
         [c indexmin] = (min(abs(peaks_time(k,:)-mintime))); %
         [c indexmax] = (min(abs(peaks_time(k,:)-maxtime))); %
         currspikes = peaks_time(k,indexmin:indexmax);
 
         spike_vel = interp1(vel_time, vel_mag, currspikes, 'linear');
-        currspikes = currspikes(spike_vel >= velthreshold & ~isnan(spike_vel) & ~isnan(currspikes));
+        csus_currspikes = interp1(CSUS_id(2,:), CSUS_id(1,:), currspikes, 'nearest', 0);
+        highspeedspikes = currspikes((spike_vel >= velthreshold) & (csus_currspikes == 0));
+
+        set(0,'DefaultFigureVisible', 'off');
 
 
-        for ii=1:length(currspikes) %finding if in good vel
-          [minValue_CSUS,closestIndex] = min(abs(currspikes(ii)-CSUS_time));
-          if minValue_CSUS <= 1/7.5 | %being CSUS takes precedence
-            continue;
-          else
-            highspeedspikes(end+1) = currspikes(ii);
-          end
-        end
-
-
-%want highspeedspikes
-
-
-  set(0,'DefaultFigureVisible', 'off');
   if length(highspeedspikes)>0
   [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(highspeedspikes, goodpos, dim, 1.000);
           if (size(spikeprob,1)) < (size(spikeprob,2))

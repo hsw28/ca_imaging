@@ -79,24 +79,38 @@ for i = 1:numel(fields_spikes)
 
       fprintf('trimming velocity')
 
-      % Find all time points where CSUS_id <0
-      keepIdx = find(CSUS_id(1,:) <= 0);
-      goodCSUS = keepIdx;
-      CSUS_time = find(CSUS_id(1,:) > 0);
-      CSUS_time = pos(CSUS_time, 1);
+      % Find all time points where CSUS_id > 0
+      taskIdx = find(CSUS_id(1,:) > 0);
+      CSUS_time = pos(taskIdx, 1);
 
-
+      % Find all time points where CSUS_id <=0
+      goodCSUS = find(CSUS_id(1,:) <= 0);
 
       % Now find the full range of indices to keep
-
+      %get vel
       vel = ca_velocity(pos);
       vel_time = vel(2,:)';
       vel_mag  = vel(1,:)';
 
-      goodvel = find(vel_mag>=velthreshold);
-      goodvel = intersect(goodvel, goodCSUS);
-      goodtime = pos(goodvel, 1);
-      goodpos = pos(goodvel,:);
+      % Interpolate CSUS labels to velocity timestamps
+      interp_CSUS = interp1(CSUS_id(2,:), CSUS_id(1,:), vel_time, 'nearest', 0);
+
+
+      [~, uniqueIdx] = unique(pos(:,1), 'stable');
+      pos = pos(uniqueIdx, :);
+
+      % Interpolate X and Y position to velocity timestamps too
+      interp_x = interp1(pos(:,1), pos(:,2), vel_time, 'linear', NaN);
+      interp_y = interp1(pos(:,1), pos(:,3), vel_time, 'linear', NaN);
+
+
+
+      % Build mask based on velocity, CSUS period, and valid position values
+      validIdx = (vel_mag >= velthreshold) & (interp_CSUS == 0) & ...
+                 ~isnan(interp_x) & ~isnan(interp_y);
+
+      % Now build the posDat used downstream
+        goodpos = [vel_time(validIdx), interp_x(validIdx), interp_y(validIdx)];
 
 
 
@@ -128,21 +142,13 @@ for i = 1:numel(fields_spikes)
                   bitsPsec(1, k) = NaN;
                   bitsPsec(2, k) = NaN;
                   continue
-                else
-                  highspeedspikes = [];
                 end
 
                 spike_vel = interp1(vel_time, vel_mag, currspikes, 'linear');
-                currspikes = currspikes(spike_vel >= velthreshold & ~isnan(spike_vel) & ~isnan(currspikes));
+                csus_currspikes = interp1(CSUS_id(2,:), CSUS_id(1,:), currspikes, 'nearest', 0);
+                highspeedspikes = currspikes((spike_vel >= velthreshold) & (csus_currspikes == 0));
 
-                for ii=1:length(currspikes) %finding if in good vel
-                    [minValue_CSUS,closestIndex] = min(abs(currspikes(ii)-CSUS_time));
-                    if minValue_CSUS <= 1/7.5 | %being CSUS takes precedence
-                        continue;
-                    else
-                        highspeedspikes(end+1) = currspikes(ii);
-                     end
-                end
+                set(0,'DefaultFigureVisible', 'off');
 
 
                 hertz = length(highspeedspikes)./(length(goodpos)/15);
@@ -206,11 +212,11 @@ for i = 1:numel(fields_spikes)
 
                   % Rank (percent of shuffle ≥ observed)
                   % Rank (percent of shuffle ≥ observed)
-                  obsSpk = MI(1,k);
+                  obscurrspikes = MI(1,k);
                   obsSec = MI(2,k);
-                  rankSpk = mean(shSort1 >= obsSpk);
+                  rankcurrspikes = mean(shSort1 >= obscurrspikes);
                   rankSec = mean(shSort2 >= obsSec);
-                  bitsPspike(3,k) = rankSpk;
+                  bitsPspike(3,k) = rankcurrspikes;
                   bitsPsec  (3,k) = rankSec;
 
                   % Store firing rate

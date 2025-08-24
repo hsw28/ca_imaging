@@ -87,12 +87,14 @@ for i = 1:numel(ratNames)
 end
 
 fprintf('ALL RATS -- spikes')
-mean(meantotSPIKES)
-std(meantotSPIKES)
+mean(allvalspike)
+allvalspike = reshape(allvalspike, 3,5);
+std(mean(allvalspike))
 
 fprintf('ALL RATS -- secs')
-mean(meantotSECS)
-std(meantotSECS)
+mean(allvalsec)
+allvalsec = reshape(allvalsec, 3,5);
+std(mean(allvalsec))
 
 
 %allval = reshape(allval, 3,5);
