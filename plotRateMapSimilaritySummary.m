@@ -1,11 +1,13 @@
 function [shuffMeans, shuffSEMs] = plotRateMapSimilaritySummary(nShuffle)
 % ------------------------------------------------------------------------
 % Task- vs non-task rate-map similarity for five rats.
-% Computes BOTH
-%   (1) population-mean test (rat-level)  and
+% Applies velocity gating to NON-TASK maps (v >= 4 cm/s and outside [CS,CS+2]).
+% Task maps use task-only position (no speed filter).
+% Computes BOTH:
+%   (1) population-mean test (rat-level), and
 %   (2) per-neuron significance (fraction sig. neurons).
 % ------------------------------------------------------------------------
-if nargin < 1, nShuffle = 1000; end      % >1 needed for population null
+if nargin < 1, nShuffle = 1000; end
 
 ratNames = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
 metrics  = {'Pearson','Spearman','Cosine'};
@@ -35,40 +37,79 @@ for r = 1:nRats
     countRep = zeros(nShuffle,nMetrics);
 
     for d = 1:3
-        pos  = rat.pos.(sprintf('pos_%s',these{d}));
-        ts   = pos(:,1);
-        cs   = rat.CS_times.(sprintf('CS_%s',these{d}));
-        mask = rat.ratemask.(sprintf('ratemask_%s',these{d}));
-        spkMat = rat.Ca_peaks.(sprintf('CA_peaks_%s',these{d}));
+        pos   = rat.pos.(sprintf('pos_%s',these{d}));     % [t x y]
+        ts    = pos(:,1);
+        xy    = pos(:,2:3);
+        cs    = rat.CS_times.(sprintf('CS_%s',these{d}));
+        mask  = rat.ratemask.(sprintf('ratemask_%s',these{d}));
+        spkMat= rat.Ca_peaks.(sprintf('CA_peaks_%s',these{d}));
 
-        % trial / non-trial time masks
+        % -------- Build task mask on POSITION timebase --------
         taskMask = false(size(ts));
         for i = 1:numel(cs)
-            taskMask = taskMask | (ts>=cs(i) & ts<=cs(i)+2);
+            taskMask = taskMask | (ts>=cs(i) & ts<cs(i)+2);
         end
-        taskTS    = ts(taskMask);
-        nonTaskTS = ts(~taskMask);
+        pos_task = pos(taskMask,:);                % task-only position stream
+        if size(pos_task,1) < 5, continue; end
+
+        % -------- Build NON-TASK, RUNNING pos on VELOCITY timebase --------
+        vel      = ca_velocity(pos);               % [speed; time]
+        vt       = vel(2,:)';
+        vmag     = vel(1,:)';
+
+        % interpolate position to velocity timestamps
+        xv = interp1(ts, xy(:,1), vt, 'linear', NaN);
+        yv = interp1(ts, xy(:,2), vt, 'linear', NaN);
+
+        % non-trial on velocity timebase
+        inTrialVel = false(size(vt));
+        for i = 1:numel(cs)
+            inTrialVel = inTrialVel | (vt>=cs(i) & vt<cs(i)+2);
+        end
+
+        keepVel = (vmag>=4) & ~inTrialVel & isfinite(xv) & isfinite(yv);
+        goodpos = [vt(keepVel), xv(keepVel), yv(keepVel)];
+        if size(goodpos,1) < 5, continue; end
 
         for ni = find(mask(:)==1)'          % iterate kept neurons
-            spikes = spkMat(ni,:);  spikes = spikes(~isnan(spikes));
+            spikes = spkMat(ni,:);  spikes = spikes(~isnan(spikes) & spikes>0);
+            if numel(spikes) < 3, continue; end
 
-            % split spikes
-            taskSpk    = spikes(ismembertol(spikes,taskTS,1e-3));
-            nonTaskSpk = setdiff(spikes,taskSpk,'stable');
+            % -------- Split spikes by TRIAL (no speed filter yet) --------
+            inTrialSpk = false(size(spikes));
+            for i = 1:numel(cs)
+                inTrialSpk = inTrialSpk | (spikes>=cs(i) & spikes<cs(i)+2);
+            end
+            taskSpk = spikes(inTrialSpk);
+            nonTaskSpk_all = spikes(~inTrialSpk);
+            if isempty(taskSpk) || isempty(nonTaskSpk_all), continue; end
 
-            R1 = CA_normalizePosData(taskSpk(:),    pos, 2.5, 1);
-            R2 = CA_normalizePosData(nonTaskSpk(:), pos, 2.5, 1);
+            % -------- Apply speed filter to NON-TASK spikes (v >= 4) --------
+            spd_non = interp1(vt, vmag, nonTaskSpk_all, 'linear','extrap');
+            nonTaskSpk = nonTaskSpk_all(spd_non>=4);
+            if numel(nonTaskSpk) < 3, continue; end
+
+            % -------- Build maps on their respective supports --------
+            R1 = CA_normalizePosData(taskSpk(:),    pos_task, 2.5, 1);   % TASK map
+            R2 = CA_normalizePosData(nonTaskSpk(:), goodpos,  2.5, 1);   % NON-TASK (run, non-trial) map
             R1 = imgaussfilt(R1,0.75); R2 = imgaussfilt(R2,0.75);
             R1(R1==0)=NaN; R2(R2==0)=NaN;
+
+            % resize to common grid (match R1)
+            if ~isequal(size(R1), size(R2))
+                R2 = imresize(R2, size(R1), 'nearest');
+            end
+
+            % vectorize & compare over finite overlap
             v1 = R1(:); v2 = R2(:);
-            good = ~isnan(v1)&~isnan(v2);
-            if nnz(good)<10, continue; end
+            good = isfinite(v1) & isfinite(v2);
+            if nnz(good) < 10, continue; end
             v1=v1(good); v2=v2(good);
 
             act = [corr(v1,v2,'type','Pearson'), ...
                    corr(v1,v2,'type','Spearman'), ...
-                   dot(v1,v2)/(norm(v1)*norm(v2))];
-            actualCorrs(end+1,:) = act;
+                   (dot(v1,v2)/(norm(v1)*norm(v2)))];
+            actualCorrs(end+1,:) = act; %#ok<AGROW>
 
             % ---------- shuffles for this neuron ----------
             shThis = nan(nShuffle,nMetrics);
@@ -77,24 +118,29 @@ for r = 1:nRats
 
             parfor s = 1:nShuffle
                 perm = lbl(randperm(numel(lbl)));
-                s1   = allSpk(perm==1);     s2 = allSpk(perm==0);
-                if numel(s1)<3 || numel(s2)<3, continue; end
-                R1s = CA_normalizePosData(s1,pos,2.5,1);
-                R2s = CA_normalizePosData(s2,pos,2.5,1);
+                s1   = allSpk(perm==1);     % goes to TASK map on pos_task
+                s2   = allSpk(perm==0);     % goes to NON-TASK map on goodpos
+                if numel(s1)<3 || numel(s2)<3
+                    continue;
+                end
+                R1s = CA_normalizePosData(s1, pos_task, 2.5, 1);
+                R2s = CA_normalizePosData(s2, goodpos,  2.5, 1);
                 R1s = imgaussfilt(R1s,0.75); R2s = imgaussfilt(R2s,0.75);
                 R1s(R1s==0)=NaN; R2s(R2s==0)=NaN;
+                if ~isequal(size(R1s), size(R2s))
+                    R2s = imresize(R2s, size(R1s), 'nearest');
+                end
                 vs1 = R1s(:); vs2 = R2s(:);
-                goodS = ~isnan(vs1)&~isnan(vs2);
-                if nnz(goodS)<10, continue; end
-                vs1=vs1(goodS); vs2=vs2(goodS);
+                gS  = isfinite(vs1) & isfinite(vs2);
+                if nnz(gS) < 10, continue; end
+                vs1=vs1(gS); vs2=vs2(gS);
                 shThis(s,:) = [corr(vs1,vs2,'type','Pearson'), ...
                                corr(vs1,vs2,'type','Spearman'), ...
-                               dot(vs1,vs2)/(norm(vs1)*norm(vs2))];
+                               (dot(vs1,vs2)/(norm(vs1)*norm(vs2)))];
             end
-            shuffCorrs(end+1,:) = nanmean(shThis,1);
 
-            % per-neuron p
-            pNeuron(end+1,:) = 1-mean(shThis >= act, 1,'omitnan');
+            shuffCorrs(end+1,:) = nanmean(shThis,1); %#ok<AGROW>
+            pNeuron(end+1,:)    = 1 - mean(bsxfun(@ge, shThis, act), 1, 'omitnan'); %#ok<AGROW>
 
             % accumulate for rat-level shuffle mean
             valid = ~isnan(shThis);
@@ -110,14 +156,9 @@ for r = 1:nRats
     shuffSEMs(r,:)   = nanstd(shuffCorrs,0,1)/sqrt(size(shuffCorrs,1));
 
     % -------- (A) Rat-level p-values --------
-
     ratShuffMean = sumRep ./ countRep;                 % nShuffle × nMetrics
     for m = 1:nMetrics
-      fprintf('shuff')
-      sort(ratShuffMean(:,m))
-      fprintf('actual')
-      actualMeans(r,m)
-        pRat(r,m) = 1-mean(ratShuffMean(:,m) >= actualMeans(r,m), 'omitnan')
+        pRat(r,m) = 1 - mean(ratShuffMean(:,m) >= actualMeans(r,m), 'omitnan');
     end
 
     % -------- (B) Fraction of significant neurons --------
@@ -130,20 +171,21 @@ for m = 1:nMetrics
     subplot(1,3,m); cla; hold on;
     b = bar([actualMeans(:,m), shuffMeans(:,m)], 'grouped');
     b(1).FaceColor = [0.3 0.5 0.9]; b(2).FaceColor = [.7 .7 .7];
-    e1 = errorbar(b(1).XEndPoints, actualMeans(:,m), actualSEMs(:,m),'k.');
-    e2 = errorbar(b(2).XEndPoints, shuffMeans(:,m),  shuffSEMs(:,m),'k.');
+    errorbar(b(1).XEndPoints, actualMeans(:,m), actualSEMs(:,m),'k.');
+    errorbar(b(2).XEndPoints, shuffMeans(:,m),  shuffSEMs(:,m),'k.');
     xticks(1:nRats); xticklabels(ratNames); ylabel('Similarity');
     title([metrics{m} ' (task vs non)']);
     legend({'Actual','Shuffle'},'location','southwest'); ylim([0 1]);
     % stars
-    for r = 1:nRats
-        if pRat(r,m)<0.001, star='***';
-        elseif pRat(r,m)<0.01, star='**';
-        elseif pRat(r,m)<0.05, star='*';
-        else, star='';
+    for rr = 1:nRats
+        if     pRat(rr,m)<0.001, star='***';
+        elseif pRat(rr,m)<0.01,  star='**';
+        elseif pRat(rr,m)<0.05,  star='*';
+        else,  star='';
         end
         if ~isempty(star)
-            text(r, max(b.YData(r,:))*1.05, star,'HorizontalAlignment','center');
+            yTop = max([actualMeans(rr,m)+actualSEMs(rr,m), shuffMeans(rr,m)+shuffSEMs(rr,m)]);
+            text(rr, yTop*1.05, star,'HorizontalAlignment','center');
         end
     end
 end
@@ -160,7 +202,6 @@ end
 
 fprintf('\nRat-level p-values (rows: rats, cols: metrics):\n');
 disp(pRat);
-
 fprintf('Fraction sig. neurons (%%, rows: rats, cols: metrics):\n');
 disp(fracSig*100);
 end

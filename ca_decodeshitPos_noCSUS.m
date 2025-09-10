@@ -1,4 +1,4 @@
-function f = ca_decodeshitPos_linear(pos, clusters, tdecode, dim)
+function f = ca_decodeshitPos_noCSUS(pos, clusters, CSUS_id, tdecode, dim)
 %decodes position and outputs decoded x, y, confidence(in percents), and time.
 %dim is bin sie in cm
 %tdecode is decoding in seconds
@@ -26,32 +26,44 @@ if isa(clusters,'double')==1
 end
 
 tic
+vel = ca_velocity(pos);
+vel_time = vel(2,:)';
+vel_mag  = vel(1,:)';
 
 
-posData = pos;
+% Interpolate CSUS labels to velocity timestamps
+interp_CSUS = interp1(CSUS_id(2,:), CSUS_id(1,:), vel_time, 'nearest', 0);
 
 
-timee = pos(:,1);
+[~, uniqueIdx] = unique(pos(:,1), 'stable');
+posData = pos(uniqueIdx, :);
+
+% Interpolate X and Y position to velocity timestamps too
+interp_x = interp1(posData(:,1), posData(:,2), vel_time, 'linear', NaN);
+interp_y = interp1(posData(:,1), posData(:,3), vel_time, 'linear', NaN);
+
+% Build mask based on velocity, CSUS period, and valid position values
+validIdx = (vel_mag >= velthreshold) & (interp_CSUS == 0) & ...
+           ~isnan(interp_x) & ~isnan(interp_y);
+
+% Now build the posDat used downstream
+  goodpos = [vel_time(validIdx), interp_x(validIdx), interp_y(validIdx)];
 
 
-[cc indexmin] = min(abs(posData(1,1)-timee));
-[cc indexmax] = min(abs(posData(end,1)-timee));
-decodetimevector = timee(indexmin:indexmax);
-if length(decodetimevector)<10
-  timevector = timee;
-else
-  timevector = decodetimevector;
-end
+mintime = vel(2,1);
+maxtime = vel(2,end);
+timevector = vel_time;
+
+numunits = size(clusters,1);
+mutinfo = NaN(3,numunits);
 
 
+fprintf('done loading')
 
-
-vel = ca_velocity(posData);
-%vel(1,:) = smoothdata(vel(1,:), 'gaussian', 15); %originally had this at 30, trying with 15 now
-goodvel = find(vel>=velthreshold);
 
 tdecodesec = tdecode;
-t = round(30*tdecode);
+
+t = round(30*tdecode); %%%%%%%%%%%%
 
 
 %find number of clusters
@@ -61,14 +73,15 @@ numclust = length(clustname);
 %BIN
 psize = 1.000 * dim;
 
-xvals = posData(:,2);
-yvals = posData(:,3);
-xmin = min(posData(:,2));
-ymin = min(posData(:,3));
-xmax = max(posData(:,2));
-ymax = max(posData(:,3));
+xvals = goodpos(:,2);
+yvals = goodpos(:,3);
+xmin = min(goodpos(:,2));
+ymin = min(goodpos(:,3));
+xmax = max(goodpos(:,2));
+ymax = max(goodpos(:,3));
 xbins = ceil((xmax-xmin)/psize); %number of x
 ybins = ceil((ymax-ymin)/psize); %number of y
+totalbins = xbins*ybins
 if ybins ==0
   ybins = 1;
 end
@@ -80,15 +93,15 @@ yinc = ymin +(0:ybins)*psize; %makes a vector of all the y values at each increm
 
 
 % for each cluster,find the firing rate at esch velocity range
-fxmatrix = ca_firingPerPos(posData, clusters, dim, tdecodesec, 7.5, velthreshold);
+fxmatrix = ca_firingPerPos_noCSUS(posData, clusters, dim, velthreshold, CSUS_id);
 names = (fieldnames(fxmatrix));
 for k=1:length(names)
   curname = char(names(k));
   now = fxmatrix.(curname);
+
   if size(fxmatrix.(curname),2)>1 & max(now)>0
   fxmatrix.(curname) = chartinterp(fxmatrix.(curname));
   fxmatrix.(curname) = ndnanfilter(fxmatrix.(curname), 'gausswin', [dim*2/dim, dim*2/dim], 2, {}, {'replicate'}, 1);
-
   end
 
   current = fxmatrix.(curname);
@@ -148,7 +161,6 @@ while tm < (length(timevector)-t)
 
   goodvel = find(vel(2,:)>=timevector(tm) & vel(2,:)<timevector(tm+t));
 
-%  if nanmean((vel(1,goodvel)))>velthreshold & nanmedian((vel(1,goodvel)))>velthreshold
   if length(find(vel(1,goodvel)>velthreshold)) >= length(goodvel)*.75
    %find spikes in each cluster for time
    nivector = zeros((numclust),1);
@@ -235,7 +247,7 @@ while tm < (length(timevector)-t)
         times(end+1) = timevector(tm);
 
     %if want overlap
-    if tdecodesec>.5
+    if tdecodesec>1
       tm = tm+(t/2);
     else
       tm = tm+t;
@@ -248,16 +260,15 @@ while tm < (length(timevector)-t)
 end
 
 warning('your probabilities were the same')
-same = same;
+same = same
 maxx = maxx;
 maxy = maxy;
 notnan = ~isnan(maxy);
 values = [maxx; maxy; percents; times];
 
-
-toc
 f = values;
 
 error = ca_decodederror(f, posData, tdecode);
-error_av = nanmean(error(1,:))
-error_med = nanmedian(error(1,:))
+
+
+toc

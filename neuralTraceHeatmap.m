@@ -21,6 +21,9 @@ p.addParameter('K', 5, @(x)isnumeric(x)&&isscalar(x)&&x>=1);
 p.addParameter('ZscorePerCell', true, @(x)islogical(x)||ismember(x,[0 1]));
 p.addParameter('MakePlots', true, @(x)islogical(x)||ismember(x,[0 1]));
 p.addParameter('Sigma', 0.30, @(x)isnumeric(x)&&isscalar(x)&&x>0);
+p.addParameter('UseMIthresh', false, @(x)islogical(x)||ismember(x,[0 1]));
+p.addParameter('MIthresh', 0.95, @(x)isnumeric(x)&&isscalar(x));
+
 p.parse(varargin{:});
 
 ratNames    = cellstr(p.Results.RatNames);
@@ -84,6 +87,7 @@ for ii = 1:numel(ratNames)
           us_on = us_on(2:end);
         end
 
+
         nT    = min(numel(cs_on), numel(us_on));
         if nT < 6, fprintf('  [%s] only %d trials — skipping.\n', dayKey, nT); continue; end
         cs_on = cs_on(1:nT); us_on = us_on(1:nT);
@@ -96,6 +100,30 @@ for ii = 1:numel(ratNames)
         [X, tCa] = getDayTraceOrPeaks(rat, dateTok, SR, sigmaKernel);  % X: [cells x nTime], tCa: [nTime x 1]
         if isempty(X), fprintf('  [%s] no Ca trace/peaks for %s — skipping.\n', dayKey, dateTok); continue; end
         if doZ, X = zscorePerCellDay(X); end
+
+          % --- optional: filter cells by CSUS MI score ---
+        if p.Results.UseMIthresh
+            % Build MI fieldname: e.g. 'MI_CSUS15_shuff'
+            miField = sprintf('MI_CSUS%d_shuff', csusNum);
+            if isfield(rat, miField)
+                MIstruct = rat.(miField);
+                % field for this date
+                miFN = findFieldWithDate(MIstruct, dateTok);
+                if ~isempty(miFN)
+                    MIvals = MIstruct.(miFN);   % [nCells x ≥3], take column 3
+                    keep = MIvals(:,3) >= p.Results.MIthresh;
+                    if any(keep)
+                        X = X(keep,:);  % filter rows of traces
+                    else
+                        fprintf('  [%s] no cells passed MI >= %.2f\n', dayKey, p.Results.MIthresh);
+                        continue; % skip this day if none pass
+                    end
+                end
+            else
+                warning('%s missing MI field %s — cannot filter', ratVar, miField);
+            end
+        end
+
 
         % ===== Panel 1: trial x time heatmap of population mean =====
         [H_day, tRel, usLag] = makeTrialHeatmap(X, tCa, cs_on, us_on, preWin, postWin, SR);
@@ -420,6 +448,7 @@ function out = valueVec(x)
 end
 
 function X = makeSyntheticTraceFromPeaks(S_pk, t, sigma)
+    fprinft('making fake data?')
     nC = size(S_pk,1); X  = zeros(nC, numel(t));
     for c=1:nC
         ev = S_pk(c,:); ev = ev(isfinite(ev) & ev>0);

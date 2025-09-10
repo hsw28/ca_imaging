@@ -1,7 +1,7 @@
 function RateMaskVsTask(animal, neuronVec, dateStr, N, dim)
 % Compare spike rates within high-rate masks defined by task or non-task spikes
 
-if nargin < 4, N = 2; end %STD above mean to use
+if nargin < 4, N = 1; end %STD above mean to use
 if nargin < 5, dim = 2.5; end
 
 for ni = 1:numel(neuronVec)
@@ -31,7 +31,6 @@ for ni = 1:numel(neuronVec)
     % For task-based mask
     rate_task = CA_normalizePosData(taskSpikes, pos, dim, 1.0);
     rate_task(isnan(rate_task)) = 0;
-    rate_task = imgaussfilt(rate_task, .75);
     rate_task(rate_task == 0) = NaN;
     mu_task = nanmean(rate_task(:));
     sigma_task = nanstd(rate_task(:));
@@ -45,7 +44,6 @@ for ni = 1:numel(neuronVec)
     % -------------------
     rate_non = CA_normalizePosData(nonTaskSpikes, pos, dim, 1.0);
     rate(isnan(rate_non)) = 0;
-    rate_non = imgaussfilt(rate_non, .75);
     rate_non(rate_non == 0) = NaN;
     mu_non = nanmean(rate_non(:));
     sigma_non = nanstd(rate_non(:));
@@ -159,8 +157,8 @@ for ni = 1:numel(neuronVec)
   box off;
 
   % Stats: paired t-tests
-  [p1, ~] = ttest2(fr_in_task_T, fr_in_task_N);
-  [p2, ~] = ttest2(fr_in_non_T, fr_in_non_N);
+  [p1, ~] = ttest(fr_in_task_T, fr_in_task_N);
+  [p2, ~] = ttest(fr_in_non_T, fr_in_non_N);
 
   % Significance stars
   %the star attached to indicate P < 0.05 and two stars to indicate P < 0.01. Occasionally three stars were used to indicate P < 0.001.

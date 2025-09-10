@@ -100,12 +100,11 @@ for i=1:length(decoded)
 
 end
 
-
+fprintf('error mean')
 nanmean(alldiff)./1.000
+fprintf('error median')
 nanmedian(alldiff)./1.000
 
-size(predX);
-size(realX);
-size(realT);
+
 f = [realT; predX; predY; realX; realY; alldiff]';
 %f = [alldiff/2.5; realT];

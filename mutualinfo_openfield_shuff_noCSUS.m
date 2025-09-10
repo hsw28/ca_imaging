@@ -140,6 +140,7 @@ for i = 1:numel(fields_spikes)
                 if isnan(MI(k))==1
                   mutinfo(1, k) = NaN;
                   mutinfo(2, k) = NaN;
+
                   continue
                 end
 

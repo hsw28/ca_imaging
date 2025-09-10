@@ -1,22 +1,29 @@
-function reliabilitySummary(ratNames)
+function f = reliabilitySummary(ratNames, varargin)
 % reliabilitySummary  Compare spike‐count variability in place field vs trace
 %
-% Splits each cell’s spikes into in-trial vs out-of-trial based on a 2 s window after each CS.
-% gets smoothed rate maps for those two conditions (2.5 cm spatial bins).
-% For non task time, we threshold each map at mean + 1·std and combines them into a binary mask of “significant” spatial bins for each cell.
-% then for each cell:
-  % for each spike, you
-  % find its (x,y) bin,
-  % check whether that bin sits inside the cell’s place-field mask,
-  % record a 1 (in-field) or 0 (out-of-field).
-  %countsTr: for each CS onset, you count how many spikes fall in the 0–2 s task window.
-  %then compute variability (Fano) and reliability (split-half) for task period and non task period
-  % graphs variability (Fano factor) and  Reliability (split‐half correlation) for each cell in task period vs place field
+% PF side:
+%   - PF masks built from running (v>=4 cm/s) & non-trial samples/spikes only
+%     using velocity-timebase filtering (same logic as RateMaskVsTask_summary).
+%   - PF values per visit = COUNT (default) or RATE (spikes/s).
+% Trace side:
+%   - values per CS window [CS, CS+2] s = COUNT (default) or RATE (spikes/s).
+% Metrics:
+%   - Fano = var/mean; split-half = random halves correlation.
+% Plots:
+%   - Per rat: Fano PF vs Trace; split-half PF vs Trace.
+%   - Pooled row.
+%
+% Usage:
+%   reliabilitySummary({'rat0222','rat0307'})                   % counts (default)
+%   reliabilitySummary({'rat0222','rat0307'}, 'mode','rate')   % rate-normalized
 
-
-
-
-%   reliabilitySummary({'rat0222','rat0307',...})
+% ---------- args ----------
+p = inputParser;
+addParameter(p,'mode','count',@(s) any(validatestring(s,{'count','rate'})));
+addParameter(p,'minVisitDur',0.1,@(x) isnumeric(x) && isscalar(x) && x>=0); % seconds
+parse(p,varargin{:});
+modeChoice  = lower(p.Results.mode);
+minVisitDur = p.Results.minVisitDur;
 
 nRats = numel(ratNames);
 figure('Color','w','Position',[100 100 1200 300*(nRats+1)]);
@@ -30,59 +37,98 @@ for r = 1:nRats
   rat   = evalin('base', ratNames{r});
   dates = autoDateList(rat);
   iAn   = find(strcmp(dates,rat.An),1);
-  days  = dates(iAn-2:iAn);
+  days  = dates(max(1,iAn-2):iAn);  % last 3 days up to An
 
-  fanoPF = [];
-  fanoTr = [];
-  spPF   = [];
-  spTr   = [];
+  fanoPF = [];  fanoTr = [];
+  spPF   = [];  spTr   = [];
 
-  for d = 1:3
+  for d = 1:numel(days)
     D       = days{d};
-    S       = rat.Ca_peaks.(sprintf('CA_peaks_%s',D));     % nCells×T
+    S       = rat.Ca_peaks.(sprintf('CA_peaks_%s',D));     % nCells×T OR cell array
     good    = find(rat.ratemask.(sprintf('ratemask_%s',D))==1);
-    pos     = rat.pos.(sprintf('pos_%s',D));               % Tpos×3
+    pos     = rat.pos.(sprintf('pos_%s',D));               % [t x y]
     csTimes = rat.CS_times.(sprintf('CS_%s',D))(:);
+
     t_pos   = pos(:,1);
     xy      = pos(:,2:3);
 
+    % ---- speed from ca_velocity (velocity timebase) ----
+    vel        = ca_velocity(pos);         % [speed; time]
+    vel_time   = vel(2,:)';
+    vel_mag    = vel(1,:)';
 
-%    S = S(good,:);
+    % interpolate speed to the POSITION timebase for visit segmentation
+    runMaskPos = interp1(vel_time, vel_mag, t_pos, 'linear','extrap') >= 4;
 
-
-
-    % --- build PF mask grid and get edges ---
-    [maskGrid, xEdges, yEdges] = computePFmaskGrid2p5(S, pos, csTimes, 1);
+    % ---- PF mask from running & non-trial ----
+    [maskGrid, xEdges, yEdges, inTrialPos] = computePFmask_runNoTrial_vel( ...
+        S, pos, csTimes, 2.5, 1, 1);
+    if isempty(maskGrid), continue, end
     [nY,nX,~] = size(maskGrid);
 
+    % Precompute pos-sample bin indices for visit detection
+    [~,~,bx_all] = histcounts(xy(:,1), xEdges);
+    [~,~,by_all] = histcounts(xy(:,2), yEdges);
+    goodSamp = bx_all>=1 & bx_all<=nX & by_all>=1 & by_all<=nY;
+
     for c = good(:)'
-      st = S(c,:);
-      st = st(~isnan(st)&st>0);
-      if numel(st)<3, continue, end
+      % spike times for this cell
+      st = getCellSpikes(S,c); st = st(~isnan(st) & st>0);
+      if numel(st) < 3, continue, end
 
-      % bin spike positions
-      idx_spk = interp1(t_pos, (1:numel(t_pos))', st, 'nearest','extrap');
-      bx      = discretize(xy(idx_spk,1), xEdges);
-      by      = discretize(xy(idx_spk,2), yEdges);
+      % ---- PF counts as per-visit spike counts (v>=4 & non-trial, inside PF mask) ----
       thisMask = maskGrid(:,:,c);
+      if ~any(thisMask,'all'), continue, end
 
-      % identify PF visits
-      validSpk = bx>=1 & bx<=nX & by>=1 & by<=nY;
-      vPF = thisMask(sub2ind([nY,nX], by(validSpk), bx(validSpk)));
-      % collapse runs: treat each spike as one count
-      % can refine to count per visit if desired
-      countsPF = vPF;
+      % in-PF over position samples
+      inPF_all = false(numel(t_pos),1);
+      if any(goodSamp)
+        linIdx = sub2ind([nY,nX], by_all(goodSamp), bx_all(goodSamp));
+        inPF_all(goodSamp) = thisMask(linIdx);
+      end
 
-      % trace counts
-      countsTr = arrayfun(@(t0) sum(st>=t0 & st< t0+2), csTimes);
+      pfRunNonTrial = inPF_all & runMaskPos & ~inTrialPos;
+      visits = logicalRuns(pfRunNonTrial, t_pos, minVisitDur);   % visits >= minVisitDur
+      if isempty(visits), continue, end
 
-           % only accumulate when we have >1 spike in both PF and Trace
-           if numel(countsPF)>1 && numel(countsTr)>1
-             fanoPF(end+1) = var(countsPF)/mean(countsPF);
-             fanoTr(end+1) = var(countsTr)/mean(countsTr);
-             spPF(end+1)   = splitHalfCorr(countsPF);
-             spTr(end+1)   = splitHalfCorr(countsTr);
-           end
+      % per-visit counts and durations
+      nVisits = size(visits,1);
+      vCounts = zeros(nVisits,1);
+      vDur    = zeros(nVisits,1);
+      for iv = 1:nVisits
+        t0 = visits(iv,1); t1 = visits(iv,2);
+        vCounts(iv) = sum(st >= t0 & st < t1);
+        vDur(iv)    = max(eps, t1 - t0); % avoid 0
+      end
+
+      % ---- Trace counts per CS in [0,2] s ----
+      if isempty(csTimes), continue, end
+      countsTr = arrayfun(@(t0) sum(st>=t0 & st<t0+2), csTimes);
+      trDur    = 2; % s
+
+      % ---- values for Fano/split-half: counts vs rates ----
+      switch modeChoice
+        case 'count'
+          valsPF = vCounts;
+          valsTr = countsTr;
+        case 'rate'
+          valsPF = vCounts ./ vDur;     % spikes/s per visit
+          valsTr = countsTr / trDur;    % spikes/s per trial
+      end
+
+      % ---- accumulate if valid ----
+      if numel(valsPF)>1 && numel(valsTr)>1
+        mPF = mean(valsPF); mTr = mean(valsTr);
+        if mPF>0 && mTr>0
+          fanoPF(end+1) = var(valsPF)/mPF;           %#ok<AGROW>
+          fanoTr(end+1) = var(valsTr)/mTr;           %#ok<AGROW>
+          spPF(end+1)   = splitHalfCorr(valsPF);     %#ok<AGROW>
+          spTr(end+1)   = splitHalfCorr(valsTr);     %#ok<AGROW>
+        else
+          fanoPF(end+1) = NaN; fanoTr(end+1) = NaN;  %#ok<AGROW>
+          spPF(end+1)   = NaN; spTr(end+1)   = NaN;  %#ok<AGROW>
+        end
+      end
     end
   end
 
@@ -92,73 +138,115 @@ for r = 1:nRats
   allSplitPF = [allSplitPF; spPF(:)];
   allSplitTr = [allSplitTr; spTr(:)];
 
-
-  % plotting per rat
-  ax1 = subplot(nRats+1,2, (r-1)*2+1);
-  hold(ax1,'on');
-  %axis(ax1,'square');
+  % ---- plotting per rat ----
+  ax1 = subplot(nRats+1,2, (r-1)*2+1); hold(ax1,'on'); axis(ax1,'square')
   scatter(ax1,fanoPF, fanoTr, 12, 'filled');
-  axis([0 max(fanoTr), 0 max(fanoTr)])
-  plot(ax1, xlim, xlim,'k--');
-  xlabel(ax1,'Fano Place Field'); ylabel(ax1,'Fano Trace'); title(ax1, ratNames{r});
+  lim = [0, max([fanoPF(:); fanoTr(:); 1])*1.05];
+  xlim(ax1,lim); ylim(ax1,lim);
+  plot(ax1, lim, lim,'k--');
+  xlabel(ax1,sprintf('Fano PF (%s; run, non-trial)', modeChoice));
+  ylabel(ax1,sprintf('Fano Trace (%s; 0–2 s)', modeChoice));
+  title(ax1, ratNames{r});
 
-  ax2 = subplot(nRats+1,2, r*2);
-  hold(ax2,'on');
-  %axis(ax2,'square');
+  ax2 = subplot(nRats+1,2, r*2); hold(ax2,'on'); axis(ax2,'square')
   scatter(ax2,spPF, spTr, 12,'filled');
-  plot(ax2, xlim, xlim,'k--');
-  xlabel(ax2,'Split-half Place Field'); ylabel(ax2,'Split-half Trace');
+  lim2 = [min([spPF(:);spTr(:);-1]) max([spPF(:);spTr(:);1])];
+  plot(ax2, [lim2(1) lim2(2)], [lim2(1) lim2(2)], 'k--');
+  xlim(ax2,lim2); ylim(ax2,lim2);
+  xlabel(ax2,sprintf('Split-half PF (%s)', modeChoice));
+  ylabel(ax2,sprintf('Split-half Trace (%s)', modeChoice));
 end
 
-% pooled row
-ax1 = subplot(nRats+1,2, nRats*2+1);
-hold(ax1,'on'); %axis(ax1,'square');
+% ---- pooled row ----
+ax1 = subplot(nRats+1,2, nRats*2+1); hold(ax1,'on'); axis(ax1,'square')
 scatter(ax1,allFanoPF,allFanoTr,12,'r','filled');
-  axis([0 max(allFanoTr), 0 max(allFanoTr)])
-plot(ax1, xlim, xlim,'k--');
-xlabel(ax1,'Fano Place Field'); ylabel(ax1,'Fano Trace'); title(ax1,'All pooled');
-ax2 = subplot(nRats+1,2, nRats*2+2);
-hold(ax2,'on'); %axis(ax2,'square');
-scatter(ax2,allSplitPF,allSplitTr,12,'r','filled'); plot(ax2, xlim, xlim,'k--');
-xlabel(ax2,'Split-half Place Field'); ylabel(ax2,'Split-half Trace'); title(ax2,'All pooled');
+lim = [0, max([allFanoPF(:); allFanoTr(:); 1])*1.05];
+xlim(ax1,lim); ylim(ax1,lim);
+plot(ax1, lim, lim,'k--');
+xlabel(ax1,sprintf('Fano PF (%s; run, non-trial)', modeChoice));
+ylabel(ax1,sprintf('Fano Trace (%s; 0–2 s)', modeChoice));
+title(ax1,'All pooled');
+
+f = [allFanoPF,allFanoTr]; % keep original return shape
+
+ax2 = subplot(nRats+1,2, nRats*2+2); hold(ax2,'on'); axis(ax2,'square')
+scatter(ax2,allSplitPF,allSplitTr,12,'r','filled');
+lim2 = [min([allSplitPF(:);allSplitTr(:);-1]) max([allSplitPF(:);allSplitTr(:);1])];
+plot(ax2, [lim2(1) lim2(2)], [lim2(1) lim2(2)], 'k--');
+xlim(ax2,lim2); ylim(ax2,lim2);
+xlabel(ax2,sprintf('Split-half PF (%s)', modeChoice));
+ylabel(ax2,sprintf('Split-half Trace (%s)', modeChoice));
+title(ax2,'All pooled');
 end
 
-function [maskGrid,xEdges,yEdges] = computePFmaskGrid2p5(spikeMat,pos,cs_times,N)
-% reuse CA_normalizePosData grid
-
-nCells = size(spikeMat,1);
+% ================= helpers =================
+function [maskGrid,xEdges,yEdges,inTrialPos] = computePFmask_runNoTrial_vel(S, pos, csTimes, binSize, smoothFlag, N)
 t_pos = pos(:,1);
-isInTrial = false(size(t_pos)); for t=cs_times(:)', isInTrial = isInTrial | (t_pos>=t & t_pos< t+2); end
-
-makeNewGrid = 0;
-for c=1:nCells
-  st = spikeMat(c,:); st = st(~isnan(st)&st>0);
-  if numel(st)<3, continue; end
-  idx_spk = interp1(t_pos,(1:numel(t_pos))', st, 'nearest','extrap');
-  inTr = isInTrial(idx_spk);
-  if size(st(inTr),2)==0 || size(st(~inTr),2) ==0
-    continue
+inTrialPos = false(size(t_pos));
+for t = csTimes(:).', end
+for t = csTimes(:).'
+  inTrialPos = inTrialPos | (t_pos>=t & t_pos<t+2);
+end
+vel      = ca_velocity(pos);    % [speed; time]
+vt       = vel(2,:)'; vmag = vel(1,:)';
+xv = interp1(t_pos, pos(:,2), vt, 'linear', NaN);
+yv = interp1(t_pos, pos(:,3), vt, 'linear', NaN);
+inTrialVel = false(size(vt));
+for t = csTimes(:).'
+  inTrialVel = inTrialVel | (vt>=t & vt<t+2);
+end
+keep = (vmag>=4) & ~inTrialVel & isfinite(xv) & isfinite(yv);
+posPF = [vt(keep), xv(keep), yv(keep)];
+if size(posPF,1) < 5, maskGrid = []; xEdges=[]; yEdges=[]; return; end
+xEdges = floor(min(posPF(:,2))):binSize:ceil(max(posPF(:,2)));
+yEdges = floor(min(posPF(:,3))):binSize:ceil(max(posPF(:,3)));
+ny = numel(yEdges)-1; nx = numel(xEdges)-1;
+nCells = size(S,1); maskGrid = false(ny,nx,nCells);
+for c = 1:nCells
+  st = getCellSpikes(S,c); st = st(~isnan(st) & st>0);
+  if numel(st)<3, continue, end
+  spd_spk   = interp1(vt, vmag, st, 'linear', 'extrap');
+  inTrialSpk= isInTrial_at_spike(st, csTimes, [0 2]);
+  st_pf     = st((spd_spk>=4) & ~inTrialSpk);
+  if isempty(st_pf), continue, end
+  rate = CA_normalizePosData(st_pf, posPF, binSize, smoothFlag);
+  if ~isequal(size(rate), [ny nx]), rate = imresize(rate, [ny nx], 'nearest'); end
+  if any(isfinite(rate(:)) & rate(:)~=0)
+    thr = nanmean(rate(:)) + N*nanstd(rate(:));
+    maskGrid(:,:,c) = (rate >= thr) & isfinite(rate);
   end
-  rateT = CA_normalizePosData(st(inTr), pos, 2.5, 1);
-  rateN = CA_normalizePosData(st(~inTr), pos, 2.5, 1);
-  if makeNewGrid == 0
-    [xEdges,yEdges] = size(rateT);
-    maskGrid = false(xEdges,yEdges,nCells);
-  end
-  makeNewGrid = 1;
-  rt = rateT;
-  rn=rateN;
-  maskGrid(:,:,c) = (rt>nanmean(rt(:))+N*nanstd(rt(:))) | (rn>nanmean(rn(:))+N*nanstd(rn(:)));
+end
 end
 
+function st = getCellSpikes(S, c)
+  if iscell(S), st = S{c}(:); else, st = S(c,:).'; end
+end
+
+function in = isInTrial_at_spike(st, csTimes, win)
+  st = st(:); in = false(size(st));
+  for k = 1:numel(csTimes)
+    in = in | (st>=csTimes(k)+win(1) & st<csTimes(k)+win(2));
+  end
+end
+
+function visits = logicalRuns(mask, t, minDur)
+  mask = mask(:)>0; t = t(:);
+  d = diff([false; mask; false]);
+  iStart = find(d==1); iEnd = find(d==-1)-1;
+  if isempty(iStart), visits = zeros(0,2); return; end
+  % guard last index for t(iEnd+1)
+  tPad = [t; t(end)+(t(end)-t(end-1))];
+  tStart = t(iStart); tEnd = tPad(iEnd+1);
+  dur = tEnd - tStart;
+  keep = dur >= minDur;
+  visits = [tStart(keep) tEnd(keep)];
 end
 
 function r = splitHalfCorr(v)
-  n   = numel(v);
+  n = numel(v);
+  if n < 2, r = NaN; return; end
   idx = randperm(n);
   h   = floor(n/2);
-  idx = idx(1:2*h);                  % only use the first 2*h spikes
-  r   = corr( v(idx(1:h)), ...
-              v(idx(h+1:2*h)), ...
-              'Rows','pairwise');
+  idx = idx(1:2*h);
+  r   = corr( v(idx(1:h)), v(idx(h+1:2*h)), 'Rows','pairwise' );
 end

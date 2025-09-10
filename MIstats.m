@@ -26,6 +26,8 @@ for i = 1:numel(ratNames)
     % Filter MI struct
     mi_struct = filterFieldsByDay(rat.MI_noCSUS15_shuff, daysToUse);
     %mi_struct = filterFieldsByDay(rat.MI_wCSUS_shuff, daysToUse);
+  %  mi_struct = filterFieldsByDay(rat.MI_noCSUS15_8cm_shuff, daysToUse); %%%
+
     ratemask_struct = filterFieldsByDay(rat.ratemask, daysToUse);
 
     fprintf('\n---- %s ----\n', ratVar);
