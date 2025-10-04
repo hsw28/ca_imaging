@@ -14,12 +14,19 @@ function Rall = postShockPV_evenOdd(ratNames, varargin)
 %   - Creates one figure with 2 columns per rat (PV corr heatmap; diag trace)
 %   - Creates a second figure with pooled-across-rats results
 %   - Returns Rall with per-rat results and pooled-across-rats fields.
+%
+% New option:
+%   'Preprocess' : 'none' | 'demean' | 'zscore' (default 'none')
+%                  Per-cell normalization applied to across all bins×trials
+%                  X (cells × bins × trials) before forming PVs.
 
 % ---------- args ----------
 p = inputParser;
 addParameter(p,'Days','An-2:An');
-addParameter(p,'PostWin',[0 25],@(v)isnumeric(v)&&numel(v)==2&&v(2)>v(1));
-addParameter(p,'BinSec',(1/7.5)*3,@isscalar);
+addParameter(p,'PostWin',[0 4],@(v)isnumeric(v)&&numel(v)==2&&v(2)>v(1));
+%addParameter(p,'BinSec',(1/7.5)*3,@isscalar);
+addParameter(p,'BinSec',(1/7.5),@isscalar);
+
 addParameter(p,'MinEvents',3,@isscalar);
 addParameter(p,'QFDR',0.05,@isscalar);
 addParameter(p,'NShuff',1000,@(x)isscalar(x)&&x>=100);
@@ -28,6 +35,7 @@ addParameter(p,'Debug',false,@islogical);
 addParameter(p,'UseSpeedMask',false,@islogical);
 addParameter(p,'SpeedThresh',4,@isscalar);
 addParameter(p,'SpeedMaskFrac',0.5,@(x)isscalar(x)&&x>=0&&x<=1);
+addParameter(p,'Preprocess','none',@(s) ischar(s)||isstring(s));
 parse(p,varargin{:});
 opts = p.Results;
 
@@ -166,12 +174,8 @@ if ~isempty(pooled_Z_stack)
 
         subplot(1,2,2); hold on;
         plot(tBins_master, diag_pooled_r, 'LineWidth', 1.5);
-        %yyaxis right; stairs(tBins_master, double(mask_pool)*100, 'LineWidth', 1.2);
-        %ylabel('Sig (FDR)'); ylim([0 110]);
-        %yyaxis left;
         ylabel('r (diag)');
         xlabel('Time since US (s)');
-        %title(sprintf('POOLED diag r (q=%.2g) | dur=%.2fs', opts.QFDR, dur_pool_s));
         grid on;
     end
 end
@@ -303,6 +307,23 @@ for d = 1:numel(dayNames)
         end
     end
 
+    % ---------- NEW: per-cell preprocessing ----------
+    switch lower(string(opts.Preprocess))
+        case "none"
+            % do nothing
+        case "demean"
+            mu = mean(X, [2 3], 'omitnan');          % cells×1×1
+            X  = X - mu;                              % broadcast subtract
+        case "zscore"
+            mu = mean(X, [2 3], 'omitnan');
+            sd = std(X, 0, [2 3], 'omitnan');
+            sd(sd==0 | isnan(sd)) = eps;
+            X  = (X - mu) ./ sd;
+        otherwise
+            error('Preprocess must be ''none'', ''demean'', or ''zscore''.');
+    end
+    % -----------------------------------------------
+
     % Even/odd splits
     trIdx  = 1:Ntr;
     trEven = trIdx(mod(trIdx,2)==0);  trOdd = trIdx(mod(trIdx,2)==1);
@@ -411,7 +432,8 @@ R.pooled.duration_sig_s = dur_pool_s;
 R.pooled.tBins          = tBins;
 R.params = struct('PostWin',opts.PostWin,'BinSec',opts.BinSec,'MinEvents',opts.MinEvents, ...
                   'QFDR',opts.QFDR,'NShuff',opts.NShuff,'Days',{daysToUse}, ...
-                  'UseSpeedMask',opts.UseSpeedMask,'SpeedThresh',opts.SpeedThresh,'SpeedMaskFrac',opts.SpeedMaskFrac);
+                  'UseSpeedMask',opts.UseSpeedMask,'SpeedThresh',opts.SpeedThresh, ...
+                  'SpeedMaskFrac',opts.SpeedMaskFrac,'Preprocess',opts.Preprocess);
 end
 
 

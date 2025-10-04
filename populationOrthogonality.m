@@ -4,21 +4,25 @@ function R = populationOrthogonality(ratName, varargin)
 %
 % Usage:
 %   R = populationOrthogonality('rat0314');
-%   R = populationOrthogonality('rat0314','WinSecs',[0 2],'NSplits',6,'Mode','zscore','Similarity','pearson');
+%   R = populationOrthogonality('rat0314','WinSecs',[0 2],'NSplits',16,'Mode','zscore','Similarity','pearson');
 %
 % Name-Value:
 %   'WinSecs'          – [t0 t1], default [0 2]
-%   'NSplits'          – default 6
+%   'NSplits'          – default 16
 %   'Mode'             – 'raw' | 'demean' | 'zscore' (default 'raw')
 %   'Similarity'       – 'cosine' | 'pearson' | 'spearman' (default 'pearson')
 %   'MICutoff'         – [] (off) or scalar in [0,1]; INCLUDE if MI(:,3) >= cutoff (from MI_CSUS15_shuff)
 %   'MIExcludeCutoff'  – [] (off) or scalar in [0,1]; EXCLUDE if MI(:,3) >= cutoff (from MI_noCSUS15_shuff)
 %   'SaveFig'          – true/false, default false
 %   'FigName'          – filename if SaveFig=true (default auto)
-%   'DoStats'    : true/false (default true)
-%   'NBoot'      : 1000   (cell bootstrap for CIs)
-%   'NPerm'      : 5000   (permutations for Mantel & epoch test)
-%   'EpochEdges' : [0 0.25 0.75 0.85 2]  (relative to WinSecs)
+%   'DoStats'          – true/false (default true)
+%   'NBoot'            – 500 (cell bootstrap for CI of lag curve)
+%   'NPerm'            – 500 (permutation test for within>between)
+%   'EpochEdges'       – [0 0.25 0.75 0.85 2] relative to WinSecs (CS, trace, US, post)
+%
+% Adds per-cell shuffled null for lag curve (95% band + dashed mean),
+% plus Within vs Between epoch bars with paired t, Wilcoxon, and perm p.
+% Layout mirrors populationSpatialOrthogonality_singleRat: top heatmaps, bottom bars + lag.
 
 p = inputParser;
 addParameter(p,'WinSecs',[0 2], @(v) isnumeric(v) && numel(v)==2 && v(2)>v(1));
@@ -29,12 +33,12 @@ addParameter(p,'MICutoff',[],@(x) isempty(x) || (isscalar(x)&&isfinite(x)));
 addParameter(p,'MIExcludeCutoff',[],@(x) isempty(x) || (isscalar(x)&&isfinite(x)));
 addParameter(p,'SaveFig',false,@islogical);
 addParameter(p,'FigName','',@(s) ischar(s) || isstring(s));
-% NEW
 addParameter(p,'DoStats',true,@islogical);
 addParameter(p,'NBoot',500,@isscalar);
 addParameter(p,'NPerm',500,@isscalar);
 addParameter(p,'EpochEdges',[0 0.25 0.75 0.85 2],@(v) isnumeric(v) && numel(v)==5);
 parse(p,varargin{:});
+
 winSecs    = p.Results.WinSecs;
 nSplits    = p.Results.NSplits;
 modeStr    = lower(p.Results.Mode);
@@ -53,12 +57,11 @@ R = populationOrthogonality_byRat(ratName, ...
       'WinSecs',winSecs,'NSplits',nSplits,'Mode',modeStr,'Similarity',simStr, ...
       'MICutoff',miCutoff,'MIExcludeCutoff',miXCutoff);
 
-% ---- collect per-day panels (similarity & norms) ----
+% ---- collect per-day panels (similarity) ----
 days = R.days; nDays = numel(days);
 haveDay = false(1,nDays);
 meanOff = nan(1,nDays);
 meanAng = nan(1,nDays);
-rowNormsAll = cell(1,nDays);
 
 for d = 1:nDays
   if isempty(R.perDay(d).simMat), continue; end
@@ -70,11 +73,6 @@ for d = 1:nDays
       meanAng(d) = real(acos(max(-1,min(1,meanOff(d))))); % radians
   else
       meanAng(d) = NaN;
-  end
-  if ~isempty(R.perDay(d).rate5xN)
-    rowNormsAll{d} = vecnorm(R.perDay(d).rate5xN,2,2);
-  else
-    rowNormsAll{d} = nan(nSplits,1);
   end
 end
 
@@ -90,8 +88,9 @@ end
 
 % =====================  STATS on pooled matrix  =========================
 stats = struct();   % will attach to R.stats
-if doStats && all(isfinite(Cpool(:)))
-    % gather pooled split×cell matrix (concat cells across days)
+
+if doStats && any(isfinite(Cpool(:)))
+    % stack pooled split×cell matrix across days
     Mpool = [];
     for d = 1:nDays
         M = R.perDay(d).rate5xN;   % (splits × cells)
@@ -99,91 +98,57 @@ if doStats && all(isfinite(Cpool(:)))
     end
     nCells = size(Mpool,2);
 
-
-    % A) lag–similarity curve + bootstrap CI
-    lags = 0:(nSplits-1);  utLag = cell(1,nSplits);
+    % ---------- Lag curve (observed) ----------
+    lags = 0:(nSplits-1);
+    utLag = cell(1,nSplits);
     lagMean = nan(1,nSplits);
     for L = lags
         idx = diag(true(nSplits-L,1), L) | diag(true(nSplits-L,1), -L);
-        utLag{L+1} = find(idx);                         %#ok<AGROW>
+        utLag{L+1} = find(idx);
         lagMean(L+1) = mean(Cpool(idx),'omitnan');
-    end
-    lagBoot = nan(nBoot, nSplits);
-    if nCells >= 5
-        for b = 1:nBoot
-            cols = randsample(nCells, nCells, true);
-            Cb   = simFromM(Mpool(:, cols));
-            for L = lags
-                lagBoot(b, L+1) = mean(Cb(utLag{L+1}), 'omitnan');
-            end
-        end
-        stats.lag.ci_low  = prctile(lagBoot, 2.5, 1);
-        stats.lag.ci_high = prctile(lagBoot,97.5, 1);
-    else
-        stats.lag.ci_low = nan(1,nSplits); stats.lag.ci_high = stats.lag.ci_low;
     end
     stats.lag.mean = lagMean;
     [stats.lag.rho, stats.lag.p_rho] = corr((lags(:)), lagMean(:), 'Type','Spearman','Rows','complete');
-    halfTarget = lagMean(1) * 0.5;
+    halfTarget = lagMean(1)*0.5;
     ix = find(lagMean <= halfTarget, 1, 'first');
-    if isempty(ix)
-        stats.lag.halfwidth_bins = NaN;
+    stats.lag.halfwidth_bins = tern(isempty(ix), NaN, ix-1);
+
+    % ---------- Lag null via per-cell spatially-permuted splits ----------
+    % Shuffle each cell's split vector independently (destroys adjacency, preserves marginals)
+    useCos = strcmpi(simStr,'cosine');
+    if nCells >= 3
+        nSh = 500;                       % mirrors spatial code
+        lagNull = nan(nSh, nSplits);
+        for b = 1:nSh
+            Cb = simFromM( shuffle_full_per_cell(Mpool), useCos, simStr );
+            for L = lags
+                lagNull(b, L+1) = mean(Cb(utLag{L+1}), 'omitnan');
+            end
+        end
+        stats.lag.null_mean = mean(lagNull,1,'omitnan');
+        stats.lag.null_lo   = prctile(lagNull,  2.5, 1);
+        stats.lag.null_hi   = prctile(lagNull, 97.5, 1);
     else
-        stats.lag.halfwidth_bins = ix - 1;
+        stats.lag.null_mean = nan(1,nSplits);
+        stats.lag.null_lo   = nan(1,nSplits);
+        stats.lag.null_hi   = nan(1,nSplits);
     end
 
-    % B) Mantel test vs temporal proximity model
-    Dmodel = -abs((1:nSplits) - (1:nSplits)'); ut = triu(true(nSplits),1);
-    r_true = corr( Cpool(ut), Dmodel(ut), 'Type','Spearman','Rows','complete');
-    r_perm = nan(nPerm,1);
-    ord = 1:nSplits;
-    for ppp = 1:nPerm
-        perm = ord(randperm(nSplits));
-        Xp = Cpool(perm, perm);
-        r_perm(ppp) = corr( Xp(ut), Dmodel(ut), 'Type','Spearman','Rows','complete');
-    end
-    stats.mantel.r = r_true;
-    stats.mantel.p = mean(r_perm >= r_true);
-
-    % C) RSA: similarity ~ SameEpoch + Proximity
+    % ---------- Within vs Between epoch ----------
+    % Build epoch labels from centers of time bins
     tEdges = linspace(winSecs(1), winSecs(2), nSplits+1);
     tCtr   = (tEdges(1:end-1)+tEdges(2:end))/2;
     epID   = zeros(1,nSplits);
     E = epochEdges(:)';   % relative to WinSecs
     for k = 1:nSplits
-        t = tCtr(k);
-        if     t>=E(1) && t<E(2), epID(k)=1;
-        elseif t>=E(2) && t<E(3), epID(k)=2;
-        elseif t>=E(3) && t<E(4), epID(k)=3;
-        else,  epID(k)=4;
+        t = tCtr(k) - winSecs(1);  % convert to 0..(t1-t0)
+        if     t>=E(1) && t<E(2), epID(k)=1;  % CS
+        elseif t>=E(2) && t<E(3), epID(k)=2;  % Trace
+        elseif t>=E(3) && t<E(4), epID(k)=3;  % US
+        else,  epID(k)=4;                      % Post
         end
     end
-    SameEpoch = double(epID(:)==epID(:)');
-    Proximity = Dmodel;
-
-    y  = Cpool(ut);
-    Xr = [ SameEpoch(ut) Proximity(ut) ];
-    Xr = zscore(Xr);                   % scale predictors
-    b  = Xr \ y;
-    stats.rsa.beta_same = b(1);
-    stats.rsa.beta_prox = b(2);
-
-    % bootstrap CIs for betas
-    betab = nan(nBoot,2);
-    if nCells >= 5
-        for bidx = 1:nBoot
-            cols = randsample(nCells, nCells, true);
-            Cb   = simFromM(Mpool(:, cols));
-            yb   = Cb(ut);
-            betab(bidx,:) = (Xr \ yb).';
-        end
-        stats.rsa.beta_same_CI = prctile(betab,[2.5 97.5]);
-        stats.rsa.beta_prox_CI = prctile(betab,[2.5 97.5]);
-    else
-        stats.rsa.beta_same_CI = [NaN NaN]; stats.rsa.beta_prox_CI = [NaN NaN];
-    end
-
-    % D) Within vs between epoch similarity (permutation p)
+    ut = triu(true(nSplits),1);
     W = []; B = [];
     for i=1:nSplits
         for j=i+1:nSplits
@@ -192,12 +157,26 @@ if doStats && all(isfinite(Cpool(:)))
             end
         end
     end
+    W = W(isfinite(W)); B = B(isfinite(B));
     stats.epoch.within_mean  = mean(W,'omitnan');
     stats.epoch.between_mean = mean(B,'omitnan');
-    diff_true = stats.epoch.within_mean - stats.epoch.between_mean;
+    stats.epoch.diff         = stats.epoch.within_mean - stats.epoch.between_mean;
+
+    % unpaired (Welch) + Wilcoxon on pair distributions
+    try
+        [~,p_t] = ttest2(W, B);
+    catch, p_t = NaN; end
+    try
+        p_w = ranksum(W, B);
+    catch, p_w = NaN; end
+    stats.epoch.p_ttest   = p_t;
+    stats.epoch.p_wilcox  = p_w;
+
+    % permutation p (shuffle epoch labels)
     diff_perm = nan(nPerm,1);
+    ord = 1:nSplits;
     for ppp = 1:nPerm
-        ep = epID(randperm(nSplits));
+        ep = epID(ord(randperm(nSplits)));
         Wp = []; Bp = [];
         for i=1:nSplits
             for j=i+1:nSplits
@@ -206,121 +185,130 @@ if doStats && all(isfinite(Cpool(:)))
         end
         diff_perm(ppp) = mean(Wp,'omitnan') - mean(Bp,'omitnan');
     end
-    stats.epoch.diff   = diff_true;
-    stats.epoch.p_perm = mean(diff_perm >= diff_true);
+    stats.epoch.p_perm = (1 + sum(diff_perm >= stats.epoch.diff)) / (nnz(isfinite(diff_perm)) + 1);
 end
 
-% ---- figure layout ----
-% ---- figure layout ----
-nHeat = sum(haveDay) + 1;
-nCols = max(3, nHeat);
-nRows = 2 + double(doStats);   % <— add one extra row for stats panels
-fig = figure('Color','w','Position',[100 100 320*nCols 820]);
-tiledlayout(nRows, nCols, 'TileSpacing','compact','Padding','compact');
-
-
-
-
-% ---- heatmaps (per-day + pooled) ----
-plotIdx = 0;
-for d = 1:nDays
-  if ~haveDay(d), continue; end
-  plotIdx = plotIdx + 1;
-  nexttile(plotIdx);
-  clim = strcmp(simStr,'cosine')*[0 1] + ~strcmp(simStr,'cosine')*[-1 1];
-  imagesc(R.perDay(d).simMat, clim);
-  axis square; colormap(gca, parula); colorbar;
-  xticks(1:nSplits); yticks(1:nSplits);
-  xlabel('Split'); ylabel('Split');
-  if strcmp(simStr,'cosine')
-      ttlExtra = sprintf('mean off-diag cos = %.2f (%.0f°)', meanOff(d), rad2deg(meanAng(d)));
-  else
-      ttlExtra = sprintf('mean off-diag %s = %.2f', simStr, meanOff(d));
-  end
-  title(sprintf('%s  |  %s', days{d}, ttlExtra));
+% ---------- RSA + Mantel (add back) ----------
+try
+    Smore = analyzePVSimStats(R, epochEdges, nBoot, nPerm);
+    if isfield(Smore,'mantel'), stats.mantel = Smore.mantel; end
+    if isfield(Smore,'rsa'),    stats.rsa    = Smore.rsa;    end
+catch ME
+    warning('analyzePVSimStats failed: %s', ME.message);
 end
-% pooled
-plotIdx = plotIdx + 1;
-nexttile(plotIdx);
-clim = strcmp(simStr,'cosine')*[0 1] + ~strcmp(simStr,'cosine')*[-1 1];
-imagesc(Cpool, clim);
-axis square; colormap(gca, parula); colorbar;
-xticks(1:nSplits); yticks(1:nSplits);
-xlabel('Split'); ylabel('Split');
-if strcmp(simStr,'cosine')
-    ttlExtra = sprintf('mean off-diag cos = %.2f (%.0f°)', meanOff_pool, rad2deg(meanAng_pool));
-else
-    ttlExtra = sprintf('mean off-diag %s = %.2f', simStr, meanOff_pool);
-end
-title(['Pooled  |  ' ttlExtra]);
-
-% ---- MDS of pooled (distance = 1 - similarity) ----
-%{
-nexttile([1 max(1, floor(nCols/2))]);
-D = 1 - max(-1,min(1,Cpool));
-D = (D + D')/2; D(1:nSplits+1:end) = 0;
-try, Y = mdscale(D, 2, 'Criterion','stress'); catch, [V,~]=eigs((Cpool+Cpool')/2,2); Y=V; end
-plot(Y(:,1), Y(:,2), '-o','LineWidth',1.5,'MarkerFaceColor',[.1 .1 .1]); hold on
-text(Y(:,1), Y(:,2), compose('%d',1:nSplits), 'VerticalAlignment','bottom','FontSize',10);
-axis equal; grid on
-xlabel('MDS-1'); ylabel('MDS-2');
-title(sprintf('Pooled: MDS of splits (dist = 1 - %s)', simStr));
 
 
-% ---- grouped bars: vector norms per split (per day + pooled mean) ----
-nexttile([1 max(1, ceil(nCols/2))]); cla; hold on
-validIdx = find(haveDay); nValid = numel(validIdx);
-Rnorms = nan(nSplits, nValid); lbls = strings(1, nValid);
-for j = 1:nValid, d = validIdx(j); Rnorms(:, j) = rowNormsAll{d}(:); lbls(j)=string(days{d}); end
-rnMean = mean(Rnorms, 2, 'omitnan'); Ybars = [Rnorms, rnMean];
-b = bar(Ybars, 'grouped'); box on
-for j = 1:nValid, b(j).DisplayName = lbls(j); end
-b(nValid+1).DisplayName = 'Mean(non-NaN)'; b(nValid+1).FaceAlpha = 0.45;
-xticks(1:nSplits); xlim([0.5 nSplits+0.5])
-xlabel('Split'); ylabel(sprintf('||population||_2 (%s)', upper(R.params.Mode)))
-title('Population vector norms per split')
-legend('Location','bestoutside')
-ylim([0, max(Ybars(:), [], 'omitnan') * 1.1])
 
-%}
+% =====================  FIGURE (match reference layout)  =================
+% Top row: up to 3 per-day heatmaps + pooled; bottom: bars (span 2) + lag (span 2)
+dayIdx = find(haveDay);
+if numel(dayIdx) > 3, dayIdx = dayIdx(1:3); end
 
-% ---- NEW PANELS: Lag curve + Within-vs-Between ----
-if doStats && isfield(stats,'lag')
+fig = figure('Color','w','Position',[100 100 1400 700]);
+tiledlayout(fig,2,4,'TileSpacing','compact','Padding','compact');
 
-  % Within vs between
-  nexttile([1 max(1, ceil(nCols/3))]); cla; hold on
-  bar([1 2], [stats.epoch.within_mean, stats.epoch.between_mean], 0.6);
-  set(gca,'XTick',[1 2],'XTickLabel',{'Within','Between'});
-  ylabel(sprintf('Mean %s similarity', simStr));
-  title(sprintf('Within > Between?  \\Delta=%.3f, p_{perm}=%.3g', ...
-        stats.epoch.diff, stats.epoch.p_perm));
-  box off
-
-  % Text box: Mantel + RSA
-  annotation('textbox',[0.78 0.02 0.20 0.12],'String', sprintf( ...
-    'Mantel r=%.2f, p=%.1g\nRSA  β_same=%.3f [%0.3f %0.3f]\nRSA  β_prox=%.3f [%0.3f %0.3f]', ...
-    stats.mantel.r, stats.mantel.p, ...
-    stats.rsa.beta_same, stats.rsa.beta_same_CI(1), stats.rsa.beta_same_CI(2), ...
-    stats.rsa.beta_prox, stats.rsa.beta_prox_CI(1), stats.rsa.beta_prox_CI(2) ), ...
-    'EdgeColor',[.8 .8 .8],'BackgroundColor',[1 1 1], 'FontSize',10);
-
-    % Lag curve
-    nexttile([1 max(1, 2)]); hold on
-    x = 0:(nSplits-1);
-    plot(x, stats.lag.mean, 'k-', 'LineWidth',1.8);
-    if all(isfinite(stats.lag.ci_low))
-        xx = [x fliplr(x)];
-        yy = [stats.lag.ci_low fliplr(stats.lag.ci_high)];
-        fill(xx, yy, [0.7 0.8 1], 'EdgeColor','none', 'FaceAlpha',0.5);
-        plot(x, stats.lag.mean, 'k-', 'LineWidth',1.8);
+% --- top: per-day heatmaps (up to 3) ---
+for j = 1:3
+    nexttile(j); cla
+    if j <= numel(dayIdx)
+        d = dayIdx(j);
+        C = R.perDay(d).simMat;
+        clim = strcmp(simStr,'cosine')*[0 1] + ~strcmp(simStr,'cosine')*[-1 1];
+        imagesc(C, clim); axis square; colormap(gca, parula); colorbar;
+        xticks(1:nSplits); yticks(1:nSplits); xlabel('Split'); ylabel('Split');
+        if strcmp(simStr,'cosine')
+            ttlExtra = sprintf('mean off cos = %.2f (%.0f°)', meanOff(d), rad2deg(real(acos(max(-1,min(1,meanOff(d)))))));
+        else
+            ttlExtra = sprintf('mean off %s = %.2f', simStr, meanOff(d));
+        end
+        title(sprintf('%s  |  %s', R.days{d}, ttlExtra));
+    else
+        axis off
+        text(0.5,0.5,'(no day)', 'HorizontalAlignment','center', ...
+             'VerticalAlignment','middle','FontSize',12);
     end
-    xlabel('Lag (bins)'); ylabel(sprintf('Mean %s similarity', simStr));
-    ttl = sprintf('Lag curve (\\rho=%.2f, p=%.1g; half-width=%s bins)', ...
-                  stats.lag.rho, stats.lag.p_rho, num2str(stats.lag.halfwidth_bins));
-    title(ttl); box off
-
-
 end
+
+% --- top: pooled heatmap ---
+nexttile(4); cla
+clim = strcmp(simStr,'cosine')*[0 1] + ~strcmp(simStr,'cosine')*[-1 1];
+imagesc(Cpool, clim); axis square; colormap(gca, parula); colorbar;
+xticks(1:nSplits); yticks(1:nSplits); xlabel('Split'); ylabel('Split');
+if strcmp(simStr,'cosine')
+    ttlExtra = sprintf('Pooled | mean off cos=%.2f (%.0f°)', meanOff_pool, rad2deg(meanAng_pool));
+else
+    ttlExtra = sprintf('Pooled | mean off %s=%.2f', simStr, meanOff_pool);
+end
+title(ttlExtra);
+
+% --- bottom-left: Within vs Between bars (span 2) ---
+nexttile(5,[1 2]); cla; hold on
+if doStats && isfield(stats,'epoch') && isfinite(stats.epoch.within_mean) && isfinite(stats.epoch.between_mean)
+    mW = stats.epoch.within_mean; mB = stats.epoch.between_mean;
+
+    % compute SEM from distributions if available
+    sem = @(v) std(v,0,'omitnan')/sqrt(max(1,nnz(isfinite(v))));
+    if exist('W','var') && exist('B','var') && ~isempty(W) && ~isempty(B)
+        seW = sem(W); seB = sem(B);
+    else
+        seW = NaN; seB = NaN;
+    end
+
+    bar([1 2],[mW mB],0.65,'FaceColor',[0.80 0.85 1.00],'EdgeColor','k');
+    errorbar([1 2],[mW mB],[seW seB],'k','LineStyle','none','LineWidth',1.3);
+
+    xticks([1 2]); xticklabels({'Within','Between'});
+    ylabel(sprintf('Mean %s similarity', simStr)); box on
+
+    yl = ylim; yb = yl(2) - 0.06*range(yl);
+    plot([1 1 2 2],[yb-0.01 yb yb yb-0.01],'k-','LineWidth',1.25)
+    txt = sprintf('%s (t p=%.2g; rank p=%.2g; perm p=%.2g)', ...
+        sigStars(stats.epoch.p_ttest), stats.epoch.p_ttest, stats.epoch.p_wilcox, stats.epoch.p_perm);
+    text(1.5, yb+0.01*range(yl), txt, 'HorizontalAlignment','center', 'FontSize',12, 'FontWeight','bold');
+
+    title('Within vs Between epoch (pooled pairs)');
+else
+    axis off
+    text(0.5,0.5,'No epoch stats available','HorizontalAlignment','center','VerticalAlignment','middle');
+end
+
+% --- bottom-right: lag curve with shuffled band (span 2) ---
+nexttile(7,[1 2]); cla; hold on
+if doStats && isfield(stats,'lag') && any(isfinite(stats.lag.mean))
+    x = 0:(nSplits-1);
+    % null band
+    if isfield(stats.lag,'null_lo') && any(isfinite(stats.lag.null_lo))
+        xx = [x fliplr(x)];
+        yy = [stats.lag.null_lo fliplr(stats.lag.null_hi)];
+        fill(xx, yy, [0.8 0.85 1], 'EdgeColor','none', 'FaceAlpha',0.45);
+    end
+    if isfield(stats.lag,'null_mean') && any(isfinite(stats.lag.null_mean))
+        plot(x, stats.lag.null_mean, '--', 'LineWidth', 1.4);
+    end
+    % observed
+    plot(x, stats.lag.mean, 'k-', 'LineWidth', 1.8);
+    xlabel('Lag (bins)'); ylabel(sprintf('Mean %s similarity', simStr));
+    title(sprintf('Lag curve (\\rho=%.2f, p=%.1g; half-width=%s bins)', ...
+          stats.lag.rho, stats.lag.p_rho, num2str(stats.lag.halfwidth_bins)));
+    box off
+    % legend
+    lg = {}; lh = [];
+    if any(isfinite(stats.lag.null_lo))
+        lg{end+1} = 'Shuffled 95% band';  lh(end+1)=plot(nan,nan,'-','Color',[0.8 0.85 1],'LineWidth',8); %#ok<AGROW>
+    end
+    if any(isfinite(stats.lag.null_mean))
+        lg{end+1} = 'Shuffled mean';      lh(end+1)=plot(nan,nan,'--k','LineWidth',1.4); %#ok<AGROW>
+    end
+    lg{end+1} = 'Observed';               lh(end+1)=plot(nan,nan,'k-','LineWidth',1.8); %#ok<AGROW>
+    if ~isempty(lh), legend(lh, lg, 'Location','northeast'); end
+else
+    axis off
+    text(0.5,0.5,'No lag stats available','HorizontalAlignment','center','VerticalAlignment','middle');
+end
+
+% Page title (match style)
+sgtitle(fig, sprintf('%s | %dsplits | %0.1f–%0.1fs | %s | %s', ...
+       ratName, nSplits, winSecs(1), winSecs(2), upper(modeStr), upper(simStr)), 'FontWeight','bold');
 
 % ---- save if requested ----
 if doSave
@@ -338,24 +326,42 @@ R.summary.meanOff_pooled = meanOff_pool;
 R.summary.meanAng_pooled = meanAng_pool;
 R.stats = stats;
 
-
-    function C = simFromM(Min)
-        if strcmp(simStr,'cosine')
-            rn = vecnorm(Min,2,2);
-            C  = (Min*Min') ./ max(rn*rn', eps);
-            C  = max(-1,min(1,C));
-        else
-            C  = corr(Min','rows','pairwise','Type',upper(simStr));
-        end
-        C = (C + C')/2;
-        C(1:nSplits+1:end) = 1;
+% ---------------- local helpers ----------------
+function C = simFromM(Min, useCos, simStrLocal)
+    if useCos
+        rn = vecnorm(Min,2,2);
+        C  = (Min*Min') ./ max(rn*rn', eps);
+        C  = max(-1,min(1,C));
+    else
+        C  = corr(Min','rows','pairwise','Type',upper(simStrLocal));
     end
-end  % <- end of populationOrthogonality
+    C = (C + C')/2; C(1:size(C,1)+1:end) = 1;
+end
 
+function Ms = shuffle_full_per_cell(M)
+    % Independently permute the S-bin vector for each cell (columns).
+    [S,N] = size(M);
+    Ms = zeros(S,N);
+    for j=1:N
+        idx = randperm(S);
+        Ms(:,j) = M(idx,j);
+    end
+end
 
+function out = tern(cond, a, b)
+    if cond, out=a; else, out=b; end
+end
 
+function s = sigStars(pval)
+  if ~isfinite(pval), s = 'n.s.'; return; end
+  if pval < 1e-4, s='****';
+  elseif pval < 1e-3, s='***';
+  elseif pval < 1e-2, s='**';
+  elseif pval < 0.05, s='*';
+  else, s='n.s.'; end
+end
 
-
+end
 
 function R = populationOrthogonality_byRat(ratName, varargin)
 % Build S×N population vectors of mean trial-window rates,
@@ -592,7 +598,8 @@ S.lag.mean = lagMean;
 
 % bootstrap using stored per-day split×cell matrices (faster than recomputing)
 useCosine = strcmpi(R.params.Similarity,'cosine');
-getSim = @(M) pvSimFromRates(M, useCosine);   % nested below
+getSim = @(M) simFromM_local(M, useCosine, lower(R.params.Similarity));
+
 
 % stack all days' split×cell matrices (concatenate cells)
 Mpool = [];
@@ -694,12 +701,14 @@ S.epoch.diff   = diff_true;
 S.epoch.p_perm = mean(diff_perm >= diff_true);
 end
 
-% ---- helper to recompute similarity from split×cell matrix M (S×N) ----
-function C = pvSimFromRates(M, useCosine)
-    if useCosine
-        rn = vecnorm(M,2,2); C = (M*M') ./ max(rn*rn', eps);
-        C = max(-1,min(1,C));
-    else
-        C = corr(M','rows','pairwise');  % Pearson
-    end
+function C = simFromM_local(Min, useCos, simStrLocal)
+% Build split×split similarity from split×cell matrix Min
+if useCos
+    rn = vecnorm(Min,2,2);
+    C  = (Min*Min') ./ max(rn*rn', eps);
+    C  = max(-1,min(1,C));
+else
+    C  = corr(Min','rows','pairwise','Type',upper(simStrLocal));  % 'pearson' or 'spearman'
+end
+C = (C + C')/2; C(1:size(C,1)+1:end) = 1;
 end

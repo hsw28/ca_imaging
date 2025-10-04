@@ -100,6 +100,9 @@ pWB = NaN;
     [~,pWB] = ttest(within, between);
 
 
+
+
+
 % ---------------- Group figure ----------------
 nColsHeat = min(5, nR+1);      % heatmaps per row (incl. mean)
 nRowsHeat = ceil((nR+1)/nColsHeat);

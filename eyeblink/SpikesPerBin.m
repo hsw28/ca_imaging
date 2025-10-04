@@ -9,9 +9,11 @@ function SpikesPerBin(ratNames)
 %binEdges     = linspace(win(1), win(2), nBins+1);   % 0 : 0.133 : 2.0
 %binWidth     = diff(binEdges(1:2));
 
-winFull   = [-1 2];                 % 3-second window
-binWidth  = (1/7.5);               % keep the 0–2 s resolution
-binEdges  = winFull(1):binWidth:winFull(2);   % edges –1 : 0.133 : 2
+% define your analysis window explicitly
+endtime = 2;
+winFull  = [-1 endtime];                     % if you want -1 to +2 s around CS
+binWidth = (1/7.5);
+binEdges = winFull(1):binWidth:winFull(2);
 nBins     = numel(binEdges)-1;      % 23 bins (7 pre-CS, 15 post-CS, 1 overlap)
 
 for r = 1:numel(ratNames)
@@ -42,11 +44,14 @@ for r = 1:numel(ratNames)
             t0 = csTimes(t);                          % CS onset
             for jj = 1:numel(inclIdx)
                 c   = inclIdx(jj);
-                st  = spk(c,:);  st = st(~isnan(st) & st>0);
-                rel = st - t0;
-                rel = rel(rel>=0 & rel<2);            % 0–2 s after CS
-                if isempty(rel),  continue, end
-                cnt = histcounts(rel, binEdges);      % 15-bin histogram
+                st  = spk(c,:);
+                st = st(~isnan(st) & st>0);
+                rel = (st - t0);
+
+                % keep ALL spikes that land in your histogram’s support
+                rel = rel(rel >= binEdges(1) & rel < binEdges(end));
+
+                cnt = histcounts(rel, binEdges);
                 spikesperbin(:,c) = spikesperbin(:,c) + cnt(:);
               end
             end
@@ -105,7 +110,7 @@ for rr = 1:nRats
     line([0 0], ylim, 'Color','r','LineStyle','--');  % CS marker
     line([.75 .75], ylim, 'Color','blue','LineStyle','--');  % US marker
 
-    xlabel('Time from CS (s)'); ylabel('Spikes / bin');
+    xlabel('Time from CS (s)'); ylabel('Event Rate (hz)');
     title(ratNames{rr}); box off;
 
     grandMat = [grandMat; mu];              %#ok<AGROW>

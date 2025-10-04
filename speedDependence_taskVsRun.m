@@ -42,7 +42,7 @@ addParameter(p,'CapNonTaskToTask',false);
 addParameter(p,'CapMode','random');
 addParameter(p,'CapUseSpeedGatedTask',false);
 addParameter(p,'CapSeed',[]);
-addParameter(p,'VelMatchNBins',10);
+addParameter(p,'VelMatchNBins',20);
 parse(p,varargin{:});
 Win         = p.Results.Win;
 BinSec      = p.Results.BinSec;
@@ -97,15 +97,26 @@ for r = 1:nR
 
     for d = 1:numel(days)
         D = days{d};
-        Sraw = rat.Ca_peaks.(sprintf('CA_peaks_%s',D));   % n×m cell (n=cells)
-        S    = normalizeCApeaks(Sraw);                    % {n,1} spike vectors
 
-        pos = rat.pos.(sprintf('pos_%s',D));              % [t x y]
-        [vt, vv] = velocityFromPos(pos);
+        % ---- data pull ----
+        Sraw = rat.Ca_peaks.(sprintf('CA_peaks_%s',D));
+        S    = normalizeCApeaks(Sraw);
 
-        CS  = rat.CS_times.(sprintf('CS_%s',D));          % CS onset times
+        pos = rat.pos.(sprintf('pos_%s',D));      % [t x y]
+        pos = smoothpos(pos);
+        if isfield(rat,'vel') && isfield(rat.vel, sprintf('vel_%s',D))
+            velTS = rat.vel.(sprintf('vel_%s',D)); vt = velTS(:,1); vv = velTS(:,2);
+        else
+            [vt, vv] = velocityFromPos(pos);
+        end
+        CS  = rat.CS_times.(sprintf('CS_%s',D));
 
-        % ---------- trial side ----------
+        % ---- trial samplewise speeds (for vel-match target) ----
+        dtPos = median(diff(pos(:,1)),'omitnan');
+        [trialSampSpeeds_d, ~] = trialWithinSampleSpeeds( ...
+            pos(:,1), vt, vv, CS, Win, vThresh, capTaskGate);
+
+        % ---- task side (trial-level rates & trial mean speeds for corr) ----
         if capTaskGate
             [trialSpeed_d, trialRatePerCell_d] = trialSpeedAndRates_speedGated( ...
                 S, CS, vt, vv, Win, vThresh, pos(:,1));
@@ -115,12 +126,15 @@ for r = 1:nR
         end
         allTrialSpeed = [allTrialSpeed; trialSpeed_d]; %#ok<AGROW>
 
-        % ---------- non-task side (uncapped bins first) ----------
+        % ---- non-task side (UNCAPPED first) ----
         [binSpeed_d, binRatePerCell_d, effDur_d] = runBinsSpeedAndRates_withDur( ...
             S, CS, pos(:,1), vt, vv, Win, BinSec, vThresh);
 
-        % ---------- compute this day's task effective seconds ----------
-        dtPos  = median(diff(pos(:,1)),'omitnan');
+        % record uncapped for diagnostics
+        nPtsRun_uncap = sum(isfinite(binSpeed_d));
+        [rr_uncap, ~] = perCellCorr(binSpeed_d, binRatePerCell_d);
+
+        % ---- compute today's task effective seconds (target for capping) ----
         vOnPos = interp1(vt, vv, pos(:,1), 'linear','extrap');
         if capTaskGate
             inWin = false(size(pos,1),1);
@@ -133,38 +147,65 @@ for r = 1:nR
             taskEffSec_d = numel(CS) * diff(Win);
         end
 
-        % ---------- optionally cap THIS DAY'S non-task seconds ----------
+        % ---- select bins (capped or passthrough) ----
         if capOn & ~isempty(binSpeed_d)
-            if ~isempty(capSeed), rng(capSeed); end
+            if ~isempty(capSeed), rng(capSeed + d); end  % reproducible but different per day
             switch capMode
                 case 'random'
                     sel = selectBinsToMatchSeconds_random(effDur_d, taskEffSec_d);
                 case 'velmatch'
-                    sel = selectBinsToMatchSeconds_velmatch(binSpeed_d, effDur_d, ...
-                            trialSpeed_d, taskEffSec_d, nBinsVM);
+                    % within-trial SAMPLE distribution matching
+                    sel = selectBinsToMatchSeconds_velmatchSamples( ...
+                            binSpeed_d, effDur_d, trialSampSpeeds_d, taskEffSec_d, nBinsVM);
                 otherwise
                     error('CapMode must be ''random'' or ''velmatch''.');
             end
-            binSpeed_d       = binSpeed_d(sel);
-            binRatePerCell_d = binRatePerCell_d(sel,:);
-            effDur_d         = effDur_d(sel); %#ok<NASGU> % kept for clarity
+        else
+            % no capping → take all bins
+            sel = (1:numel(binSpeed_d)).';
         end
 
-        % ---------- correlations for this day ----------
-        [rt, pt] = perCellCorr(trialSpeed_d, trialRatePerCell_d);  % task
-        [rr, pr] = perCellCorr(binSpeed_d , binRatePerCell_d );    % run
+        % ---- apply selection & diagnostics ----
+        binSpeed_sel       = binSpeed_d(sel);
+        binRatePerCell_sel = binRatePerCell_d(sel,:);
+        effDur_sel         = effDur_d(sel);
 
-        % ---------- speed-matched trial vs run ratios (use the same selected bins) ----------
-        rr_match = perCellSpeedMatchedRateRatio(trialSpeed_d, trialRatePerCell_d, ...
-                                                binSpeed_d, binRatePerCell_d);
+        totSel = nansum(effDur_sel);
+        fprintf('[%s] Target=%.2fs, selected=%.2fs, #bins=%d (mean effDur/bin=%.2fs)\n', ...
+            D, taskEffSec_d, totSel, numel(sel), mean(effDur_sel,'omitnan'));
 
-        % ---------- append across days (per rat) ----------
+        % histogram match diagnostic (trial samples vs selected run samples)
+        q = linspace(0,1,11);
+        edges = quantile(trialSampSpeeds_d, q); edges(1)=-inf; edges(end)=inf;
+
+        h_tr  = histcounts(trialSampSpeeds_d, edges, 'Normalization','probability');
+        effSamp_sel      = max(1, round(effDur_sel / dtPos));          % ~#samples/bin at 7.5 Hz
+        runSamplesApprox = repelem(binSpeed_sel, effSamp_sel);
+        h_run = histcounts(runSamplesApprox, edges, 'Normalization','probability');
+
+        l1 = 0.5*sum(abs(h_tr - h_run));
+        fprintf('[%s] hist L1(trialSamples vs runSelected) = %.3f\n', D, l1);
+
+        % ---- correlations (task = per-trial; run = selected bins) ----
+        [rt, pt] = perCellCorr(trialSpeed_d,        trialRatePerCell_d);
+        [rr, pr] = perCellCorr(binSpeed_sel, binRatePerCell_sel);
+
+        nPtsRun_cap = sum(isfinite(binSpeed_sel));
+        fprintf('[%s] nPtsRun uncapped=%d, capped=%d; median r_run uncapped=%.3f, capped=%.3f\n', ...
+            D, nPtsRun_uncap, nPtsRun_cap, median(rr_uncap,'omitnan'), median(rr,'omitnan'));
+
+        % ---- speed-matched rate ratios (use selected run bins) ----
+        rr_match = perCellSpeedMatchedRateRatio( ...
+            trialSpeed_d, trialRatePerCell_d, binSpeed_sel, binRatePerCell_sel);
+
+        % ---- append across days ----
         r_task = [r_task; rt];
         r_run  = [r_run ; rr];
         p_task = [p_task; pt];
         p_run  = [p_run ; pr];
         rateRatio_match = [rateRatio_match; rr_match];
     end
+
 
 
 
@@ -299,53 +340,42 @@ end
 end
 
 function [binSpeed, rateMat, effDur] = runBinsSpeedAndRates_withDur(S, CS, tPos, vt, vv, Win, binSec, vThr)
-% Build non-task bins outside [CS+Win] with v >= vThr; compute mean speed, rates, and effective duration.
 nCells = size(S,1);
-% mask out trial windows
 csMask = false(size(tPos));
 for k = 1:numel(CS)
     csMask = csMask | ((tPos >= CS(k)+Win(1)) & (tPos < CS(k)+Win(2)));
 end
+dtPos = median(diff(tPos),'omitnan');
 vOnPos = interp1(vt, vv, tPos, 'linear','extrap');
 runMask = ~csMask & (vOnPos >= vThr);
 
 tmin = tPos(find(runMask,1,'first'));
 tmax = tPos(find(runMask,1,'last'));
-if isempty(tmin) || isempty(tmax)
-    binSpeed = []; rateMat = []; effDur = [];
-    return
-end
+if isempty(tmin) || isempty(tmax), binSpeed=[]; rateMat=[]; effDur=[]; return; end
 
-edges = tmin:binSec:tmax;
-if edges(end) < tmax, edges = [edges tmax]; end
+edges = tmin:binSec:tmax; if edges(end) < tmax, edges = [edges tmax]; end
 nB = numel(edges)-1;
-
-binSpeed = nan(nB,1);
-effDur   = zeros(nB,1);
-rateMat  = nan(nB,nCells);
-
-dtPos = median(diff(tPos), 'omitnan');
+binSpeed = nan(nB,1); effDur = zeros(nB,1); rateMat = nan(nB,nCells);
 
 for b = 1:nB
     iv = (tPos>=edges(b)) & (tPos<edges(b+1)) & runMask;
-    effDur(b) = sum(iv) * dtPos;     % seconds with v>=thr
+    effDur(b) = sum(iv) * dtPos;
     if effDur(b) <= 0, continue; end
-    binSpeed(b) = mean(vOnPos(iv), 'omitnan');
+    binSpeed(b) = mean(vOnPos(iv),'omitnan');
 
-    % spike counts in the bin; divide by effective duration
+    intervals = maskToIntervals(tPos, iv, dtPos);
     for c = 1:nCells
         sp = S{c,1};
         if isempty(sp), rateMat(b,c) = 0; continue; end
-        nSp = sum(sp>=edges(b) & sp<edges(b+1));
+        nSp = countInIntervals(sp, intervals);
         rateMat(b,c) = nSp / effDur(b);
     end
 end
 
 ok = isfinite(binSpeed) & (effDur>0) & any(isfinite(rateMat),2);
-binSpeed = binSpeed(ok);
-rateMat  = rateMat(ok,:);
-effDur   = effDur(ok);
+binSpeed = binSpeed(ok); rateMat = rateMat(ok,:); effDur = effDur(ok);
 end
+
 
 function [r, p] = perCellCorr(x, Y)
 % x: n x 1 speeds; Y: n x cells rates
@@ -491,7 +521,7 @@ end
 
 % If we're severely short (e.g., scarce non-task data in some speed ranges), top up randomly.
 accTot = sum(effDur(keep));
-if accTot < 0.9*targetSec
+if accTot < 0.95*targetSec
     topup = selectBinsToMatchSeconds_random(effDur(~keep), targetSec - accTot);
     iiAll = find(~keep);
     keep(iiAll(topup)) = true;
@@ -563,4 +593,142 @@ function plotFracSigBars(R, includeDelta)
     legend(leg,'Location','northwest');
 
     hold off;
+end
+
+function [trialSampleSpeeds, dtPos] = trialWithinSampleSpeeds(tPos, vt, vv, CS, Win, vThr, gate)
+% Return vector of speeds for every *sample* inside CS windows.
+% gate=true -> only include samples with v >= vThr (use for apples-to-apples).
+% gate=false -> include all samples within Win.
+    dtPos  = median(diff(tPos),'omitnan');
+    vOnPos = interp1(vt, vv, tPos, 'linear','extrap');
+    inWin = false(size(tPos));
+    for k = 1:numel(CS)
+        t0 = CS(k)+Win(1); t1 = CS(k)+Win(2);
+        inWin = inWin | (tPos>=t0 & tPos<t1);
+    end
+    if gate
+        trialSampleSpeeds = vOnPos(inWin & (vOnPos >= vThr));
+    else
+        trialSampleSpeeds = vOnPos(inWin);
+    end
+    trialSampleSpeeds = trialSampleSpeeds(isfinite(trialSampleSpeeds));
+end
+
+function sel = selectBinsToMatchSeconds_velmatchSamples(binSpeed, effDur, trialSampleSpeeds, targetSec, nBins)
+% Allocate targetSec across speed *quantile bins* built from *samplewise* trial speeds.
+% Then randomly pick non-task bins inside each speed bin until hitting that per-bin seconds target.
+
+    trialSampleSpeeds = trialSampleSpeeds(isfinite(trialSampleSpeeds));
+    if isempty(trialSampleSpeeds) || all(~isfinite(binSpeed))
+        sel = selectBinsToMatchSeconds_random(effDur, targetSec);
+        return;
+    end
+
+    % Quantile edges from *sample* speeds within trials
+    q = linspace(0,1,nBins+1);
+    edges = quantile(trialSampleSpeeds, q);
+    edges(1) = -inf; edges(end) = inf;
+
+    % Samples per bin → seconds per bin (proportional allocation)
+    sampCounts = histcounts(trialSampleSpeeds, edges);
+    if sum(sampCounts)==0
+        sel = selectBinsToMatchSeconds_random(effDur, targetSec);
+        return;
+    end
+    targetPerBin = targetSec * (sampCounts / sum(sampCounts));   % seconds target in each speed bin
+
+    % Assign non-task bins to speed bins by their mean bin speed
+    [~,~,binIdx] = histcounts(binSpeed, edges);
+
+    keep = false(size(effDur));
+    for b = 1:nBins
+        targ = targetPerBin(b);
+        if targ <= 0, continue; end
+        cand = find(binIdx==b & effDur>0);
+        if isempty(cand), continue; end
+        cand = cand(randperm(numel(cand)));
+        acc = 0;
+        for j = 1:numel(cand)
+            ii = cand(j);
+            if acc + effDur(ii) > targ
+                if (targ - acc) < (acc + effDur(ii) - targ)
+                    % stop
+                else
+                    keep(ii) = true; acc = acc + effDur(ii);
+                end
+                break;
+            else
+                keep(ii) = true; acc = acc + effDur(ii);
+            end
+        end
+    end
+
+    % Top-up if we fell short due to sparseness in some speed ranges
+    accTot = sum(effDur(keep));
+    if accTot < 0.9*targetSec
+        extra = selectBinsToMatchSeconds_random(effDur(~keep), targetSec - accTot);
+        iiAll = find(~keep);
+        keep(iiAll(extra)) = true;
+    end
+
+    % Trim if overshot a lot
+    accTot = sum(effDur(keep));
+    if accTot > 1.1*targetSec
+        ii = find(keep);
+        [~,order] = sort(effDur(ii),'descend');
+        for j = 1:numel(order)
+            if accTot <= targetSec, break; end
+            keep(ii(order(j))) = false;
+            accTot = sum(effDur(keep));
+        end
+    end
+
+    if ~any(keep)
+        cand = find(effDur>0);
+        if ~isempty(cand), keep(cand(1)) = true; end
+    end
+    sel = find(keep);
+end
+
+function [trialSpeed, rateMat] = trialSpeedAndRates_speedGated(S, CS, vt, vv, Win, vThr, tPos)
+nCells = size(S,1);
+nTr    = numel(CS);
+trialSpeed = nan(nTr,1);
+rateMat    = nan(nTr,nCells);
+dtPos = median(diff(tPos),'omitnan');
+vOnPos = interp1(vt, vv, tPos, 'linear','extrap');
+
+for k = 1:nTr
+    t0 = CS(k)+Win(1); t1 = CS(k)+Win(2);
+    inWin = (tPos>=t0 & tPos<t1) & (vOnPos>=vThr);
+    effDur = sum(inWin) * dtPos;
+    if effDur <= 0, trialSpeed(k)=NaN; rateMat(k,:)=NaN; continue; end
+    trialSpeed(k) = mean(vOnPos(inWin),'omitnan');
+
+    intervals = maskToIntervals(tPos, inWin, dtPos);
+    for c = 1:nCells
+        sp = S{c,1};
+        if isempty(sp), rateMat(k,c) = 0; continue; end
+        nSp = countInIntervals(sp, intervals);
+        rateMat(k,c) = nSp / effDur;
+    end
+end
+end
+
+function intervals = maskToIntervals(t, mask, dt)
+if nargin<3 || isempty(dt), dt = median(diff(t),'omitnan'); end
+mask = mask(:); t = t(:);
+dm = diff([false; mask; false]);
+starts = find(dm==1); ends = find(dm==-1)-1;
+intervals = [t(starts)  t(ends)+dt];
+end
+
+function n = countInIntervals(spikes, intervals)
+if isempty(spikes) || isempty(intervals), n = 0; return; end
+spikes = spikes(:);
+inside = false(size(spikes));
+for k = 1:size(intervals,1)
+    inside = inside | (spikes>=intervals(k,1) & spikes<intervals(k,2));
+end
+n = sum(inside);
 end
