@@ -1,66 +1,49 @@
-function run_MI_control_rollingPost(csusNum, WEdges)
+function run_MI_control_rollingPost(WEdges)
 % run_MI_control_rollingPost
-% Calls MI_control_rollingPost per animal, aggregates curves across the last
-% 3 days, plots one curve/animal (mean over days×cells of MI_rand−MI_win),
-% overlays group mean±SEM, and prints the requested statistics:
-%  - Per-animal paired t-test using *all points* (windows×days×cells):
-%       ttest(MI_rand(:), MI_win_expanded(:))
-%  - Group tests:
-%       (A) All points: one-sample ttest of Δ = (MI_rand − MI_win) vs 0
-%       (B) Day means: one-sample ttest across animal×day means of Δ vs 0
-%
-% Uses ratemask if available: rat.ratemask.ratemask_YYYY_MM_DD == 1.
-
-%WEdges = [0 1; .5 1.5; 1 2; 1.5 2.5; 2 3; 2.5 3.5; 3 4; 3.5 4.5; 4 5];
-%  WEdges = [0 2; 1 3; 2 4];
-
-%WEdges = [0 1.5; .75 2.25; 1.5 3; 2.25 3.75];
-
-%WEdges = [0 1; .5 1.5; 1 2; 1.5 2.5; 2 3; 2.5 3.5];
-
-%WEdges = [-1 1; 0 2; 1 3; 2 4; 3 5; 4 6];
-
-%WEdges = [0 2; 1 3; 2 4; 3 5; 4 6; 5 7; 8 10; 9 11; 10 12; 11 13];
-
-%WEdges = [0 3; 1 4; 2 5; 3 6; 4 7; 5 8; 6 9; 7 10; 8 11; 9 12];
-%WEdges = [0 3; 1 4; 2 5; 3 6; 4 7];
+% CS-aligned rolling removal:
+%   Test  : remove spikes ONLY in the current window.
+%   Control: remove same # spikes ONLY from OUTSIDE the full span.
+% Optional tighter controls (speed / space / both), plus spike-count diagnostics.
 
 
-%WEdges = [0 2; 1 3; 2 4; 3 5; 4 6; 5 7; 8 10; 9 11; 10 12; 11 13];
+% ---- analysis windows (allow negatives) ----
+if nargin < 2 || isempty(WEdges)
+    starts = -4:.5:5;                 % window start times (s)
+    widths = ones(numel(starts),1)*2;   % 2-s wide windows
+    WEdges = [starts(:), starts(:)+widths(:)];
+end
 
-starts = 0:.5:11;       % window start times
-widths = ones(numel(starts),1)*2; % here always width 2
-WEdges = [starts(:), starts(:)+widths(:)];
-
-if nargin < 1, csusNum = 15; end
+% ---- CONTROL MATCHING OPTIONS ----
+ControlMatch = 'speed';        % 'none' | 'speed' | 'space' | 'speedspace'
+NSpeedBins   = 50;  %10           % used when ControlMatch includes 'speed'
+SpaceBinSize = [];            % [] => use MI 'dim'; else numeric bin size (same units as pos)
 
 % ---- config ----
-
 ratNames  = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
 velthresh = 4;    % cm/s
 dim       = 2.5;
-nIter     = 100;
+nIter     = 5;
 alpha     = 0.05;
 
-fprintf('\n===== Running MI_control_rollingPost (csus%d) =====\n', csusNum);
+fprintf('\n===== Running MI_control_rollingPost (CS-aligned; control outside span; match=%s) =====\n', ControlMatch);
 
-winCenters = [];           % shared x-axis (filled after first animal)
-curves     = [];           % W × N_animals (each col = animal curve)
-names      = {};           % animal names included
-allDelta   = [];           % collects ALL Δ across animals (for test A)
-allDayMeans = [];          % collects animal×day means (for test B)
+winCenters   = [];
+curves       = [];
+names        = {};
+allDelta     = [];
+allDayMeans  = [];
 
 set(0,'DefaultFigureVisible','on');
 
 for ii = 1:numel(ratNames)
-    ratVar = ratNames{ii};
+    ratVar = ratNames{ii}
     if ~evalin('base', sprintf('exist(''%s'',''var'')', ratVar))
         warning('Variable %s not found in base workspace. Skipping.', ratVar);
         continue;
     end
     rat = evalin('base', ratVar);
 
-    % figure out last 3 days up to An
+    % last 3 days up to An
     dateList = autoDateList(rat);
     idx = find(strcmp(dateList, rat.An));
     if isempty(idx) || idx < 3
@@ -69,56 +52,50 @@ for ii = 1:numel(ratNames)
     end
     daysToUse = dateList(idx-2:idx);
 
-    % Pull fields needed to run the analysis
-    spikes = filterFieldsByDay(rat.Ca_peaks, daysToUse);
-    pos    = filterFieldsByDay(rat.pos,       daysToUse);
-    ts     = filterFieldsByDay(rat.Ca_ts,     daysToUse);
-    csus   = filterFieldsByDay(rat.(sprintf('csus%d', csusNum)), daysToUse);
+    % needed fields
+    spikes   = filterFieldsByDay(rat.Ca_peaks, daysToUse);
+    pos      = filterFieldsByDay(rat.pos,       daysToUse);
+    ts       = filterFieldsByDay(rat.Ca_ts,     daysToUse); %#ok<NASGU>
+    cs_times = filterFieldsByDay(rat.CS_times,  daysToUse); % ACTUAL CS onsets
 
-    % We don't need actual MI to run the control here; pass an empty struct
-    out = MI_control_rollingPost(spikes, pos, velthresh, dim, ts, csus, nIter, WEdges);
+    % run rolling CS-aligned analysis with control-matching options
+    out = MI_control_rollingPost(spikes, pos, velthresh, dim, ts, cs_times, ...
+                                 nIter, WEdges, ControlMatch, NSpeedBins, SpaceBinSize);
 
-    fprintf('aggregating animal')
-    % Aggregate this animal across days:
+    % ---- spike-count parity print (per animal) ----
+    print_spike_count_parity(out, ratVar);
+
+    % aggregate per animal
     [centersW, curveW, delta_allPoints, dayMeans] = aggregate_animal(out, rat, daysToUse);
-
     if isempty(curveW)
-        warning('%s: no usable data (check MI_win/MI_rand fields). Skipping.', ratVar);
+        warning('%s: no usable data (check MI_win/MI_rand). Skipping.', ratVar);
         continue;
     end
 
-    % harmonize x-axis across animals
     if isempty(winCenters)
         winCenters = centersW(:);
     elseif numel(centersW) ~= numel(winCenters) || any(centersW(:) ~= winCenters(:))
-        % interpolate onto shared axis
         curveW = interp1(centersW(:), curveW(:), winCenters(:), 'linear', 'extrap');
-        % also align per-point deltas to shared axis if needed (we only need stats, already scalarized)
     end
 
-    % store
     curves(:, end+1) = curveW(:); %#ok<AGROW>
     names{end+1}     = ratVar;    %#ok<AGROW>
 
-    % collect for group stats
-    allDelta   = [allDelta; delta_allPoints(:)]; %#ok<AGROW>
-    allDayMeans = [allDayMeans; dayMeans(:)];    %#ok<AGROW>
+    allDelta     = [allDelta; delta_allPoints(:)]; %#ok<AGROW>
+    allDayMeans  = [allDayMeans; dayMeans(:)];     %#ok<AGROW>
 
-    % -------- Per-animal stats (paired t-test MI_rand vs MI_win) --------
-    % Note: test uses ALL points (windows×days×cells). This replicates each cell's MI_win
-    % across windows; that's what you asked for.
-    [p_pair,~,stats_pair] = ttest(delta_allPoints, 0, 'Alpha', alpha);  % equivalent to paired rand-vs-base
+    % per-animal ALL-POINTS Δ vs 0
+    [~,p_pair,~,stats_pair] = ttest(delta_allPoints, 0, 'Alpha', alpha);
     muA  = mean(curveW,'omitnan');
     seA  = std(curveW,0,'omitnan')/sqrt(sum(~isnan(curveW)));
 
-    % Also report per-window within-animal tests across cells (uncorr & FDR), useful to print
+    % per-window within-animal across-cells tests (print summary counts)
     [p_unc, q_fdr, nWin, nSig_unc, nSig_fdr] = per_animal_window_tests(out, rat, daysToUse, alpha);
 
-    fprintf('%s: mean curve Δ = %.3f ± %.3f; paired all-points: t(%d)=%.3f, p=%.3g\n', ...
-            ratVar, muA, seA, stats_pair, stats_pair, p_pair);
+    fprintf('%s: mean curve Δ = %.3f ± %.3f; all-points: t(%d)=%.3f, p=%.3g\n', ...
+            ratVar, muA, seA, stats_pair.df, stats_pair.tstat, p_pair);
     fprintf('   per-window across-cells (uncorr/FDR): %d/%d and %d/%d; min p=%.3g\n', ...
             nSig_unc, nWin, nSig_fdr, nWin, min(p_unc,[],'omitnan'));
-
 end
 
 % ---------- Plot ----------
@@ -143,6 +120,7 @@ fill(xx, yy, [0 0 0], 'FaceAlpha', 0.10, 'EdgeColor', 'none');
 plot(winCenters, m, 'k-', 'LineWidth', 2.5);
 
 % per-window group t-tests across animals' curves (vs 0) + BH-FDR
+alpha = 0.05;
 pvals = nan(size(m));
 for w = 1:numel(winCenters)
     [~,pvals(w)] = ttest(curves(w,:), 0, 'Alpha', alpha);
@@ -154,14 +132,13 @@ for s = sigIdx(:)'
     plot(winCenters(s), ymin - 0.1*range(m), 'kv', 'MarkerFaceColor','k', 'MarkerSize',8);
 end
 
-
-xlabel('Post-trial window center (s)');
+xlabel('Window center relative to CS (s)');
 ylabel('\Delta MI  (MI_{rand} - MI_{win})');
-title(sprintf('Rolling-post control (csus%d): per-animal curves + mean±SEM', csusNum));
+title(sprintf('Rolling control (CS-aligned; control outside span; match=%s)', ControlMatch));
 grid on;
 legend([names, {'Mean±SEM'}], 'Interpreter','none', 'Location','best');
 
-outname = sprintf('MI_rollingPost_curves_csus%d.png', csusNum);
+outname = sprintf('MI_rollingPost_curves_CSaligned_match-%s.png', ControlMatch);
 exportgraphics(gcf, outname, 'Resolution', 300);
 fprintf('Saved figure: %s\n', outname);
 
@@ -176,7 +153,7 @@ fprintf('Significant windows (BH-FDR q<%.2f): %s\n', alpha, mat2str(winCenters(s
 fprintf('======================================================================================\n');
 
 % ---------- Overall group tests ----------
-% (A) ALL POINTS (windows×days×cells×animals)
+% (A) ALL POINTS
 x_all = allDelta(:); x_all = x_all(~isnan(x_all));
 [~,p_all,~,stats_all] = ttest(x_all, 0, 'Alpha', alpha);
 mu_all = mean(x_all,'omitnan');
@@ -186,7 +163,7 @@ fprintf('Mean Δ over all points: %g ± %g (SEM), N=%d\n', mu_all, se_all, numel
 fprintf('t(%d) = %.3f, p = %.3g\n', stats_all.df, stats_all.tstat, p_all);
 fprintf('==================================================================\n');
 
-% (B) DAY MEANS (animal×day means of Δ)
+% (B) DAY MEANS
 x_days = allDayMeans(:); x_days = x_days(~isnan(x_days));
 if ~isempty(x_days)
     [~,p_days,~,stats_days] = ttest(x_days, 0, 'Alpha', alpha);
@@ -202,130 +179,80 @@ end
 end
 
 
+% ------------------------------- helpers -------------------------------
+
 function [centers, curve, delta_allPoints, dayMeans] = aggregate_animal(out_struct, rat, daysToUse)
-% Returns:
-%  centers        : W×1 midpoints (from the first day encountered)
-%  curve          : W×1 mean over days×cells of (MI_rand − MI_win)
-%  delta_allPoints: vector of all pointwise Δ across windows×days×cells
-%  dayMeans       : 1×Ndays mean Δ per day (mean over windows×cells)
-
-centers = [];
-curve   = [];
-delta_allPoints = [];
-dayMeans = [];
-
+centers = []; curve = []; delta_allPoints = []; dayMeans = [];
 if isempty(out_struct) || ~isstruct(out_struct), return; end
 fns = fieldnames(out_struct);
 dayFns = fns(startsWith(fns,'MI_'));
 if isempty(dayFns), return; end
 
-Wref = [];     % number of windows (to align)
-sumW = [];     % W×1 running sum for curve
-cntW = [];     % W×1 running count for curve
-
-
+Wref = []; sumW = []; cntW = [];
 for di = 1:numel(dayFns)
     day = out_struct.(dayFns{di});
-    if ~isfield(day,'winEdges') || ~isfield(day,'MI_rand') || ~isfield(day,'MI_win')
-        continue;
-    end
+    if ~isfield(day,'winEdges') || ~isfield(day,'MI_rand') || ~isfield(day,'MI_win'), continue; end
     W = size(day.winEdges,1);
     if isempty(centers)
         centers = nanmean(day.winEdges,2);
-        Wref = W;
-        sumW = zeros(W,1);
-        cntW = zeros(W,1);
-    else
-        if W ~= Wref
-            % align this day's windows to the reference centers
-            centers_d = nanmean(day.winEdges,2);
-        else
-            centers_d = centers;
-        end
+        Wref = W; sumW = zeros(W,1); cntW = zeros(W,1);
     end
 
     maskField = sprintf('ratemask_%s', dayFns{di}(4:end));
     maskVec = true(1, size(day.MI_rand,2));
     if isfield(rat,'ratemask') && isfield(rat.ratemask, maskField)
         mv = rat.ratemask.(maskField)(:);
-        if numel(mv) == size(day.MI_rand,2)
-            maskVec = (mv == 1);
-        end
-      end
+        if numel(mv) == size(day.MI_rand,2), maskVec = (mv==1); end
+    end
 
-    % Δ per window×cell for this day
-    % Δ per window×cell for this day
-    MI_rand = day.MI_rand(:, maskVec);   % W×Nc
-    MI_win  = day.MI_win(:,  maskVec);   % W×Nc   <-- use ALL rows, not (1, :)
-
+    MI_rand = day.MI_rand(:, maskVec);
+    MI_win  = day.MI_win(:,  maskVec);
     if isempty(MI_rand) || isempty(MI_win), continue; end
 
-    Delta  = MI_rand - MI_win;           % sign per your spec (control – removal)
+    Delta  = MI_rand - MI_win;
 
-
-    % update animal curve accumulators
-    sumW = sumW + nanmean(Delta, 2);         % mean over cells for this day
+    sumW = sumW + nanmean(Delta, 2);
     cntW = cntW + ~all(isnan(Delta),2);
 
-    % collect ALL points (for all-points test A)
     delta_allPoints = [delta_allPoints; Delta(:)]; %#ok<AGROW>
-
-    % day mean (for day-means test B)
     dayMeans = [dayMeans, mean(Delta,'all','omitnan')]; %#ok<AGROW>
 end
 
 if any(cntW>0)
-    curve = sumW ./ max(1,cntW);             % mean over days of (mean over cells)
+    curve = sumW ./ max(1,cntW);
 else
     curve = [];
 end
 end
 
 function [p_unc, q_fdr, nW, nSig_unc, nSig_fdr] = per_animal_window_tests(out_struct, rat, daysToUse, alpha)
-% For printing: within-animal per-window tests across cells (uncorr & FDR).
-% Pools cells across the animal's analyzed days for each window; one-sample ttest vs 0.
-
-p_unc = [];
-q_fdr = [];
-nW = 0; nSig_unc = 0; nSig_fdr = 0;
-
+p_unc = []; q_fdr = []; nW = 0; nSig_unc = 0; nSig_fdr = 0;
 if isempty(out_struct) || ~isstruct(out_struct), return; end
 fns = fieldnames(out_struct);
 dayFns = fns(startsWith(fns,'MI_'));
 if isempty(dayFns), return; end
 
-% find reference W and centers
 day0 = out_struct.(dayFns{1});
 if ~isfield(day0,'winEdges'), return; end
 centers = mean(day0.winEdges,2);
 W = numel(centers);
 
-% build, for each window, the list of Δ across all (day×cells) for this animal
 Delta_byW = cell(W,1);
 for di = 1:numel(dayFns)
     day = out_struct.(dayFns{di});
     if ~isfield(day,'winEdges') || ~isfield(day,'MI_rand') || ~isfield(day,'MI_win'), continue; end
-    centers_d = mean(day.winEdges,2);
-    MIrand = day.MI_rand;
-    MI_win = day.MI_win;
+
+    MIrand = day.MI_rand; MI_win = day.MI_win;
     if isempty(MIrand) || isempty(MI_win), continue; end
 
-    % ratemask
     maskField = sprintf('ratemask_%s', dayFns{di}(4:end));
     maskVec = true(1, size(MIrand,2));
     if isfield(rat,'ratemask') && isfield(rat.ratemask, maskField)
         mv = rat.ratemask.(maskField)(:);
         if numel(mv) == size(MIrand,2), maskVec = (mv==1); end
     end
-    MIrand = day.MI_rand(:,maskVec);   % W×Nc
-    MI_win = day.MI_win(:,maskVec);    % W×Nc
-    Delta  = MIrand - MI_win;          % W×Nc
-
-
-    if numel(centers_d) ~= W || any(centers_d(:) ~= centers(:))
-        % align rows to reference centers
-        Delta = interp1(centers_d(:), Delta, centers(:), 'linear', 'extrap');
-    end
+    MIrand = MIrand(:,maskVec); MI_win = MI_win(:,maskVec);
+    Delta  = MIrand - MI_win;
 
     for w = 1:W
         Delta_byW{w} = [Delta_byW{w}, Delta(w,:)]; %#ok<AGROW>
@@ -334,37 +261,69 @@ end
 
 p_unc = nan(W,1);
 for w = 1:W
-    x = Delta_byW{w};
-    x = x(~isnan(x));
+    x = Delta_byW{w}; x = x(~isnan(x));
     if numel(x) >= 2
         [~,p_unc(w)] = ttest(x, 0, 'Alpha', alpha);
     end
 end
-q_fdr = bh_fdr(p_unc);
-nW = W;
+q_fdr = bh_fdr(p_unc); nW = W;
 nSig_unc = sum(p_unc < alpha, 'omitnan');
 nSig_fdr = sum(q_fdr < alpha, 'omitnan');
 end
 
 function q = bh_fdr(p)
-% Benjamini–Hochberg FDR; returns q-values shaped like p
 q = nan(size(p));
-ps = p(:);
-valid = ~isnan(ps);
-pv = ps(valid);
-[sv, order] = sort(pv);
-m = numel(sv);
+ps = p(:); valid = ~isnan(ps); pv = ps(valid);
+[sv, order] = sort(pv); m = numel(sv);
 if m==0, q = reshape(q, size(p)); return; end
-qv = sv .* m ./ (1:m)';
-for i = m-1:-1:1
-    qv(i) = min(qv(i), qv(i+1));
-end
-q_full = nan(size(ps));
-q_full(valid) = qv(invperm(order));
-q = reshape(q_full, size(p));
+qv = sv .* m ./ (1:m)'; for i=m-1:-1:1, qv(i)=min(qv(i),qv(i+1)); end
+q_full = nan(size(ps)); idx=zeros(size(order)); idx(order)=1:numel(order);
+q_full(valid)=qv(idx); q = reshape(q_full, size(p));
 end
 
-function idx = invperm(order)
-idx = zeros(size(order));
-idx(order) = 1:numel(order);
+function print_spike_count_parity(out_struct, label)
+% Parity of kept spikes for TEST vs CONTROL, per window.
+% Only counts cells where CONTROL succeeded (Iter_OK > 0).
+
+if nargin < 2, label = ''; end
+if isempty(out_struct) || ~isstruct(out_struct), return; end
+fns = fieldnames(out_struct);
+dayFns = fns(startsWith(fns,'MI_')); if isempty(dayFns), return; end
+
+day0 = out_struct.(dayFns{1});
+if ~isfield(day0,'winEdges') || ~isfield(day0,'counts'), return; end
+centers = nanmean(day0.winEdges,2);  W = numel(centers);
+
+K_keep_win  = [];  % W x cells (concat days)
+K_keep_ctrl = [];
+K_iter_ok   = [];  % W x cells
+
+for di = 1:numel(dayFns)
+    day = out_struct.(dayFns{di});
+    if ~isfield(day,'counts'), continue; end
+    K_keep_win  = [K_keep_win,  day.counts.N_keep_win];   %#ok<AGROW>
+    K_keep_ctrl = [K_keep_ctrl, day.counts.N_keep_ctrl];  %#ok<AGROW>
+    K_iter_ok   = [K_iter_ok,   day.counts.Iter_OK];      %#ok<AGROW>
+end
+
+fprintf('\n[spike parity %s]\n', label);
+fprintf('%9s  %12s  %12s  %9s  %8s\n', ...
+    'Center(s)', 'med keep(win)', 'med keep(ctrl)', '% parity', 'n OK');
+
+for w = 1:W
+    kw = K_keep_win(w, :);
+    kc = K_keep_ctrl(w, :);
+    ok = K_iter_ok(w, :) > 0;                         % control succeeded
+    valid = ok & isfinite(kw) & isfinite(kc);
+    if any(valid)
+        pct_equal = 100 * mean(kw(valid) == kc(valid));
+        n_ok = sum(valid);
+        med_win  = median(kw(valid), 'omitnan');
+        med_ctrl = median(kc(valid), 'omitnan');
+    else
+        pct_equal = NaN; n_ok = 0; med_win = NaN; med_ctrl = NaN;
+    end
+    fprintf('%9.2f  %12.1f  %12.1f  %8.1f%%  %8d\n', ...
+        centers(w), med_win, med_ctrl, pct_equal, n_ok);
+end
 end
