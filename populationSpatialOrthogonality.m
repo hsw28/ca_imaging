@@ -1136,8 +1136,22 @@ if isfield(binMeta,'mode') && strcmpi(binMeta.mode,'grid') && ...
         case 'rook',  adjMaskVec = (Dman  == 1);
     end
 
+    % --- GRID branch ---
     kmax = max(Dcheb(:));
-    lag_mean = nan(1,kmax);
+    lag_k1 = nan(1,kmax);
+    for k = 1:kmax
+        lag_k1(k) = mean(sUT(Dcheb==k), 'omitnan');
+    end
+    lag_mean = [1, lag_k1];       % <-- prepend zero-lag = 1
+
+    % --- 1-D fallback branch ---
+    kmax = max(Didx(:));
+    lag_k1 = nan(1,kmax);
+    for k = 1:kmax
+        lag_k1(k) = mean(sUT(Didx==k), 'omitnan');
+    end
+    lag_mean = [1, lag_k1];       % <-- prepend zero-lag = 1
+
     for k = 1:kmax, lag_mean(k) = mean(sUT(Dcheb==k), 'omitnan'); end
 
     Dfull = nan(K); Dfull(UT) = De; Dfull = (Dfull + Dfull')./2; Dfull(1:K+1:end) = 0;
@@ -1226,6 +1240,18 @@ else
         end
     end
 end
+
+% -------- prepend zero-distance point (lag 0) --------
+centers   = centers(:);
+dist_mean = dist_mean(:);
+centers   = [0; centers];
+dist_mean = [1; dist_mean];
+% -----------------------------------------------------
+
+% then later keep your existing assignments:
+Sstats.dist_edges   = edges;
+Sstats.dist_centers = centers;
+
 
 Sstats = struct();
 Sstats.mean_off       = mean_off;

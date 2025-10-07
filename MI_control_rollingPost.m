@@ -229,7 +229,21 @@ for iDay = 1:numel(fields_spikes)
           end
 
           % ---------------- CONTROL: sample nRemove indices from OUTSIDE the span ----------------
-          ctrl_mask = (rel_t_move < WMIN) | (rel_t_move > WMAX);
+          % current window
+          in_win   = (rel_t_move > wstart) & (rel_t_move <= wend);
+          % sets
+          pre_all  = (rel_t_move < 0);        % all pre-CS spikes
+          far_post = (rel_t_move > WMAX);     % post spikes outside analysis span
+          if wend <= 0
+              % test window is pre: exclude THIS pre window from the control pool
+              ctrl_mask = (pre_all & ~in_win) | far_post;
+          else
+              % test window is post: allow any pre + far post
+              ctrl_mask = pre_all | far_post;
+          end
+
+
+          %%%ctrl_mask = (rel_t_move < WMIN) | (rel_t_move > WMAX);
           ctrl_idx  = find(ctrl_mask);                        % candidate indices (into move_spikes)
           N_ctrl_idx_k(w) = numel(ctrl_idx);
 
@@ -253,8 +267,8 @@ for iDay = 1:numel(fields_spikes)
 
                   case 'speed'
                       ctrl_speed = move_speed(ctrl_idx);
-                    %%%  edges = make_quant_edges([w_speed(:); ctrl_speed(:)], NSpeedBins);
-                      edges = make_quant_edges([w_speed(:); ctrl_speed(:)], length([w_speed(:); ctrl_speed(:)]));
+                      edges = make_quant_edges([w_speed(:); ctrl_speed(:)], NSpeedBins);
+                      %edges = make_quant_edges([w_speed(:); ctrl_speed(:)], length([w_speed(:); ctrl_speed(:)]));
 
                       wbins    = discretize(w_speed,    edges);
                       ctrlbins = discretize(ctrl_speed, edges);

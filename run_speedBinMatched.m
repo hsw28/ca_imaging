@@ -609,7 +609,7 @@ for rr=1:nR
         flips = (rand(size(x))<0.5)*2 - 1;
         Tperm(b) = mean(x .* flips,'omitnan');
     end
-    size(perRat_cellTrialHz{rr})
+    size(perRat_cellTrialHz{rr)
     [~,p]=ttest(perRat_cellTrialHz{rr},perRat_cellNonHz{rr})
     p_perm_rats(rr) = mean(abs(Tperm) >= abs(T_obs_rats(rr)));
     T_perm_rats{rr} = Tperm;
