@@ -76,30 +76,34 @@ addParameter(p,'BufferPost',0);
 addParameter(p,'binSize',1/7.5);
 addParameter(p,'AcrossMode','cross-halves'); % 'cross-halves'|'mean-of-halves'
 addParameter(p,'GridRC',[3 2]);              % fallback rows×cols if NumBins=[]
+
+%not using
 addParameter(p,'NumBins',3);                 % if given, auto factor into rows×cols
 addParameter(p,'UseTrialROI',false);
 addParameter(p,'ROIPrc',[5 95]);
 addParameter(p,'ROIMarginFrac',0.05);
 addParameter(p,'ROIByDay',true);
 addParameter(p,'MinOcc',1/7.5);
+
 addParameter(p,'VelThresh',4);
 addParameter(p,'DoPlots',true);
 addParameter(p,'NPerm',49);
 addParameter(p,'UseSpeedMask',true);
 addParameter(p,'CtrlSplitMode','interleaved');
 addParameter(p,'CellNorm','demean');  % 'zscore'|'demean'|'none'
-addParameter(p,'MinTraceSamples',3);
-addParameter(p,'MinTraceEachHalf',1);
+addParameter(p,'MinTraceSamples',0);
+addParameter(p,'MinTraceEachHalf',0);
 addParameter(p,'BinWeight','traceCount'); % 'none'|'traceCount'|'ctrlReliability'|'traceCount*ctrlReliability'
+
 % Space-with-vs-without-task (C):
 addParameter(p,'NPerm_C',49);
 addParameter(p,'NullMode_C','frame-redistribute'); % 'frame-redistribute'|'ctrl-derange-bins'
-addParameter(p,'MinTraceSamples_C',3);
+addParameter(p,'MinTraceSamples_C',0);
 addParameter(p,'MinCtrlOcc_C',0);
 
 % --- Across-trials (AT) options ---
 addParameter(p,'DoAcrossTrials',true);  % enable/disable AT analysis
-addParameter(p,'NPerm_AT',200);         % permutations for AT (per-day, optional)
+addParameter(p,'NPerm_AT',49);         % permutations for AT (per-day, optional)
 addParameter(p,'MinTrials_AT',5);       % minimum trials/day to include AT for that day
 
 parse(p,varargin{:});
@@ -259,6 +263,11 @@ end
 %plot_taskSpacePV_results(R); % time-course + intrusion per rat + group summary
 
 summarize_taskSpacePV_clean(R);
+% Across-trials (AT) plots
+plot_space_to_task_acrossTrials_perAnimal(R);
+plot_space_to_task_acrossTrials_group(R);
+cdf_acrossTrials_within_vs_across_AT(R);
+
 
 %try
 %    plot_spaceSimilarity_withWithout_group(R); % with vs without task (group)
@@ -609,6 +618,12 @@ CTRL.occ   = occ_by;                % {day} : [K × 1] seconds
 CTRL.grid.edges   = edgesByDay;     % {day} edges
 CTRL.grid.GridRC  = rc_eff;
 CTRL.grid.K       = K;
+
+% NEW: store per-day distributions for CDFs
+AT_byDay_within_list_z  = cell(D,1);  % Fisher-z values for WITHIN pairs
+AT_byDay_across_list_z  = cell(D,1);  % Fisher-z values for ACROSS pairs
+
+
 if o.UseTrialROI && o.ROIByDay
     CTRL.grid.origin = 'trialROI_byDay';
 elseif o.UseTrialROI
@@ -630,503 +645,7 @@ CTRL.params.ROIPrc        = o.ROIPrc;
 CTRL.params.ROIMarginFrac = o.ROIMarginFrac;
 end
 
-% ---------- (B) Space→Task intrusion ----------
-function B = compute_space_to_task_intrusion(spikes, ts, pos, cs, CTRL, varargin)
-% Compute within-bin vs across-bin task PV similarity and permutation tests.
-% Default "AcrossMode" is 'cross-halves' (symmetric odd–even across bins).
 
-p = inputParser;
-addParameter(p,'TraceWin',[0 2]);
-addParameter(p,'binSize',1/7.5);
-addParameter(p,'NPerm',49);
-addParameter(p,'VelThresh',4);
-addParameter(p,'UseSpeedMask',false);
-addParameter(p,'CellNorm','demean');          % 'zscore'|'demean'|'none'
-addParameter(p,'MinTraceSamples',6);
-addParameter(p,'MinTraceEachHalf',1);
-addParameter(p,'BinWeight','traceCount');     % 'none'|'traceCount'|'ctrlReliability'|'traceCount*ctrlReliability'
-addParameter(p,'NullMode','derange-pairing'); % 'derange-pairing'|'frame-redistribute'
-addParameter(p,'RecomputeAcrossInPerm',true);
-addParameter(p,'AcrossMode','cross-halves');  % 'cross-halves'|'mean-of-halves'
-addParameter(p,'Label','');
-parse(p,varargin{:});
-o = p.Results; L = char(o.Label);
-
-D = numel(ts);
-K = CTRL.grid.K;
-
-% ---- Container scaffolding ----
-B = struct();
-B.byDay = struct();
-B.byDay.within = struct('r',[],'z',[],'rBins',[]);   % rBins will be {D×1} cells
-B.byDay.across = struct('r',[],'z',[]);
-B.byDay.valid  = false(D,1);
-B.byDay.within.rBins = cell(D,1);                   % <- correct per-day cell init
-
-B.perm = struct();
-B.perm.byDay = struct('delta', {cell(1,D)});        % cell{d} -> [Nperm×1] Δz for that day
-
-z_within_day = nan(D,1);
-z_across_day = nan(D,1);
-has_any      = false(D,1);
-
-% caches for permutations
-PV_even_cache = cell(1,D);
-PV_odd_cache  = cell(1,D);
-validK_cache  = cell(1,D);
-w_cache       = cell(1,D);
-
-% frame index caches (for frame-redistribute)
-even_idx_cache = cell(1,D);
-odd_idx_cache  = cell(1,D);
-n_even_cache   = cell(1,D);
-n_odd_cache    = cell(1,D);
-
-for d = 1:D
-    t = ts{d}(:);
-    [x, y] = interp_pos(pos{d}, t);
-    S = spikes_to_matrix(spikes{d}, t);
-    S = normalize_cells(S, o.CellNorm);
-
-    if o.UseSpeedMask
-        v = speed_cm_per_s(pos{d});
-        v = interp1(pos{d}.t(:), v(:), t, 'linear','extrap');
-        mask_speed = (v >= o.VelThresh);
-    else
-        mask_speed = true(size(t));
-    end
-
-    edges_d = CTRL.grid.edges{d};
-    PVd     = CTRL.PV{d};
-    if isempty(PVd), continue; end
-
-    PV_even = nan(size(S,1), K);
-    PV_odd  = nan(size(S,1), K);
-    n_even  = zeros(K,1);
-    n_odd   = zeros(K,1);
-    has_k   = false(K,1);
-
-    even_idx_by_bin = cell(K,1);
-    odd_idx_by_bin  = cell(K,1);
-
-    csd = cs{d};
-    for tr = 1:numel(csd)
-        tidx = t >= csd(tr)+o.TraceWin(1) & t <= csd(tr)+o.TraceWin(2);
-        tidx = tidx & mask_speed;
-        idxs = find(tidx);
-        if numel(idxs) < 2, continue; end
-
-        idx_even = clamp_idx(idxs(2:2:end), numel(t));
-        idx_odd  = clamp_idx(idxs(1:2:end), numel(t));
-
-        [~, b_even] = pos2bin(x(idx_even), y(idx_even), edges_d);
-        [~, b_odd ] = pos2bin(x(idx_odd ), y(idx_odd ), edges_d);
-
-        for k = 1:K
-            if any(b_even==k)
-                ie = idx_even(b_even==k);
-                if ~isempty(ie)
-                    PV_even(:,k) = nanmean([PV_even(:,k), mean(S(:,ie),2)],2);
-                    n_even(k) = n_even(k) + numel(ie);
-                    has_k(k) = true;
-                    even_idx_by_bin{k} = [even_idx_by_bin{k}; ie]; %#ok<AGROW>
-                end
-            end
-            if any(b_odd==k)
-                io = idx_odd(b_odd==k);
-                if ~isempty(io)
-                    PV_odd(:,k)  = nanmean([PV_odd(:,k),  mean(S(:,io),2)],2);
-                    n_odd(k)  = n_odd(k) + numel(io);
-                    has_k(k) = true;
-                    odd_idx_by_bin{k} = [odd_idx_by_bin{k}; io]; %#ok<AGROW>
-                end
-            end
-        end
-    end
-
-    % gate bins by trace samples + control PV availability
-    n_tot = n_even + n_odd;
-    gate_counts = (n_even >= o.MinTraceEachHalf) & (n_odd >= o.MinTraceEachHalf) & (n_tot >= o.MinTraceSamples);
-    validK = find(has_k & gate_counts & all(isfinite(PVd),1)');
-    if isempty(validK)
-        fprintf('[%s][Intrusion d=%d] no valid bins.\n', L, d);
-        continue;
-    end
-    has_any(d) = true;
-
-    % bin weights
-    switch lower(o.BinWeight)
-        case 'none',                               w = ones(K,1);
-        case 'tracecount',                         w = n_tot;
-        case 'ctrlreliability',                    r = CTRL.reliability_byDay{d}; if isempty(r), r = zeros(K,1); end, w = max(r(:),0);
-        case {'tracecount*ctrlreliability','tracecount×ctrlreliability'}
-                                                   r = CTRL.reliability_byDay{d}; if isempty(r), r = zeros(K,1); end, w = n_tot .* max(r(:),0);
-        otherwise, error('Unknown BinWeight: %s', o.BinWeight);
-    end
-    w(~isfinite(w)) = 0;
-    w_valid = w(validK); if ~any(w_valid>0), w_valid = ones(numel(validK),1); end
-
-    % observed WITHIN (Fisher-z weighted mean)
-    zW = nan(numel(validK),1);
-    for iK = 1:numel(validK)
-        k = validK(iK);
-        zW(iK) = atanh(max(min(safe_corr(PV_even(:,k), PV_odd(:,k)),0.99999),-0.99999));
-    end
-    z_within_day(d) = nansum(w_valid .* zW) / max(1, nansum(w_valid));
-
-    % store per-bin r for this day
-    rW_bins = nan(K,1);
-    for iK = 1:numel(validK)
-        k = validK(iK);
-        rW_bins(k) = safe_corr(PV_even(:,k), PV_odd(:,k));
-    end
-    B.byDay.within.rBins{d} = rW_bins;
-
-    % observed ACROSS
-    if numel(validK) >= 2
-        pairs = nchoosek(validK(:)',2);
-        zA = nan(size(pairs,1),1);
-        wA = nan(size(pairs,1),1);
-        switch lower(o.AcrossMode)
-            case 'cross-halves'
-                for i = 1:size(pairs,1)
-                    k1 = pairs(i,1); k2 = pairs(i,2);
-                    r1 = safe_corr(PV_even(:,k1), PV_odd(:,k2));
-                    r2 = safe_corr(PV_odd(:,k1),  PV_even(:,k2));
-                    zA(i) = mean([atanh(max(min(r1,0.99999),-0.99999)), atanh(max(min(r2,0.99999),-0.99999))], 'omitnan');
-                    wA(i) = sqrt(w(k1)*w(k2));
-                end
-            case 'mean-of-halves'
-                for i = 1:size(pairs,1)
-                    k1 = pairs(i,1); k2 = pairs(i,2);
-                    v1 = mean([PV_even(:,k1), PV_odd(:,k1)],2,'omitnan');
-                    v2 = mean([PV_even(:,k2), PV_odd(:,k2)],2,'omitnan');
-                    zA(i) = atanh(max(min(safe_corr(v1, v2),0.99999),-0.99999));
-                    wA(i) = sqrt(w(k1)*w(k2));
-                end
-            otherwise
-                error('Unknown AcrossMode: %s', o.AcrossMode);
-        end
-        wA(~isfinite(wA)) = 0; if ~any(wA>0), wA(:)=1; end
-        z_across_day(d) = nansum(wA .* zA) / max(1, nansum(wA));
-    else
-        z_across_day(d) = NaN;
-    end
-
-    % caches
-    PV_even_cache{d} = PV_even;
-    PV_odd_cache{d}  = PV_odd;
-    validK_cache{d}  = validK;
-    w_cache{d}       = w;
-
-    even_idx_cache{d} = even_idx_by_bin;
-    odd_idx_cache{d}  = odd_idx_by_bin;
-    n_even_cache{d}   = n_even;
-    n_odd_cache{d}    = n_odd;
-end
-
-% mean across days (Fisher z)
-m_valid        = isfinite(z_within_day) & (B.byDay.valid | true); %#ok<NASGU>
-z_within_mean  = mean(z_within_day(isfinite(z_within_day)),'omitnan');
-z_across_mean  = mean(z_across_day(isfinite(z_across_day)),'omitnan');
-delta_z        = z_within_mean - z_across_mean;
-
-% ------- permutations -------
-Nperm = o.NPerm;
-perm_delta        = nan(Nperm,1);
-zW_perm_mean_all  = nan(Nperm,1);
-zA_perm_mean_all  = nan(Nperm,1);
-
-if Nperm>0 && any(isfinite(z_within_day))
-    switch lower(o.NullMode)
-
-    case 'derange-pairing'
-        for pidx = 1:Nperm
-            zW_perm_day = nan(D,1);
-            zA_perm_day = nan(D,1);
-            for d = 1:D
-                validK = validK_cache{d};
-                if isempty(validK), continue; end
-
-                w = w_cache{d};
-                w_valid = w(validK); if ~any(w_valid>0), w_valid(:)=1; end
-                PV_even = PV_even_cache{d};
-                PV_odd  = PV_odd_cache{d};
-
-                % derange the mapping O<-E across bins
-                Kvalid = numel(validK);
-                if Kvalid < 1, continue; end
-                pi_idx = rand_derangement_idx(Kvalid);
-                map_to = validK(pi_idx);
-
-                % WITHIN under null
-                zP = nan(Kvalid,1); wP = nan(Kvalid,1);
-                for j = 1:Kvalid
-                    k1 = validK(j); k2 = map_to(j);
-                    zP(j) = atanh(max(min(safe_corr(PV_even(:,k1), PV_odd(:,k2)),0.99999),-0.99999));
-                    wP(j) = sqrt(w(k1)*w(k2));
-                end
-                wP(~isfinite(wP))=0; if ~any(wP>0), wP(:)=1; end
-                zW_perm_day(d) = nansum(wP .* zP) / max(1,nansum(wP));
-
-                % ACROSS under null (optional recompute)
-                if o.RecomputeAcrossInPerm && Kvalid >= 2
-                    pairs = nchoosek(validK(:)',2);
-                    zA = nan(size(pairs,1),1);
-                    wA = nan(size(pairs,1),1);
-                    switch lower(o.AcrossMode)
-                        case 'cross-halves'
-                            for i = 1:size(pairs,1)
-                                k1 = pairs(i,1); k2 = pairs(i,2);
-                                k1o = map_to(validK==k1);
-                                k2o = map_to(validK==k2);
-                                r1 = safe_corr(PV_even(:,k1), PV_odd(:,k2o));
-                                r2 = safe_corr(PV_odd(:,k1o),  PV_even(:,k2));
-                                zA(i) = mean([atanh(max(min(r1,0.99999),-0.99999)), atanh(max(min(r2,0.99999),-0.99999))], 'omitnan');
-                                wA(i) = sqrt(w(k1)*w(k2));
-                            end
-                        case 'mean-of-halves'
-                            for i = 1:size(pairs,1)
-                                k1 = pairs(i,1); k2 = pairs(i,2);
-                                k1o = map_to(validK==k1);
-                                k2o = map_to(validK==k2);
-                                v1 = mean([PV_even(:,k1), PV_odd(:,k1o)],2,'omitnan');
-                                v2 = mean([PV_even(:,k2), PV_odd(:,k2o)],2,'omitnan');
-                                zA(i) = atanh(max(min(safe_corr(v1, v2),0.99999),-0.99999));
-                                wA(i) = sqrt(w(k1)*w(k2));
-                            end
-                    end
-                    wA(~isfinite(wA))=0; if ~any(wA>0), wA(:)=1; end
-                    zA_perm_day(d) = nansum(wA .* zA) / max(1, nansum(wA));
-                else
-                    zA_perm_day(d) = z_across_day(d);
-                end
-
-                % ---- save per-day Δz for this permutation properly ----
-                if ~isfield(B.perm,'byDay') || isempty(B.perm.byDay.delta)
-                    B.perm.byDay.delta = cell(1,D);
-                end
-                if isfinite(zW_perm_day(d)) && isfinite(zA_perm_day(d))
-                    B.perm.byDay.delta{d}(end+1,1) = zW_perm_day(d) - zA_perm_day(d); %#ok<AGROW>
-                end
-            end
-            zW_perm_mean_all(pidx) = mean(zW_perm_day(isfinite(zW_perm_day)),'omitnan');
-            zA_perm_mean_all(pidx) = mean(zA_perm_day(isfinite(zA_perm_day)),'omitnan');
-            perm_delta(pidx)       = zW_perm_mean_all(pidx) - zA_perm_mean_all(pidx);
-        end
-
-    case 'frame-redistribute'
-        for pidx = 1:Nperm
-            zW_perm_day = nan(D,1);
-            zA_perm_day = nan(D,1);
-
-            for d = 1:D
-                validK = validK_cache{d};
-                if isempty(validK), continue; end
-                w = w_cache{d};
-                w_valid = w(validK); if ~any(w_valid>0), w_valid(:)=1; end
-
-                even_idx_by_bin = even_idx_cache{d};
-                odd_idx_by_bin  = odd_idx_cache{d};
-                ne = n_even_cache{d};
-                no = n_odd_cache{d};
-
-                E_pool = vertcat(even_idx_by_bin{validK});
-                O_pool = vertcat(odd_idx_by_bin{validK});
-                E_pool = unique(clamp_idx(E_pool, numel(ts{d})));
-                O_pool = unique(clamp_idx(O_pool, numel(ts{d})));
-                if isempty(E_pool) || isempty(O_pool), continue; end
-
-                % randomize/split to match original counts
-                E_perm = E_pool(randperm(numel(E_pool)));
-                O_perm = O_pool(randperm(numel(O_pool)));
-                ce = max(0, round(ne(validK))); co = max(0, round(no(validK)));
-
-                if sum(ce) > numel(E_perm)
-                    deficit = sum(ce) - numel(E_perm);
-                    for j = numel(ce):-1:1
-                        take = min(ce(j), deficit);
-                        ce(j) = ce(j) - take; deficit = deficit - take;
-                        if deficit <= 0, break; end
-                    end
-                end
-                if sum(co) > numel(O_perm)
-                    deficit = sum(co) - numel(O_perm);
-                    for j = numel(co):-1:1
-                        take = min(co(j), deficit);
-                        co(j) = co(j) - take; deficit = deficit - take;
-                        if deficit <= 0, break; end
-                    end
-                end
-
-                E_chunks = split_by_counts_ptr(E_perm, ce);
-                O_chunks = split_by_counts_ptr(O_perm, co);
-
-                % rebuild permuted PVs
-                t_day = ts{d}(:);
-                Sday  = spikes_to_matrix(spikes{d}, t_day);
-                Sday  = normalize_cells(Sday, o.CellNorm);
-                PV_even_p = nan(size(Sday,1), K);
-                PV_odd_p  = nan(size(Sday,1), K);
-                for j = 1:numel(validK)
-                    k = validK(j);
-                    segE = clamp_idx(E_chunks{j}, size(Sday,2));
-                    segO = clamp_idx(O_chunks{j}, size(Sday,2));
-                    if ~isempty(segE), PV_even_p(:,k) = mean(Sday(:, segE), 2, 'omitnan'); end
-                    if ~isempty(segO), PV_odd_p(:,k)  = mean(Sday(:, segO),  2, 'omitnan'); end
-                end
-
-                % WITHIN (perm)
-                zW_vec = nan(numel(validK),1);
-                for j = 1:numel(validK)
-                    k = validK(j);
-                    zW_vec(j) = atanh(max(min(safe_corr(PV_even_p(:,k), PV_odd_p(:,k)),0.99999),-0.99999));
-                end
-                zW_perm_day(d) = nansum(w_valid .* zW_vec) / max(1,nansum(w_valid));
-
-                % ACROSS (perm) per AcrossMode
-                if numel(validK) >= 2
-                    pairs = nchoosek(validK(:)', 2);
-                    zA_vec = nan(size(pairs,1),1);
-                    wA     = nan(size(pairs,1),1);
-                    switch lower(o.AcrossMode)
-                        case 'cross-halves'
-                            for iPair = 1:size(pairs,1)
-                                k1 = pairs(iPair,1); k2 = pairs(iPair,2);
-                                r1 = safe_corr(PV_even_p(:,k1), PV_odd_p(:,k2));
-                                r2 = safe_corr(PV_odd_p(:,k1),  PV_even_p(:,k2));
-                                zA_vec(iPair) = mean([atanh(max(min(r1,0.99999),-0.99999)), atanh(max(min(r2,0.99999),-0.99999))], 'omitnan');
-                                wA(iPair)     = sqrt(w(k1)*w(k2));
-                            end
-                        case 'mean-of-halves'
-                            for iPair = 1:size(pairs,1)
-                                k1 = pairs(iPair,1); k2 = pairs(iPair,2);
-                                v1 = mean([PV_even_p(:,k1), PV_odd_p(:,k1)],2,'omitnan');
-                                v2 = mean([PV_even_p(:,k2), PV_odd_p(:,k2)],2,'omitnan');
-                                zA_vec(iPair) = atanh(max(min(safe_corr(v1, v2),0.99999),-0.99999));
-                                wA(iPair)     = sqrt(w(k1)*w(k2));
-                            end
-                    end
-                    wA(~isfinite(wA))=0; if ~any(wA>0), wA(:)=1; end
-                    zA_perm_day(d) = nansum(wA .* zA_vec) / max(1, nansum(wA));
-                end
-
-                % save per-day Δz for this permutation
-                if isfinite(zW_perm_day(d)) && isfinite(zA_perm_day(d))
-                    B.perm.byDay.delta{d}(end+1,1) = zW_perm_day(d) - zA_perm_day(d); %#ok<AGROW>
-                end
-            end
-
-            zW_perm_mean_all(pidx) = mean(zW_perm_day(isfinite(zW_perm_day)),'omitnan');
-            zA_perm_mean_all(pidx) = mean(zA_perm_day(isfinite(zA_perm_day)),'omitnan');
-            perm_delta(pidx)       = zW_perm_mean_all(pidx) - zA_perm_mean_all(pidx);
-        end
-
-    otherwise
-        error('Unknown NullMode: %s', o.NullMode);
-    end
-end
-
-fprintf('Obs: within_z=%.3f, across_z=%.3f, Δ_z=%.3f\n', z_within_mean, z_across_mean, delta_z);
-fprintf('Null (perm): mean(within_z)=%.3f (sd=%.3f), mean(across_z)=%.3f (sd=%.3f), mean(Δ_z)=%.3f (sd=%.3f)\n', ...
-        mean(zW_perm_mean_all,'omitnan'), std(zW_perm_mean_all,'omitnan'), ...
-        mean(zA_perm_mean_all,'omitnan'), std(zA_perm_mean_all,'omitnan'), ...
-        mean(perm_delta,'omitnan'),       std(perm_delta,'omitnan'));
-
-% p-values
-perm_delta = perm_delta(isfinite(perm_delta));
-delta_obs  = delta_z;
-if isempty(perm_delta)
-    p_right = NaN; p_left = NaN; p_two = NaN;
-else
-    p_right = mean(perm_delta >= delta_obs);
-    p_left  = mean(perm_delta <= delta_obs);
-    p_two   = 2*min(p_right, p_left);
-end
-
-% per-day exposure for across-day testing
-B.byDay.within.z = z_within_day;
-B.byDay.across.z = z_across_day;
-B.byDay.within.r = tanh(z_within_day);
-B.byDay.across.r = tanh(z_across_day);
-B.byDay.valid    = isfinite(z_within_day) & (isfinite(z_within_day)|isfinite(z_across_day));
-
-% pack
-B.within.r = tanh(z_within_mean);  B.within.z = z_within_mean;
-B.across.r = tanh(z_across_mean);  B.across.z = z_across_mean;
-B.delta.r  = tanh(delta_z);        B.delta.z  = delta_z;
-
-B.p_perm_right = p_right;
-B.p_perm_left  = p_left;
-B.p_perm_two   = p_two;
-B.perm_delta   = perm_delta;
-
-B.null = struct('mode', o.NullMode, 'recomputeAcross', logical(o.RecomputeAcrossInPerm), ...
-                'NPerm', o.NPerm, 'AcrossMode', o.AcrossMode);
-
-B.notes = struct('MinTraceSamples',o.MinTraceSamples, ...
-                 'MinTraceEachHalf',o.MinTraceEachHalf, ...
-                 'BinWeight',o.BinWeight);
-end
-
-% ---------- Tiny utility: bound, dedupe, and sort indices ----------
-function idx = clamp_idx(idx, N)
-if isempty(idx), return; end
-idx = idx(:);
-idx = idx(isfinite(idx));
-idx = idx(idx>=1 & idx<=N);
-idx = unique(round(idx)); % ensure integer, unique, ascending
-end
-
-% ---------- Split pool into chunk sizes (greedy) ----------
-function chunks = split_by_counts_ptr(pool, counts)
-chunks = cell(numel(counts),1);
-ptr = 1;
-for j = 1:numel(counts)
-    take = max(0, counts(j));
-    if take==0 || ptr > numel(pool)
-        chunks{j} = [];
-    else
-        last = min(numel(pool), ptr+take-1);
-        chunks{j} = pool(ptr:last);
-        ptr = last + 1;
-    end
-end
-end
-
-% ---------- Random derangement of 1:n (no fixed points) ----------
-function pi = rand_derangement_idx(n)
-if n<=1
-    pi = 1:n;  % degenerate (caller should avoid n<=1 cases)
-    return
-end
-ok = false;
-while ~ok
-    pi = randperm(n);
-    ok = all(pi ~= 1:n);
-end
-end
-
-% ---------- Terse if-else ----------
-function out = ifelse(cond, a, b), if cond, out=a; else, out=b; end, end
-
-
-% ---------- Per-cell normalization ----------
-function S = normalize_cells(S, mode)
-switch lower(mode)
-    case 'none'
-        % leave raw counts
-    case 'demean'
-        mu = mean(S,2,'omitnan');
-        S = S - mu;
-    case 'zscore'
-        mu = mean(S,2,'omitnan');
-        sd = std(S,0,2,'omitnan'); sd(sd==0|~isfinite(sd)) = 1;
-        S = (S - mu) ./ sd;
-    otherwise
-        error('CellNorm must be ''zscore'', ''demean'', or ''none''.');
-end
-end
 
 % ---------- Interpolate position to timebase t ----------
 function [x_i, y_i] = interp_pos(posd, t)
@@ -1662,15 +1181,19 @@ addParameter(p,'TraceWin',[0 2]);
 addParameter(p,'VelThresh',4);
 addParameter(p,'UseSpeedMask',true);
 addParameter(p,'CellNorm','demean');     % 'zscore'|'demean'|'none'
-addParameter(p,'MinTraceSamples',3);     % min TASK frames per bin
+addParameter(p,'MinTraceSamples',0);     % min TASK frames per bin
 addParameter(p,'MinCtrlOcc',0);          % extra CTRL occupancy seconds to require
-addParameter(p,'NPerm',500);
+addParameter(p,'NPerm',49);
 addParameter(p,'NullMode','frame-redistribute');
 addParameter(p,'Label','');
 parse(p,varargin{:});
 o = p.Results; L = char(o.Label);
 
 D = numel(ts); K = CTRL.grid.K;
+
+AT_byDay_within_list_z  = cell(D,1);
+AT_byDay_across_list_z  = cell(D,1);
+
 
 r_bin_byDay   = cell(1,D);
 z_day         = nan(D,1);
@@ -1870,7 +1393,7 @@ fprintf('[NEWCHK] paired bins per day: ');
 fprintf('%d ', arrayfun(@(dd) numel(C.byDay.withTask.r{dd}), 1:numel(C.byDay.withTask.r)));
 fprintf('\n');
 
-% --- permutations (same logic; default NPerm=500 here) ---
+% --- permutations (same logic; default NPerm=49 here) ---
 Nperm = o.NPerm;
 z_perm = nan(Nperm,1);
 if Nperm > 0 && any(isfinite(z_day))
@@ -2666,6 +2189,456 @@ st=double(st(:)); st=st(isfinite(st) & st>0);
 end
 
 
+
+
+
+
+
+% ---------- (B) Space→Task intrusion ----------
+% ---------- (B) Space→Task intrusion ----------
+function B = compute_space_to_task_intrusion(spikes, ts, pos, cs, CTRL, varargin)
+% Compute within-bin vs across-bin task PV similarity and permutation tests.
+% Default "AcrossMode" is 'cross-halves' (symmetric odd–even across bins).
+
+p = inputParser;
+addParameter(p,'TraceWin',[0 2]);
+addParameter(p,'binSize',1/7.5);
+addParameter(p,'NPerm',49);
+addParameter(p,'VelThresh',4);
+addParameter(p,'UseSpeedMask',false);
+addParameter(p,'CellNorm','demean');          % 'zscore'|'demean'|'none'
+addParameter(p,'MinTraceSamples',6);
+addParameter(p,'MinTraceEachHalf',1);
+addParameter(p,'BinWeight','traceCount');     % 'none'|'traceCount'|'ctrlReliability'|'traceCount*ctrlReliability'
+addParameter(p,'NullMode','derange-pairing'); % 'derange-pairing'|'frame-redistribute'
+addParameter(p,'RecomputeAcrossInPerm',true);
+addParameter(p,'AcrossMode','cross-halves');  % 'cross-halves'|'mean-of-halves'
+addParameter(p,'Label','');
+parse(p,varargin{:});
+o = p.Results; L = char(o.Label);
+
+D = numel(ts);
+K = CTRL.grid.K;
+
+% ---- Container scaffolding ----
+B = struct();
+B.byDay = struct();
+B.byDay.within = struct('r',[],'z',[],'rBins',[]);   % rBins will be {D×1} cells
+B.byDay.across = struct('r',[],'z',[]);
+B.byDay.valid  = false(D,1);
+B.byDay.within.rBins = cell(D,1);                   % <- correct per-day cell init
+
+B.perm = struct();
+B.perm.byDay = struct('delta', {cell(1,D)});        % cell{d} -> [Nperm×1] Δz for that day
+
+z_within_day = nan(D,1);
+z_across_day = nan(D,1);
+has_any      = false(D,1);
+
+% caches for permutations
+PV_even_cache = cell(1,D);
+PV_odd_cache  = cell(1,D);
+validK_cache  = cell(1,D);
+w_cache       = cell(1,D);
+
+% frame index caches (for frame-redistribute)
+even_idx_cache = cell(1,D);
+odd_idx_cache  = cell(1,D);
+n_even_cache   = cell(1,D);
+n_odd_cache    = cell(1,D);
+
+for d = 1:D
+    t = ts{d}(:);
+    [x, y] = interp_pos(pos{d}, t);
+    S = spikes_to_matrix(spikes{d}, t);
+    S = normalize_cells(S, o.CellNorm);
+
+    if o.UseSpeedMask
+        v = speed_cm_per_s(pos{d});
+        v = interp1(pos{d}.t(:), v(:), t, 'linear','extrap');
+        mask_speed = (v >= o.VelThresh);
+    else
+        mask_speed = true(size(t));
+    end
+
+    edges_d = CTRL.grid.edges{d};
+    PVd     = CTRL.PV{d};
+    if isempty(PVd), continue; end
+
+    PV_even = nan(size(S,1), K);
+    PV_odd  = nan(size(S,1), K);
+    n_even  = zeros(K,1);
+    n_odd   = zeros(K,1);
+    has_k   = false(K,1);
+
+    even_idx_by_bin = cell(K,1);
+    odd_idx_by_bin  = cell(K,1);
+
+    csd = cs{d};
+    for tr = 1:numel(csd)
+        tidx = t >= csd(tr)+o.TraceWin(1) & t <= csd(tr)+o.TraceWin(2);
+        tidx = tidx & mask_speed;
+        idxs = find(tidx);
+        if numel(idxs) < 2, continue; end
+
+        idx_even = clamp_idx(idxs(2:2:end), numel(t));
+        idx_odd  = clamp_idx(idxs(1:2:end), numel(t));
+
+        [~, b_even] = pos2bin(x(idx_even), y(idx_even), edges_d);
+        [~, b_odd ] = pos2bin(x(idx_odd ), y(idx_odd ), edges_d);
+
+        for k = 1:K
+            if any(b_even==k)
+                ie = idx_even(b_even==k);
+                if ~isempty(ie)
+                    PV_even(:,k) = nanmean([PV_even(:,k), mean(S(:,ie),2)],2);
+                    n_even(k) = n_even(k) + numel(ie);
+                    has_k(k) = true;
+                    even_idx_by_bin{k} = [even_idx_by_bin{k}; ie]; %#ok<AGROW>
+                end
+            end
+            if any(b_odd==k)
+                io = idx_odd(b_odd==k);
+                if ~isempty(io)
+                    PV_odd(:,k)  = nanmean([PV_odd(:,k),  mean(S(:,io),2)],2);
+                    n_odd(k)  = n_odd(k) + numel(io);
+                    has_k(k) = true;
+                    odd_idx_by_bin{k} = [odd_idx_by_bin{k}; io]; %#ok<AGROW>
+                end
+            end
+        end
+    end
+
+    % gate bins by trace samples + control PV availability
+    n_tot = n_even + n_odd;
+    gate_counts = (n_even >= o.MinTraceEachHalf) & (n_odd >= o.MinTraceEachHalf) & (n_tot >= o.MinTraceSamples);
+    validK = find(has_k & gate_counts & all(isfinite(PVd),1)');
+    if isempty(validK)
+        fprintf('[%s][Intrusion d=%d] no valid bins.\n', L, d);
+        continue;
+    end
+    has_any(d) = true;
+
+    % bin weights
+    switch lower(o.BinWeight)
+        case 'none',                               w = ones(K,1);
+        case 'tracecount',                         w = n_tot;
+        case 'ctrlreliability',                    r = CTRL.reliability_byDay{d}; if isempty(r), r = zeros(K,1); end, w = max(r(:),0);
+        case {'tracecount*ctrlreliability','tracecount×ctrlreliability'}
+                                                   r = CTRL.reliability_byDay{d}; if isempty(r), r = zeros(K,1); end, w = n_tot .* max(r(:),0);
+        otherwise, error('Unknown BinWeight: %s', o.BinWeight);
+    end
+    w(~isfinite(w)) = 0;
+    w_valid = w(validK); if ~any(w_valid>0), w_valid = ones(numel(validK),1); end
+
+    % observed WITHIN (Fisher-z weighted mean)
+    zW = nan(numel(validK),1);
+    for iK = 1:numel(validK)
+        k = validK(iK);
+        zW(iK) = atanh(max(min(safe_corr(PV_even(:,k), PV_odd(:,k)),0.99999),-0.99999));
+    end
+    z_within_day(d) = nansum(w_valid .* zW) / max(1, nansum(w_valid));
+
+    % store per-bin r for this day
+    rW_bins = nan(K,1);
+    for iK = 1:numel(validK)
+        k = validK(iK);
+        rW_bins(k) = safe_corr(PV_even(:,k), PV_odd(:,k));
+    end
+    B.byDay.within.rBins{d} = rW_bins;
+
+    % observed ACROSS
+    if numel(validK) >= 2
+        pairs = nchoosek(validK(:)',2);
+        zA = nan(size(pairs,1),1);
+        wA = nan(size(pairs,1),1);
+        switch lower(o.AcrossMode)
+            case 'cross-halves'
+                for i = 1:size(pairs,1)
+                    k1 = pairs(i,1); k2 = pairs(i,2);
+                    r1 = safe_corr(PV_even(:,k1), PV_odd(:,k2));
+                    r2 = safe_corr(PV_odd(:,k1),  PV_even(:,k2));
+                    zA(i) = mean([atanh(max(min(r1,0.99999),-0.99999)), atanh(max(min(r2,0.99999),-0.99999))], 'omitnan');
+                    wA(i) = sqrt(w(k1)*w(k2));
+                end
+            case 'mean-of-halves'
+                for i = 1:size(pairs,1)
+                    k1 = pairs(i,1); k2 = pairs(i,2);
+                    v1 = mean([PV_even(:,k1), PV_odd(:,k1)],2,'omitnan');
+                    v2 = mean([PV_even(:,k2), PV_odd(:,k2)],2,'omitnan');
+                    zA(i) = atanh(max(min(safe_corr(v1, v2),0.99999),-0.99999));
+                    wA(i) = sqrt(w(k1)*w(k2));
+                end
+            otherwise
+                error('Unknown AcrossMode: %s', o.AcrossMode);
+        end
+        wA(~isfinite(wA)) = 0; if ~any(wA>0), wA(:)=1; end
+        z_across_day(d) = nansum(wA .* zA) / max(1, nansum(wA));
+    else
+        z_across_day(d) = NaN;
+    end
+
+    % caches
+    PV_even_cache{d} = PV_even;
+    PV_odd_cache{d}  = PV_odd;
+    validK_cache{d}  = validK;
+    w_cache{d}       = w;
+
+    even_idx_cache{d} = even_idx_by_bin;
+    odd_idx_cache{d}  = odd_idx_by_bin;
+    n_even_cache{d}   = n_even;
+    n_odd_cache{d}    = n_odd;
+end
+
+% mean across days (Fisher z)
+m_valid        = isfinite(z_within_day) & (B.byDay.valid | true); %#ok<NASGU>
+z_within_mean  = mean(z_within_day(isfinite(z_within_day)),'omitnan');
+z_across_mean  = mean(z_across_day(isfinite(z_across_day)),'omitnan');
+delta_z        = z_within_mean - z_across_mean;
+
+% ------- permutations -------
+Nperm = o.NPerm;
+perm_delta        = nan(Nperm,1);
+zW_perm_mean_all  = nan(Nperm,1);
+zA_perm_mean_all  = nan(Nperm,1);
+
+if Nperm>0 && any(isfinite(z_within_day))
+    switch lower(o.NullMode)
+
+    case 'derange-pairing'
+        for pidx = 1:Nperm
+            zW_perm_day = nan(D,1);
+            zA_perm_day = nan(D,1);
+            for d = 1:D
+                validK = validK_cache{d};
+                if isempty(validK), continue; end
+
+                w = w_cache{d};
+                w_valid = w(validK); if ~any(w_valid>0), w_valid(:)=1; end
+                PV_even = PV_even_cache{d};
+                PV_odd  = PV_odd_cache{d};
+
+                % derange the mapping O<-E across bins
+                Kvalid = numel(validK);
+                if Kvalid < 1, continue; end
+                pi_idx = rand_derangement_idx(Kvalid);
+                map_to = validK(pi_idx);
+
+                % WITHIN under null
+                zP = nan(Kvalid,1); wP = nan(Kvalid,1);
+                for j = 1:Kvalid
+                    k1 = validK(j); k2 = map_to(j);
+                    zP(j) = atanh(max(min(safe_corr(PV_even(:,k1), PV_odd(:,k2)),0.99999),-0.99999));
+                    wP(j) = sqrt(w(k1)*w(k2));
+                end
+                wP(~isfinite(wP))=0; if ~any(wP>0), wP(:)=1; end
+                zW_perm_day(d) = nansum(wP .* zP) / max(1,nansum(wP));
+
+                % ACROSS under null (optional recompute)
+                if o.RecomputeAcrossInPerm && Kvalid >= 2
+                    pairs = nchoosek(validK(:)',2);
+                    zA = nan(size(pairs,1),1);
+                    wA = nan(size(pairs,1),1);
+                    switch lower(o.AcrossMode)
+                        case 'cross-halves'
+                            for i = 1:size(pairs,1)
+                                k1 = pairs(i,1); k2 = pairs(i,2);
+                                k1o = map_to(validK==k1);
+                                k2o = map_to(validK==k2);
+                                r1 = safe_corr(PV_even(:,k1), PV_odd(:,k2o));
+                                r2 = safe_corr(PV_odd(:,k1o),  PV_even(:,k2));
+                                zA(i) = mean([atanh(max(min(r1,0.99999),-0.99999)), atanh(max(min(r2,0.99999),-0.99999))], 'omitnan');
+                                wA(i) = sqrt(w(k1)*w(k2));
+                            end
+                        case 'mean-of-halves'
+                            for i = 1:size(pairs,1)
+                                k1 = pairs(i,1); k2 = pairs(i,2);
+                                k1o = map_to(validK==k1);
+                                k2o = map_to(validK==k2);
+                                v1 = mean([PV_even(:,k1), PV_odd(:,k1o)],2,'omitnan');
+                                v2 = mean([PV_even(:,k2), PV_odd(:,k2o)],2,'omitnan');
+                                zA(i) = atanh(max(min(safe_corr(v1, v2),0.99999),-0.99999));
+                                wA(i) = sqrt(w(k1)*w(k2));
+                            end
+                    end
+                    wA(~isfinite(wA))=0; if ~any(wA>0), wA(:)=1; end
+                    zA_perm_day(d) = nansum(wA .* zA) / max(1, nansum(wA));
+                else
+                    zA_perm_day(d) = z_across_day(d);
+                end
+
+                % ---- save per-day Δz for this permutation properly ----
+                if ~isfield(B.perm,'byDay') || isempty(B.perm.byDay.delta)
+                    B.perm.byDay.delta = cell(1,D);
+                end
+                if isfinite(zW_perm_day(d)) && isfinite(zA_perm_day(d))
+                    B.perm.byDay.delta{d}(end+1,1) = zW_perm_day(d) - zA_perm_day(d); %#ok<AGROW>
+                end
+            end
+            zW_perm_mean_all(pidx) = mean(zW_perm_day(isfinite(zW_perm_day)),'omitnan');
+            zA_perm_mean_all(pidx) = mean(zA_perm_day(isfinite(zA_perm_day)),'omitnan');
+            perm_delta(pidx)       = zW_perm_mean_all(pidx) - zA_perm_mean_all(pidx);
+        end
+
+    case 'frame-redistribute'
+        for pidx = 1:Nperm
+            zW_perm_day = nan(D,1);
+            zA_perm_day = nan(D,1);
+
+            for d = 1:D
+                validK = validK_cache{d};
+                if isempty(validK), continue; end
+                w = w_cache{d};
+                w_valid = w(validK); if ~any(w_valid>0), w_valid(:)=1; end
+
+                even_idx_by_bin = even_idx_cache{d};
+                odd_idx_by_bin  = odd_idx_cache{d};
+                ne = n_even_cache{d};
+                no = n_odd_cache{d};
+
+                E_pool = vertcat(even_idx_by_bin{validK});
+                O_pool = vertcat(odd_idx_by_bin{validK});
+                E_pool = unique(clamp_idx(E_pool, numel(ts{d})));
+                O_pool = unique(clamp_idx(O_pool, numel(ts{d})));
+                if isempty(E_pool) || isempty(O_pool), continue; end
+
+                % randomize/split to match original counts
+                E_perm = E_pool(randperm(numel(E_pool)));
+                O_perm = O_pool(randperm(numel(O_pool)));
+                ce = max(0, round(ne(validK))); co = max(0, round(no(validK)));
+
+                if sum(ce) > numel(E_perm)
+                    deficit = sum(ce) - numel(E_perm);
+                    for j = numel(ce):-1:1
+                        take = min(ce(j), deficit);
+                        ce(j) = ce(j) - take; deficit = deficit - take;
+                        if deficit <= 0, break; end
+                    end
+                end
+                if sum(co) > numel(O_perm)
+                    deficit = sum(co) - numel(O_perm);
+                    for j = numel(co):-1:1
+                        take = min(co(j), deficit);
+                        co(j) = co(j) - take; deficit = deficit - take;
+                        if deficit <= 0, break; end
+                    end
+                end
+
+                E_chunks = split_by_counts_ptr(E_perm, ce);
+                O_chunks = split_by_counts_ptr(O_perm, co);
+
+                % rebuild permuted PVs
+                t_day = ts{d}(:);
+                Sday  = spikes_to_matrix(spikes{d}, t_day);
+                Sday  = normalize_cells(Sday, o.CellNorm);
+                PV_even_p = nan(size(Sday,1), K);
+                PV_odd_p  = nan(size(Sday,1), K);
+                for j = 1:numel(validK)
+                    k = validK(j);
+                    segE = clamp_idx(E_chunks{j}, size(Sday,2));
+                    segO = clamp_idx(O_chunks{j}, size(Sday,2));
+                    if ~isempty(segE), PV_even_p(:,k) = mean(Sday(:, segE), 2, 'omitnan'); end
+                    if ~isempty(segO), PV_odd_p(:,k)  = mean(Sday(:, segO),  2, 'omitnan'); end
+                end
+
+                % WITHIN (perm)
+                zW_vec = nan(numel(validK),1);
+                for j = 1:numel(validK)
+                    k = validK(j);
+                    zW_vec(j) = atanh(max(min(safe_corr(PV_even_p(:,k), PV_odd_p(:,k)),0.99999),-0.99999));
+                end
+                zW_perm_day(d) = nansum(w_valid .* zW_vec) / max(1,nansum(w_valid));
+
+                % ACROSS (perm) per AcrossMode
+                if numel(validK) >= 2
+                    pairs = nchoosek(validK(:)', 2);
+                    zA_vec = nan(size(pairs,1),1);
+                    wA     = nan(size(pairs,1),1);
+                    switch lower(o.AcrossMode)
+                        case 'cross-halves'
+                            for iPair = 1:size(pairs,1)
+                                k1 = pairs(iPair,1); k2 = pairs(iPair,2);
+                                r1 = safe_corr(PV_even_p(:,k1), PV_odd_p(:,k2));
+                                r2 = safe_corr(PV_odd_p(:,k1),  PV_even_p(:,k2));
+                                zA_vec(iPair) = mean([atanh(max(min(r1,0.99999),-0.99999)), atanh(max(min(r2,0.99999),-0.99999))], 'omitnan');
+                                wA(iPair)     = sqrt(w(k1)*w(k2));
+                            end
+                        case 'mean-of-halves'
+                            for iPair = 1:size(pairs,1)
+                                k1 = pairs(iPair,1); k2 = pairs(iPair,2);
+                                v1 = mean([PV_even_p(:,k1), PV_odd_p(:,k1)],2,'omitnan');
+                                v2 = mean([PV_even_p(:,k2), PV_odd_p(:,k2)],2,'omitnan');
+                                zA_vec(iPair) = atanh(max(min(safe_corr(v1, v2),0.99999),-0.99999));
+                                wA(iPair)     = sqrt(w(k1)*w(k2));
+                            end
+                    end
+                    wA(~isfinite(wA))=0; if ~any(wA>0), wA(:)=1; end
+                    zA_perm_day(d) = nansum(wA .* zA_vec) / max(1, nansum(wA));
+                end
+
+                % save per-day Δz for this permutation
+                if isfinite(zW_perm_day(d)) && isfinite(zA_perm_day(d))
+                    B.perm.byDay.delta{d}(end+1,1) = zW_perm_day(d) - zA_perm_day(d); %#ok<AGROW>
+                end
+            end
+
+            zW_perm_mean_all(pidx) = mean(zW_perm_day(isfinite(zW_perm_day)),'omitnan');
+            zA_perm_mean_all(pidx) = mean(zA_perm_day(isfinite(zA_perm_day)),'omitnan');
+            perm_delta(pidx)       = zW_perm_mean_all(pidx) - zA_perm_mean_all(pidx);
+        end
+
+    otherwise
+        error('Unknown NullMode: %s', o.NullMode);
+    end
+end
+
+fprintf('Obs: within_z=%.3f, across_z=%.3f, Δ_z=%.3f\n', z_within_mean, z_across_mean, delta_z);
+fprintf('Null (perm): mean(within_z)=%.3f (sd=%.3f), mean(across_z)=%.3f (sd=%.3f), mean(Δ_z)=%.3f (sd=%.3f)\n', ...
+        mean(zW_perm_mean_all,'omitnan'), std(zW_perm_mean_all,'omitnan'), ...
+        mean(zA_perm_mean_all,'omitnan'), std(zA_perm_mean_all,'omitnan'), ...
+        mean(perm_delta,'omitnan'),       std(perm_delta,'omitnan'));
+
+% p-values
+perm_delta = perm_delta(isfinite(perm_delta));
+delta_obs  = delta_z;
+if isempty(perm_delta)
+    p_right = NaN; p_left = NaN; p_two = NaN;
+else
+    p_right = mean(perm_delta >= delta_obs);
+    p_left  = mean(perm_delta <= delta_obs);
+    p_two   = 2*min(p_right, p_left);
+end
+
+% per-day exposure for across-day testing
+B.byDay.within.z = z_within_day;
+B.byDay.across.z = z_across_day;
+B.byDay.within.r = tanh(z_within_day);
+B.byDay.across.r = tanh(z_across_day);
+B.byDay.valid    = isfinite(z_within_day) & (isfinite(z_within_day)|isfinite(z_across_day));
+
+% pack
+B.within.r = tanh(z_within_mean);  B.within.z = z_within_mean;
+B.across.r = tanh(z_across_mean);  B.across.z = z_across_mean;
+B.delta.r  = tanh(delta_z);        B.delta.z  = delta_z;
+
+B.p_perm_right = p_right;
+B.p_perm_left  = p_left;
+B.p_perm_two   = p_two;
+B.perm_delta   = perm_delta;
+
+B.null = struct('mode', o.NullMode, 'recomputeAcross', logical(o.RecomputeAcrossInPerm), ...
+                'NPerm', o.NPerm, 'AcrossMode', o.AcrossMode);
+
+B.notes = struct('MinTraceSamples',o.MinTraceSamples, ...
+                 'MinTraceEachHalf',o.MinTraceEachHalf, ...
+                 'BinWeight',o.BinWeight);
+end
+
+
+
+
+
+
 function B = compute_space_to_task_acrossTrials(spikes, ts, pos, cs, CTRL, varargin)
 % compute_space_to_task_acrossTrials  (no nested helpers)
 % Uses file-scope helpers (interp_pos, spikes_to_matrix, normalize_cells,
@@ -2678,7 +2651,7 @@ addParameter(p,'VelThresh',4);
 addParameter(p,'UseSpeedMask',false);
 addParameter(p,'CellNorm','demean');
 addParameter(p,'NPerm',49);
-addParameter(p,'MinTrials',5);
+addParameter(p,'MinTrials',2);
 addParameter(p,'Debug',true);
 addParameter(p,'Label','');
 
@@ -3065,6 +3038,11 @@ for d = 1:D
     % ==== (then keep your existing overlap and r-summary prints that follow) ====
 
     % ---------- Day-level z, flags, and audit ----------
+    % NEW: save the kept per-pair distributions for CDFs
+    AT_byDay_within_list_z{d} = ZW(:);
+    AT_byDay_across_list_z{d} = ZA(:);
+
+
     zW_day_all(d) = mean(ZW,'omitnan');
     zA_day_all(d) = mean(ZA,'omitnan');
 
@@ -3155,6 +3133,12 @@ B.filtered.within.z = zW_mu_f;  B.filtered.within.r = tanh(zW_mu_f);
 B.filtered.across.z = zA_mu_f;  B.filtered.across.r = tanh(zA_mu_f);
 B.filtered.delta.z  = delta_obs_f; B.filtered.delta.r = tanh(delta_obs_f);
 B.filtered.perm = struct('delta_null', perm_f, 'delta_obs', delta_obs_f, 'p_two', p_two_f);
+
+% NEW: expose per-day lists (both z and r) for CDF plots
+B.byDay.within.list_z = AT_byDay_within_list_z;
+B.byDay.across.list_z = AT_byDay_across_list_z;
+B.byDay.within.list_r = cellfun(@tanh, AT_byDay_within_list_z, 'uni', 0);
+B.byDay.across.list_r = cellfun(@tanh, AT_byDay_across_list_z, 'uni', 0);
 
 if any(valid_all)
     fprintf('[AT SUMMARY %s] days=%d | ALL Δz=%.3f (r≈%.3f), p_two=%.3g | FILTERED Δz=%.3f (r≈%.3f), p_two=%.3g\n', ...
@@ -3284,7 +3268,6 @@ v1 = mean(S_full(:, fe),2,'omitnan');
 v2 = mean(S_full(:, fo),2,'omitnan');
 rb = safe_corr(v1, v2, 5, 0);  % min guards: low cost
 end
-
 
 
 
@@ -3720,4 +3703,197 @@ function varargout = safe_corr(a,b,varargin)
     else
         varargout = {r, nC};
     end
+end
+
+function S = normalize_cells(S, mode)
+switch lower(mode)
+    case 'none'
+        % leave raw counts
+    case 'demean'
+        mu = mean(S,2,'omitnan');
+        S = S - mu;
+    case 'zscore'
+        mu = mean(S,2,'omitnan');
+        sd = std(S,0,2,'omitnan'); sd(sd==0|~isfinite(sd)) = 1;
+        S = (S - mu) ./ sd;
+    otherwise
+        error('CellNorm must be ''zscore'', ''demean'', or ''none''.');
+end
+end
+
+% ---------- tiny helpers used in B and C ----------
+function ii = clamp_idx(ii, n)
+% Clamp indices to [1..n] and drop NaNs/zeros/negatives.
+    if isempty(ii), ii = []; return; end
+    ii = ii(:);
+    ii = ii(isfinite(ii));           % drop NaN/Inf
+    ii = round(ii);                  % ensure integer
+    ii(ii < 1) = 1;
+    ii(ii > n) = n;
+end
+
+function chunks = split_by_counts_ptr(pool, counts)
+% Split a vector of frame indices "pool" into cell chunks of given sizes.
+% Extra safety: if pool is short, we truncate later counts gracefully.
+    counts = counts(:);
+    counts(~isfinite(counts)) = 0;
+    counts = max(0, round(counts));
+    chunks = cell(numel(counts),1);
+    if isempty(pool) || ~any(counts), return; end
+    p = 1;
+    for i = 1:numel(counts)
+        c = counts(i);
+        if c <= 0 || p > numel(pool)
+            chunks{i} = [];
+        else
+            q = min(p + c - 1, numel(pool));
+            chunks{i} = pool(p:q);
+            p = q + 1;
+        end
+    end
+end
+
+function pi = rand_derangement_idx(K)
+% Return a derangement of 1:K (no fixed points). For K<=2, fall back safely.
+    if K <= 1
+        pi = 1:K;
+        return
+    elseif K == 2
+        pi = [2 1];
+        return
+    end
+    % Sattolo’s algorithm for a single-cycle permutation (guaranteed no fixed points)
+    pi = 1:K;
+    for i = K:-1:2
+        j = randi([1 i-1]);   % j < i
+        tmp = pi(i);
+        pi(i) = pi(j);
+        pi(j) = tmp;
+    end
+    % Rarely, Sattolo can still produce a fixed point if implemented incorrectly;
+    % sanity check and repair (very low probability path).
+    fixed = find(pi == 1:K);
+    if ~isempty(fixed)
+        % swap any fixed item with its neighbor
+        for f = fixed(:).'
+            s = mod(f, K) + 1;
+            [pi(f), pi(s)] = deal(pi(s), pi(f));
+        end
+    end
+end
+
+function stats = cdf_acrossTrials_within_vs_across_AT(R, Nperm)
+% CDF of across-trials (AT) WITHIN vs ACROSS distributions (r), with
+% pooled KS, right-tailed Wilcoxon (within > across?), Cliff's delta,
+% Δz, and a hierarchical sign-flip permutation across animals.
+if nargin<2, Nperm = 49; end
+
+A = numel(R);
+within_by_rat = cell(A,1);
+across_by_rat = cell(A,1);
+
+% Collect per-rat distributions across days
+for i = 1:A
+    if ~isfield(R(i),'AT') || ~isfield(R(i).AT,'byDay'), continue; end
+    ATi = R(i).AT.byDay;
+
+    rW = [];
+    if isfield(ATi,'within') && isfield(ATi.within,'list_r') && iscell(ATi.within.list_r)
+        for d = 1:numel(ATi.within.list_r)
+            v = ATi.within.list_r{d};
+            if ~isempty(v), rW = [rW; v(:)]; end %#ok<AGROW>
+        end
+    end
+
+    rA = [];
+    if isfield(ATi,'across') && isfield(ATi.across,'list_r') && iscell(ATi.across.list_r)
+        for d = 1:numel(ATi.across.list_r)
+            v = ATi.across.list_r{d};
+            if ~isempty(v), rA = [rA; v(:)]; end %#ok<AGROW>
+        end
+    end
+
+    within_by_rat{i} = rW(isfinite(rW));
+    across_by_rat{i} = rA(isfinite(rA));
+end
+
+% Keep rats that have both dists
+keep = cellfun(@(x) ~isempty(x), within_by_rat) & cellfun(@(x) ~isempty(x), across_by_rat);
+within_by_rat = within_by_rat(keep);
+across_by_rat = across_by_rat(keep);
+Aeff = numel(within_by_rat);
+
+if Aeff==0
+    warning('AT CDF: no animals with both WITHIN and ACROSS distributions.');
+    stats = struct();
+    return
+end
+
+% Pooled vectors (for CDF & simple tests)
+rW_all = vertcat(within_by_rat{:});
+rA_all = vertcat(across_by_rat{:});
+
+% ---- Plot CDFs ----
+figure('Color','w','Position',[220 220 720 540]); hold on
+for i = 1:Aeff
+    [fW,xW] = ecdf(within_by_rat{i}); plot(xW,fW,'-','Color',[0.7 0.85 1.0],'LineWidth',1);
+    [fA,xA] = ecdf(across_by_rat{i}); plot(xA,fA,'-','Color',[1.0 0.8 0.7],'LineWidth',1);
+end
+[fW,xW] = ecdf(rW_all);  plot(xW,fW,'-','Color',[0.1 0.35 0.9],'LineWidth',2.5);
+[fA,xA] = ecdf(rA_all);  plot(xA,fA,'-','Color',[0.85 0.35 0.15],'LineWidth',2.5);
+xlabel('PV correlation r (AT: across trials)'); ylabel('F(r \leq x)');
+title(sprintf('AT CDFs: WITHIN vs ACROSS  (rats=%d, nW=%d, nA=%d)', Aeff, numel(rW_all), numel(rA_all)));
+legend({'rat within','rat across','pooled within','pooled across'}, 'Location','southeast'); legend boxoff
+grid on; xlim([-1 1]); ylim([0 1]);
+
+% ---- Simple pooled tests (anti-conservative) ----
+try, [~, p_ks]   = kstest2(rW_all, rA_all);          catch, p_ks = NaN; end
+try, p_wil = ranksum(rW_all, rA_all,'tail','right');  catch, p_wil = NaN; end % within > across?
+
+% Cliff's delta on r and Δz on Fisher z
+cliff = local_cliffs_delta(rW_all, rA_all);
+zW = atanh(bound_r(rW_all)); zA = atanh(bound_r(rA_all));
+delta_z = mean(zW,'omitnan') - mean(zA,'omitnan');
+
+% ---- Hierarchical permutation across rats: sign-flip per-rat Δz ----
+rat_stat_obs = nan(Aeff,1);
+for i = 1:Aeff
+    zWi = atanh(bound_r(within_by_rat{i}));
+    zAi = atanh(bound_r(across_by_rat{i}));
+    rat_stat_obs(i) = mean(zWi,'omitnan') - mean(zAi,'omitnan');
+end
+obs = mean(rat_stat_obs,'omitnan');
+
+perm = nan(Nperm,1);
+for b = 1:Nperm
+    s = (rand(Aeff,1)>0.5)*2 - 1;  % sign flip per rat
+    perm(b) = mean(s .* rat_stat_obs, 'omitnan');
+end
+p_right = mean(perm >= obs);
+p_two   = 2*min(p_right, 1-p_right);
+
+% ---- Pack ----
+stats = struct();
+stats.pooled = struct('KS_p', p_ks, 'ranksum_right_p', p_wil, ...
+                      'CliffsDelta_r', cliff, 'delta_z', delta_z, ...
+                      'n_within', numel(rW_all), 'n_across', numel(rA_all));
+stats.hier_perm = struct('obs_delta_z', obs, 'p_right', p_right, 'p_two', p_two, ...
+                         'r_diff_approx', tanh(obs), 'rats', Aeff);
+
+fprintf('\nAT CDF (WITHIN vs ACROSS across trials):\n');
+fprintf('  Pooled: KS p=%.3g, Wilcoxon p_right=%.3g, CliffΔ=%.3f, Δz=%.3f (r≈%.3f)\n', ...
+        p_ks, p_wil, cliff, delta_z, tanh(delta_z));
+fprintf('  Hierarchical permutation: obs=%.3f (r≈%.3f), p_right=%.4g, p_two=%.4g, rats=%d\n\n', ...
+        obs, tanh(obs), p_right, p_two, Aeff);
+
+% ---- small helpers ----
+function d = local_cliffs_delta(x,y)
+    x = x(isfinite(x)); y = y(isfinite(y));
+    if isempty(x)||isempty(y), d=NaN; return; end
+    nx=numel(x); ny=numel(y);
+    allv=[x(:); y(:)]; [ranks,~]=tiedrank(allv);
+    rx=ranks(1:nx); U = nx*ny + nx*(nx+1)/2 - sum(rx);
+    d = (2*U)/(nx*ny) - 1;
+end
+function r = bound_r(r), r = max(min(r,0.999999),-0.999999); end
 end
