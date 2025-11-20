@@ -36,7 +36,7 @@ addParameter(p,'Win',[0 2]);
 addParameter(p,'BinSec',2);
 addParameter(p,'SpeedThresh',4);
 addParameter(p,'QFDR',0.05);
-addParameter(p,'NShuffle',1000);
+addParameter(p,'NShuffle',500);
 addParameter(p,'DoPlots',true);
 addParameter(p,'CapNonTaskToTask',false);
 addParameter(p,'CapMode','random');

@@ -47,3 +47,38 @@ function plotTaskVsNonTaskSpikes(animal, neuronIdx, dateStr)
     legend({'Non-task spikes', 'Task+2s spikes'}, 'Location', 'best');
     axis equal tight;
 end
+
+function [L,U] = addUnity(ax, x, y, pad)
+% addUnity  Make a proper y=x reference line and square/locked limits.
+%   - Uses finite x,y only
+%   - Sets XLim and YLim to the SAME [L U] so the line is truly unity
+%   - pad is a fractional margin (default 0.05)
+
+if nargin<4, pad = 0.05; end
+
+mask = isfinite(x) & isfinite(y);
+if ~any(mask)
+    L = 0; U = 1;
+    set(ax,'XLim',[L U],'YLim',[L U]); hold(ax,'on');
+    [L,U] = addUnity(ax, x, y);  % <-- proper unity & matched limits
+    axis(ax,'square');
+    return
+end
+
+xmin = min(x(mask)); xmax = max(x(mask));
+ymin = min(y(mask)); ymax = max(y(mask));
+
+L = min(xmin, ymin);
+U = max(xmax, ymax);
+rng = U - L;
+if rng == 0
+    % degenerate case: single point; make a tiny box
+    rng = max(1, abs(U)*0.02);
+end
+L = L - pad*rng;
+U = U + pad*rng;
+
+set(ax,'XLim',[L U],'YLim',[L U]); hold(ax,'on');
+[L,U] = addUnity(ax, x, y);  % <-- proper unity & matched limits
+axis(ax,'square');  % or 'equal' if you prefer
+end

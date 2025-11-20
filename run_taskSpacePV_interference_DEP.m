@@ -1,4 +1,4 @@
-function R = run_taskSpacePV_interference(ratNames, varargin)
+function R = run_taskSpacePV_interference_DEP(ratNames, varargin)
 % RUN_TASKSPACEPV_INTERFERENCE
 % End-to-end pipeline for testing Task↔Space population-vector interference.
 %
@@ -77,13 +77,10 @@ addParameter(p,'binSize',1/7.5);
 addParameter(p,'AcrossMode','cross-halves'); % 'cross-halves'|'mean-of-halves'
 addParameter(p,'GridRC',[3 2]);              % fallback rows×cols if NumBins=[]
 
-%not using
-addParameter(p,'NumBins',3);                 % if given, auto factor into rows×cols
-addParameter(p,'UseTrialROI',false);
-addParameter(p,'ROIPrc',[5 95]);
-addParameter(p,'ROIMarginFrac',0.05);
-addParameter(p,'ROIByDay',true);
-addParameter(p,'MinOcc',1/7.5);
+addParameter(p,'TemporalBinMode','frames');   % 'time' | 'frames'
+addParameter(p,'FramesPerBin',1);          % integer; if set, overrides NumTimeBins
+addParameter(p,'NumTimeBins',15);           % used when TemporalBinMode='time' or FramesPerBin=[]
+
 
 addParameter(p,'VelThresh',4);
 addParameter(p,'DoPlots',true);
@@ -106,6 +103,13 @@ addParameter(p,'DoAcrossTrials',true);  % enable/disable AT analysis
 addParameter(p,'NPerm_AT',49);         % permutations for AT (per-day, optional)
 addParameter(p,'MinTrials_AT',5);       % minimum trials/day to include AT for that day
 
+%not using
+addParameter(p,'NumBins',3);                 % if given, auto factor into rows×cols
+addParameter(p,'UseTrialROI',false);
+addParameter(p,'ROIPrc',[5 95]);
+addParameter(p,'ROIMarginFrac',0.05);
+addParameter(p,'ROIByDay',true);
+addParameter(p,'MinOcc',1/7.5);
 parse(p,varargin{:});
 opt = p.Results;
 

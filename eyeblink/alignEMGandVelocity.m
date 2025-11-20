@@ -22,7 +22,7 @@ function [t_interp, mean_emg, spread_emg, mean_vel, spread_vel] = alignEMGandVel
 
     learnedDays = dateList(finalIdx-2:finalIdx);
 
-    win = [-1 2];
+    win = [-.5 4];
   %  Fs_interp = 7.5;
     Fs_interp = 2000;
     t_interp = win(1):1/Fs_interp:win(2);

@@ -1,180 +1,372 @@
-function change = plotProportionModulated()
-% plotProportionModulated  Fraction of neurons with ↑FR in trace (vs null)
+function change = plotProportionModulated(varargin)
+% plotProportionModulated  Fraction of neurons modulated in trace vs null,
+% with observed-vs-shuffled histograms for any metric.
+%
+% Panels: one per rat + pooled.
+%
+% Options:
+%   'Metric' : 'logfold' (default) | 'fold' | 'symdiff'
+%              'logfold'  -> mean(FRt)/FRr (log x-axis)
+%              'fold'     -> mean(FRt)/FRr (linear x-axis)
+%              'symdiff'  -> (mean(FRt)-FRr)/(mean(FRt)+FRr)
+%   'Eps'    : numeric epsilon added to both rates (default 0)
+%   'Alpha'  : shuffle alpha (still computed; not used in plots) (default 0.05)
+%   'NPerm'  : # shuffles per cell (default 500)
+
+% ---------- options ----------
+p = inputParser;
+addParameter(p,'Metric','logfold',@(s) any(strcmpi(s,{'logfold','fold','symdiff'})));
+addParameter(p,'Eps',0,@(x) isnumeric(x)&&isscalar(x)&&x>=0);
+addParameter(p,'Alpha',0.05,@(x) isnumeric(x)&&isscalar(x)&&x>0&&x<1);
+addParameter(p,'NPerm',500,@(x) isnumeric(x)&&isscalar(x)&&x>=1);
+parse(p,varargin{:});
+Metric = lower(p.Results.Metric);
+Eps    = p.Results.Eps;
+alpha  = p.Results.Alpha;
+nPerm  = p.Results.NPerm;
+
+% ---------- config ----------
 ratNames   = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
-win        = [0 2];
-minSpikes  = 0;
-nPerm      = 500;
-alpha      = 0.05;
+win        = [0 2];   % trace window relative to CS (s)
+minSpikes  = 0;       % optional per-cell inclusion threshold
 
-nRats = numel(ratNames);
-all_obsFold = [];
-all_h       = [];
-fracRat     = nan(nRats,1);
-stdRat      = nan(nRats,1);
+nRats  = numel(ratNames);
+change = NaN(nRats,3000);   % store metric per cell per rat (size generous)
+fracRat = nan(nRats,1);
 
-figure('Color','w','Position',[100 100 1200 600]);
-change = NaN(nRats,3000);
+% Directional stats (still computed; not used in plots)
+incFracRat = nan(nRats,1);
+decFracRat = nan(nRats,1);
+nValidRat  = zeros(nRats,1);
 
-for r = 1:nRats+1
-  if r <= nRats
-    rat   = evalin('base', ratNames{r});
-    dates = autoDateList(rat);
-    idx   = find(strcmp(dates, rat.An),1);
-    days  = dates(idx-2:idx);
+% ---------- figure ----------
+fig = figure('Color','w','Position',[100 100 1200 600]);
+tiledlayout(fig,2,3,'Padding','compact','TileSpacing','compact');
 
-    cells = struct('st',{},'cs',{});
-    for d = 1:3
-      spk      = rat.Ca_peaks.(sprintf('CA_peaks_%s',days{d}));
-      csTimes  = rat.CS_times.(sprintf('CS_%s',days{d}));
-      ratemask = rat.ratemask.(sprintf('ratemask_%s',days{d}));
+colObs   = [0.20 0.60 1.00];  % observed
+colShuf  = [0.70 0.70 0.70];  % shuffled (null)
 
-      [nCells,~] = size(spk);
-      for c = 1:nCells
-        if ratemask(c) == 0, continue, end                 % ← exclude cell
-        times = spk(c,:);
-        times = times(~isnan(times)&times>0);
-        cells(end+1).st = times(:);
-        cells(end).cs   = csTimes;
-      end
-    end
-    subplot(2,3,r);
-    titleTxt = ratNames{r};
-  else
-    cells = struct('st',{},'cs',{});
-    for rr = 1:nRats
-      rat   = evalin('base', ratNames{rr});
-      dates = autoDateList(rat);
-      idx   = find(strcmp(dates, rat.An),1);
-      days  = dates(idx-2:idx);
-      for d = 1:3
-        spk      = rat.Ca_peaks.(sprintf('CA_peaks_%s',days{d}));
-        csTimes  = rat.CS_times.(sprintf('CS_%s',days{d}));
-        ratemask = rat.ratemask.(sprintf('ratemask_%s',days{d}));
-
-        [nCells,~] = size(spk);
-        for c = 1:nCells
-          if ratemask(c) == 0, continue, end               % ← exclude cell
-          times = spk(c,:);
-          times = times(~isnan(times)&times>0);
-          cells(end+1).st = times(:);
-          cells(end).cs   = csTimes;
+% ---------- helper: robust day TS fetch ----------
+    function [T0,T1,hadTS] = fetch_day_ts(rat, dayStr, spkDay)
+        hadTS = false; T0 = NaN; T1 = NaN;
+        keys = {sprintf('Ca_ts_%s',dayStr), sprintf('CA_ts_%s',dayStr), ...
+                sprintf('ts_%s',dayStr),      sprintf('TS_%s',dayStr)};
+        if isfield(rat,'Ca_ts') && isstruct(rat.Ca_ts)
+            for k = 1:numel(keys)
+                if isfield(rat.Ca_ts, keys{k})
+                    ts = rat.Ca_ts.(keys{k});
+                    if ~isempty(ts) && numel(ts)>=2
+                        T0 = ts(1); T1 = ts(end);
+                        hadTS = true; return;
+                    end
+                end
+            end
         end
-      end
-    end
-    subplot(2,3,6);
-    titleTxt = 'All rats';
-  end
-
-  % ------------- downstream analysis unchanged --------------------------
-  nCells    = numel(cells);
-  obsFold   = nan(nCells,1);
-  h         = false(nCells,1);
-  for i = 1:nCells
-    st = cells(i).st;
-    cs = cells(i).cs;
-    validCS = cs(cs+win(2)<=max(st));
-    nT = numel(validCS);
-    if nT<1, continue; end
-
-    FRt = nan(nT,1);
-    for t = 1:nT
-      t0 = validCS(t)+win(1);
-      t1 = t0+diff(win);
-      FRt(t) = sum(st>=t0 & st<t1)/diff(win);
+        for k = 1:numel(keys)
+            if isfield(rat, keys{k})
+                ts = rat.(keys{k});
+                if ~isempty(ts) && numel(ts)>=2
+                    T0 = ts(1); T1 = ts(end);
+                    hadTS = true; return;
+                end
+            end
+        end
+        % fallback to min/max spike times for the day
+        if ~isempty(spkDay)
+            allTimes = spkDay(:);
+            allTimes = allTimes(~isnan(allTimes)&allTimes>0);
+            if ~isempty(allTimes)
+                T0 = min(allTimes); T1 = max(allTimes);
+                hadTS = false;
+            end
+        end
     end
 
-    maskCS = false(size(st));
-    for t = 1:nT
-      maskCS = maskCS | (st>=validCS(t)+win(1)&st<validCS(t)+win(2));
+% ---------- helper to gather cells for one rat or pooled ----------
+    function cells = gather_cells(ratIdx)
+        cells = struct('st',{},'cs',{},'t0',{},'t1',{});
+        if ratIdx <= nRats
+            ratsToDo = ratIdx;
+        else
+            ratsToDo = 1:nRats; % pooled
+        end
+        for rr = ratsToDo
+            rat   = evalin('base', ratNames{rr});
+            dates = autoDateList(rat);
+            idx   = find(strcmp(dates, rat.An),1);
+            if isempty(idx) || idx < 3
+                warning('%s: could not center on An or not enough days; using last 3 days.', ratNames{rr});
+                idx = numel(dates);
+            end
+            days  = dates(max(1,idx-2):idx);
+
+            for d = 1:numel(days)
+                spk      = rat.Ca_peaks.(sprintf('CA_peaks_%s',days{d}));
+                csTimes  = rat.CS_times.(sprintf('CS_%s',days{d}));
+                ratemask = rat.ratemask.(sprintf('ratemask_%s',days{d}));
+
+                [T0_day, T1_day, ~] = fetch_day_ts(rat, days{d}, spk);
+
+                [nCells,~] = size(spk);
+                for c = 1:nCells
+                    if ratemask(c)==0, continue, end
+                    times = spk(c,:);
+                    times = times(~isnan(times) & times>0);
+                    if isempty(times), continue, end
+
+                    cells(end+1).st = times(:);
+                    cells(end).cs   = csTimes(:);
+                    cells(end).t0   = T0_day;
+                    cells(end).t1   = T1_day;
+                end
+            end
+        end
     end
-    totalNon = (max(st)-min(st)) - nT*diff(win);
-    FRr = (numel(st)-sum(maskCS)) / totalNon;
 
-    obsFold(i) = mean(FRt)/FRr;
-    if sum(st>=validCS(1)&st<validCS(end)+win(2)) < minSpikes
-      if r<=nRats, change(r,i) = NaN; end
-      continue
-    elseif r<=nRats
-      change(r,i) = obsFold(i);
+% ---------- loop panels: 1..nRats then pooled ----------
+for panelIdx = 1:(nRats+1)
+    cells = gather_cells(panelIdx);
+
+    % collect all shuffles for this panel
+    nullCat = [];
+
+    % ---- compute metric + shuffle per cell ----
+    nCells = numel(cells);
+    obsM   = nan(nCells,1);
+    hCell  = false(nCells,1);   % kept for summary printing
+    incCell = false(nCells,1);  % used only for symdiff summaries
+    decCell = false(nCells,1);
+
+    for i = 1:nCells
+        st = cells(i).st;
+        cs = cells(i).cs;
+        t0_rec = cells(i).t0;
+        t1_rec = cells(i).t1;
+
+        if isempty(st) || isempty(cs) || ~isfinite(t0_rec) || ~isfinite(t1_rec)
+            continue
+        end
+
+        % CS with full window inside recording span
+        dur = diff(win);
+        validCS = cs(cs+win(1) >= t0_rec & cs+win(2) <= t1_rec);
+        nT = numel(validCS);
+        if nT<1, continue, end
+
+        % trial FRs
+        FRt = nan(nT,1);
+        for t = 1:nT
+            a = validCS(t) + win(1);
+            b = a + dur;
+            FRt(t) = sum(st>=a & st<b)/dur;
+        end
+        FRt_mean = mean(FRt);
+
+        % non-trial FR (complement of real trial windows)
+        inWin = false(size(st));
+        for t = 1:nT
+            a = validCS(t) + win(1);
+            b = a + dur;
+            inWin = inWin | (st>=a & st<b);
+        end
+        nSpk_non = sum(~inWin);
+        totalTime = (t1_rec - t0_rec);
+        totalNon  = totalTime - nT*dur;
+        if totalNon <= 0, continue, end
+        FRr = nSpk_non / totalNon;
+
+        % observed metric for this cell
+        obsM(i) = compute_metric(FRt_mean, FRr, Metric, Eps);
+        if panelIdx<=nRats
+            change(panelIdx,i) = obsM(i);
+        end
+
+        % null via shuffled starts (uniform over [t0_rec, t1_rec-dur])
+        tStarts = linspace(t0_rec, t1_rec - dur, 500);
+        nullM = nan(nPerm,1);
+        for ip = 1:nPerm
+            samp = randsample(tStarts, nT, true);
+
+            % shuffled trial FR
+            FRs = arrayfun(@(s) sum(st >= s & st < s+dur) / dur, samp);
+            t_shuf = mean(FRs);
+
+            % shuffled non-trial FR = complement of shuffled windows
+            inWin_shuf = false(size(st));
+            for tt = 1:nT
+                a = samp(tt); b = a + dur;
+                inWin_shuf = inWin_shuf | (st >= a & st < b);
+            end
+            nSpk_non_shuf = sum(st >= t0_rec & st < t1_rec & ~inWin_shuf);
+            totalNon_shuf = (t1_rec - t0_rec) - nT*dur;
+            b_shuf = nSpk_non_shuf / max(totalNon_shuf, eps);
+
+            nullM(ip) = compute_metric(t_shuf, b_shuf, Metric, Eps);
+        end
+
+        % append this cell's null to the panel's pool
+        nullCat = [nullCat; nullM(:)];
+
+        % significance (kept for printed summaries only)
+        switch Metric
+            case 'symdiff'
+                p_right = mean(nullM >= obsM(i));   % increase
+                p_left  = mean(nullM <= obsM(i));   % decrease
+                p_two   = mean(abs(nullM) >= abs(obsM(i)));
+                hCell(i)  = (p_two < alpha);
+                incCell(i)= (p_right < alpha);
+                decCell(i)= (p_left  < alpha);
+            otherwise
+                p_right = mean(nullM >= obsM(i));
+                hCell(i)  = (p_right < alpha);
+                incCell(i)= hCell(i);
+                decCell(i)= false;
+        end
     end
 
-    nullF = nan(nPerm,1);
-    tStarts = linspace(min(st),max(st)-diff(win),1000);
-    for ip = 1:nPerm
-      samp = randsample(tStarts,nT,true);
-      FRs  = arrayfun(@(s) sum(st>=s&st<s+diff(win))/diff(win), samp);
-      nullF(ip) = mean(FRs)/FRr;
+    % ---- per-rat roll-up for summaries ----
+    if panelIdx <= nRats
+        validMask = isfinite(obsM);
+        nValidRat(panelIdx) = nnz(validMask);
+        if nValidRat(panelIdx) > 0
+            fracRat(panelIdx)   = mean(hCell(validMask),'omitnan');
+            incFracRat(panelIdx)= mean(incCell(validMask),'omitnan');
+            decFracRat(panelIdx)= mean(decCell(validMask),'omitnan');
+        end
     end
-    pval = mean(nullF >= obsFold(i));
-    h(i) = (pval<alpha);
-  end
 
-  all_obsFold = [all_obsFold; obsFold];
-  all_h       = [all_h;       h];
+    % ---- plot into this panel: Observed vs Shuffled ----
+    nexttile; hold on;
 
-  if r<=nRats, fracRat(r) = mean(h,'omitnan'); end
+    % Use exactly what was saved for rats; pooled uses current obsM
+    if panelIdx <= nRats
+        dataAll = change(panelIdx,:).';
+    else
+        dataAll = obsM(:);
+    end
 
+    switch Metric
+        case 'logfold'  % ratio; log x-axis; require positive values
+            obsUse  = dataAll(isfinite(dataAll) & dataAll>0);
+            shfUse  = nullCat(isfinite(nullCat) & nullCat>0);
+            if isempty(obsUse) || isempty(shfUse)
+                text(0.5,0.5,'No positive values to plot','HorizontalAlignment','center');
+            else
+                minF = max(min([obsUse(:); shfUse(:)]), realmin);
+                maxF = max([obsUse(:); shfUse(:)]);
+                nBins = 24;
+                edges = logspace(log10(minF), log10(maxF), nBins+1);
 
-  %% FOR NOT LOG PLOT
-  %maxFold = nanmax(obsFold);
-  %edges   = linspace(0, ceil(maxFold), 30);
-  %histogram(obsFold(~h), edges, 'Normalization','probability'); hold on;
-  %histogram(obsFold(h),  edges, 'Normalization','probability');
+                histogram(shfUse, 'BinEdges', edges, 'Normalization','probability', ...
+                          'FaceColor',colShuf); hold on
+                histogram(obsUse, 'BinEdges', edges, 'Normalization','probability', ...
+                          'FaceColor',colObs, 'FaceAlpha',0.75);
 
-  %FOR LOG PLOT
-  % --- assume obsFold is your data (vector) and h is logical mask for sig ---
-  dataAll = obsFold(:);      % make sure it’s a column
-  sigMask = h(:);
+                set(gca,'XScale','log');
+                xline(1,'k-');
+                xlabel('Fold-change (trial / nontrial)');
+                ylabel('Probability');
+                legend('shuffled','observed','Location','best');
+            end
 
-  % 1) only positives
-  posData = dataAll(dataAll>0);
-  if isempty(posData)
-      error('No positive fold-changes to plot on log scale.');
-  end
+        case 'fold'     % ratio; linear x-axis; include zeros
+            obsUse  = dataAll(isfinite(dataAll) & dataAll>=0);
+            shfUse  = nullCat(isfinite(nullCat) & nullCat>=0);
+            if isempty(obsUse) || isempty(shfUse)
+                text(0.5,0.5,'No finite nonnegative values','HorizontalAlignment','center');
+            else
+                hi = max(1.5, prctile([obsUse(:); shfUse(:)], 99.5));
+                lo = 0;
+                nBins = 24;
+                edges = linspace(lo, hi, nBins+1);
+                % exact edge at 1 so <1 is guaranteed to have its own bins
+                if lo < 1 && 1 < hi
+                    [~,k] = min(abs(edges - 1));
+                    edges(k) = 1;
+                end
 
-  % 2) define min & max in log domain
-  minF = max(min(posData), realmin);  % at least realmin
-  maxF = max(posData);
+                histogram(shfUse, 'BinEdges', edges, 'Normalization','probability', ...
+                          'FaceColor',colShuf); hold on
+                histogram(obsUse, 'BinEdges', edges, 'Normalization','probability', ...
+                          'FaceColor',colObs, 'FaceAlpha',0.75);
 
-  % 3) make log-spaced edges
-  nLogBins = 20;
-  logEdges = logspace(log10(minF), log10(maxF), nLogBins+1);
+                xline(1,'k-');
+                xlim([lo hi]);
+                xlabel('Fold-change (trial / nontrial)');
+                ylabel('Probability');
+                legend('shuffled','observed','Location','best');
+            end
 
-  % 4) plot
-  clf; hold on;
-  h1 = histogram(dataAll(~sigMask & dataAll>0), logEdges, ...
-                 'Normalization','probability');
-  h2 = histogram(dataAll( sigMask & dataAll>0), logEdges, ...
-                 'Normalization','probability');
+        case 'symdiff'  % symmetric difference in [-1,1]
+            obsUse  = dataAll(isfinite(dataAll));
+            shfUse  = nullCat(isfinite(nullCat));
+            edges = linspace(-1,1,41);
 
-  set(gca, 'XScale','log');
-  xlabel('Fold-change (log scale)');
-  ylabel('Probability');
-  legend('ns','sig','Location','best');
+            histogram(shfUse, 'BinEdges', edges, 'Normalization','probability', ...
+                      'FaceColor',colShuf); hold on
+            histogram(obsUse, 'BinEdges', edges, 'Normalization','probability', ...
+                      'FaceColor',colObs, 'FaceAlpha',0.75);
 
-  % 5) tweak appearance
-  h1.FaceColor = [0.2 0.6 1];
-  h2.FaceColor = [1 0.4 0.2];
-  h2.FaceAlpha = 0.6;
-  xlim([minF maxF]);
+            xline(0,'k-');
+            xlim([-1 1]);
+            xlabel('Symmetric difference (t-nt)/(t+nt)');
+            ylabel('Probability');
+            legend('shuffled','observed','Location','best');
+    end
 
-%%%
-
-
-
-  xlabel('Fold‐change'); ylabel('Probability');
-  title(titleTxt);
-  legend('ns','sig','Location','Best');
 end
 
-fprintf('\n=== Fraction modulated by rat ===\n');
+% ---- print summaries ----
+fprintf('\n=== Fraction modulated by rat (%s) ===\n', Metric);
 for r = 1:nRats
-  fprintf('%s: %.3f\n', ratNames{r}, fracRat(r));
+    if nValidRat(r) > 0
+        fprintf('%s: n=%d | mod=%.1f%%\n', ratNames{r}, nValidRat(r), 100*fracRat(r));
+    else
+        fprintf('%s: n=0 | mod=NA\n', ratNames{r});
+    end
 end
 fracAll = mean(fracRat,'omitnan');
-fprintf('All rats combined: %.3f\n', fracAll);
+fprintf('All rats combined (mean of rats): %.1f%% modulated\n', 100*fracAll);
 
+% Directional split for symdiff (printed only)
+if strcmp(Metric,'symdiff')
+    fprintf('\n=== Percent modulated by direction (symdiff; per rat) ===\n');
+    for r = 1:nRats
+        if nValidRat(r) > 0
+            fprintf('%s: n=%d | %%↑=%.1f%% | %%↓=%.1f%% | %%any=%.1f%%\n', ...
+                ratNames{r}, nValidRat(r), 100*incFracRat(r), 100*decFracRat(r), 100*fracRat(r));
+        else
+            fprintf('%s: n=0\n', ratNames{r});
+        end
+    end
+    % pooled, weighted by # valid cells per rat
+    w = nValidRat; w(~isfinite(incFracRat)|~isfinite(decFracRat)) = 0;
+    incPooled = nansum(w .* incFracRat) / max(nansum(w),1);
+    decPooled = nansum(w .* decFracRat) / max(nansum(w),1);
+    anyPooled = nansum(w .* fracRat   ) / max(nansum(w),1);
+    fprintf('ALL (weighted by n): %%↑=%.1f%% | %%↓=%.1f%% | %%any=%.1f%% | n_total=%d\n', ...
+        100*incPooled, 100*decPooled, 100*anyPooled, nansum(nValidRat));
+end
 
+end
 
-
+% ================= helper =================
+function m = compute_metric(FRt_mean, FRr, Metric, Eps)
+% compute_metric  Apply chosen metric with optional epsilon for stability.
+t = FRt_mean + Eps;
+b = FRr      + Eps;
+switch Metric
+    case {'logfold','fold'}
+        m = t ./ b;
+    case 'symdiff'
+        denom = t + b;
+        
+        if denom==0
+            m = NaN;
+        else
+            m = (t - b) ./ denom;
+        end
+    otherwise
+        error('Unknown Metric: %s', Metric);
+end
 end

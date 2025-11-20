@@ -1,14 +1,13 @@
 function plotTraceFRDist(useVelFilter, velThresh, applyTo)
-% plotTraceFRDist  Compare trace‐ vs non‐trial‐FR across cells, plus corr & AUC
+% plotTraceFRDist  Compare trace vs non-trial FR across cells + ROC/AUC
 %
-% Velocity filter (optional):
-%   useVelFilter (default false) — if true, only count spikes when speed ≥ velThresh
-%   velThresh    (default 4 cm/s)
-%   applyTo      (default 'both') — 'trace' | 'nontrial' | 'both'
+% Figure 2 (2 cols x 6 rows): each rat (5 rows) + pooled (last row)
+%   Col 1: bar (Trace, Nontrial, Nontrial vel>=thr) with SEM + significance
+%   Col 2: histogram (Trace vs ONLY one Nontrial):
+%          - if useVelFilter==false: Trace vs Nontrial (no filter)
+%          - if useVelFilter==true : Trace vs Nontrial (vel>=thr)
 %
-%  • Histograms + rank‐sum test
-%  • Across‐cell Pearson & Spearman R (last dataset computed)
-%  • ROC curve & AUC
+% Similarity/ROC sections above Figure 2 still honor useVelFilter/applyTo.
 
 if nargin < 1 || isempty(useVelFilter), useVelFilter = false; end
 if nargin < 2 || isempty(velThresh),    velThresh    = 4;     end
@@ -17,72 +16,76 @@ applyTo = validatestring(applyTo, {'trace','nontrial','both'});
 
 ratNames  = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
 win       = [0 2];        % CS trace window (s)
-minSpikes = 0;            % min total spikes in CS windows per cell
+minSpikes = 0;
 
-%— aggregate per‐cell rates —%
 FRt_all = [];
 FRr_all = [];
 
-for r = 1:numel(ratNames)
+% Per-rat storage for Figure 2
+nR = numel(ratNames);
+FRt_meancell  = cell(nR,1);   % Trace (no filter)
+FRr0_meancell = cell(nR,1);   % Nontrial (no filter)
+FRrV_meancell = cell(nR,1);   % Nontrial (vel filter)
+
+cols = [0    0.4470 0.7410;   % Trace
+        0.8500 0.3250 0.0980; % Nontrial (no filter)
+        0.4660 0.6740 0.1880];% Nontrial (vel filter)
+
+for r = 1:nR
     rat   = evalin('base', ratNames{r});
     dates = autoDateList(rat);
     idx   = find(strcmp(dates, rat.An),1);
     days  = dates(idx-2:idx);
+
+    trace_means   = [];
+    nontrial0_means = [];
+    nontrialV_means = [];
+
     for d = 1:3
         spk      = rat.Ca_peaks.(sprintf('CA_peaks_%s',days{d}));
         posMat   = rat.pos.(sprintf('pos_%s',days{d}));
         csTimes  = rat.CS_times.(sprintf('CS_%s',days{d}));
         ratemask = rat.ratemask.(sprintf('ratemask_%s',days{d}));
+        keep     = (ratemask == 1);
+        spk      = spk(keep,:);
 
-        keep = (ratemask == 1);
-        spk  = spk(keep,:);
+        % A) Path used by similarity/ROC — unchanged logic
+        useTrace    = useVelFilter && (strcmp(applyTo,'trace')   || strcmp(applyTo,'both'));
+        useNontrial = useVelFilter && (strcmp(applyTo,'nontrial')|| strcmp(applyTo,'both'));
+        [FRt_A, FRr_A] = popVecSim(spk, posMat, csTimes, win, minSpikes, useTrace, useNontrial, velThresh);
+        FRt_all = [FRt_all, mean(FRt_A,1,'omitnan')]; %#ok<AGROW>
+        FRr_all = [FRr_all, mean(FRr_A,1,'omitnan')]; %#ok<AGROW>
+        FRt_last = FRt_A; %#ok<NASGU>
+        FRr_last = FRr_A; %#ok<NASGU>
 
-        % flags for this run
-        useTrace   = useVelFilter && (strcmp(applyTo,'trace')   || strcmp(applyTo,'both'));
-        useNontrial= useVelFilter && (strcmp(applyTo,'nontrial')|| strcmp(applyTo,'both'));
+        % B) Figure 2 data: always compute all three series
+        [FRt_traceOnly, ~] = popVecSim(spk, posMat, csTimes, win, minSpikes, false, false, velThresh);
+        [~, FRr_noVF]       = popVecSim(spk, posMat, csTimes, win, minSpikes, false, false, velThresh);
+        [~, FRr_velF]       = popVecSim(spk, posMat, csTimes, win, minSpikes, false, true,  velThresh);
 
-        [FRt, FRr] = popVecSim(spk, posMat, csTimes, win, minSpikes, useTrace, useNontrial, velThresh);
-
-        % collapse to **per‐cell mean** across trials (omit NaNs from vel gating)
-        FRt_mean = mean(FRt, 1, 'omitnan');
-        FRr_mean = mean(FRr, 1, 'omitnan');
-
-        FRt_all = [FRt_all, FRt_mean(:)'];   %#ok<AGROW>
-        FRr_all = [FRr_all, FRr_mean(:)'];   %#ok<AGROW>
-
-        % Keep FRt/FRr from the **last dataset** for similarity distributions below
-        FRt_last = FRt; %#ok<NASGU>
-        FRr_last = FRr; %#ok<NASGU>
+        trace_means     = [trace_means,   mean(FRt_traceOnly,1,'omitnan')]; %#ok<AGROW>
+        nontrial0_means = [nontrial0_means,mean(FRr_noVF,   1,'omitnan')]; %#ok<AGROW>
+        nontrialV_means = [nontrialV_means,mean(FRr_velF,   1,'omitnan')]; %#ok<AGROW>
     end
+
+    FRt_meancell{r}  = trace_means(:);
+    FRr0_meancell{r} = nontrial0_means(:);
+    FRrV_meancell{r} = nontrialV_means(:);
 end
 
-% ==================== Trial / Random similarity (last dataset) ====================
-% (kept as‐is stylistically, but robust to NaNs from vel gating)
-FRt = FRt_last; FRr = FRr_last; %#ok<NASGU,ASGLU>  % for clarity with original code
+% ===== Similarity summary (unchanged) =====
+FRt = FRt_last; FRr = FRr_last; %#ok<NASGU,ASGLU>
+Ctt = corr(FRt','Rows','pairwise'); idxUT = triu(true(size(Ctt)),1); TT_vals = Ctt(idxUT);
+Crr = corr(FRr','Rows','pairwise'); RR_vals = Crr(idxUT);
+Ctr = corr(FRt', FRr','Rows','pairwise');  TR_vals = Ctr(:);
 
-Ctt = corr(FRt','Rows','pairwise');   % nTrials×nTrials
-idxUT = triu(true(size(Ctt)),1);
-TT_vals = Ctt(idxUT);
-
-Crr = corr(FRr','Rows','pairwise');
-RR_vals = Crr(idxUT);
-
-Ctr = corr(FRt', FRr','Rows','pairwise');  % nTrials×nTrials
-TR_vals = Ctr(:);
-
-mean_TT = mean(TT_vals,'omitnan');
-mean_TR = mean(TR_vals,'omitnan');
-mean_RR = mean(RR_vals,'omitnan');
+mean_TT = mean(TT_vals,'omitnan'); mean_TR = mean(TR_vals,'omitnan'); mean_RR = mean(RR_vals,'omitnan');
 sem_TT  = std(TT_vals,'omitnan')/sqrt(nnz(~isnan(TT_vals)));
 sem_TR  = std(TR_vals,'omitnan')/sqrt(nnz(~isnan(TR_vals)));
 sem_RR  = std(RR_vals,'omitnan')/sqrt(nnz(~isnan(RR_vals)));
-means = [mean_TT, mean_TR, mean_RR];
-sems  = [sem_TT,  sem_TR,  sem_RR];
-stds  = [std(TT_vals,'omitnan'), std(TR_vals,'omitnan'), std(RR_vals,'omitnan')];
+means = [mean_TT, mean_TR, mean_RR]; sems = [sem_TT, sem_TR, sem_RR];
 
 fprintf('Mean TT = %.3f, TR = %.3f, RR = %.3f\n', mean_TT, mean_TR, mean_RR)
-
-cols = [0 0.4470 0.7410; 0.8500 0.3250 0.0980; 0.9290 0.6940 0.1250];
 
 figure('Color','w','Position',[300 300 900 400]);
 subplot(1,2,1); hold on;
@@ -91,70 +94,85 @@ histogram(TT_vals, edges, 'Normalization','probability','FaceColor',cols(1,:), '
 histogram(TR_vals, edges, 'Normalization','probability','FaceColor',cols(2,:), 'FaceAlpha',.6);
 histogram(RR_vals, edges, 'Normalization','probability','FaceColor',cols(3,:), 'FaceAlpha',.6);
 legend('TT','TR','RR','Location','Best');
-xlabel('Pearson similarity'); ylabel('Probability');
-title('Trace vs Random pop‐vector similarities');
+xlabel('Pearson similarity'); ylabel('Probability'); title('Trace vs Random pop-vector similarities');
 
 subplot(1,2,2); hold on;
 b = bar(1:3, means, 'FaceColor','flat'); b.CData = cols;
 errorbar(1:3, means, sems, 'k.', 'LineWidth',1.5);
 xticks(1:3); xticklabels({'TT','TR','RR'}); ylabel('Mean similarity');
-title('Mean ± SEM pop‐vector similarity'); xlim([0.5 3.5]);
+title('Mean ± SEM pop-vector similarity'); xlim([0.5 3.5]);
 
-% Unpaired tests
-p_tt_tr = ranksum(TT_vals, TR_vals);
-p_tt_rr = ranksum(TT_vals, RR_vals);
+p_tt_tr = ranksum(TT_vals, TR_vals); p_tt_rr = ranksum(TT_vals, RR_vals);
 ymax = max(means + sems); dy = 0.05*ymax; y1 = ymax + dy; y2 = ymax + 2*dy;
-plot([1 2],[y1 y1],'-k','LineWidth',1.5); if p_tt_tr<.05, text(1.5,y1+0.02,'*','horiz','center','FontSize',16); end
-plot([1 3],[y2 y2],'-k','LineWidth',1.5); if p_tt_rr<.05, text(2.0,y2+0.02,'*','horiz','center','FontSize',16); end
+plot([1 2],[y1 y1],'-k','LineWidth',1.2); if p_tt_tr<.05, text(1.5,y1+0.02,'*','horiz','center','FontSize',14); end
+plot([1 3],[y2 y2],'-k','LineWidth',1.2); if p_tt_rr<.05, text(2.0,y2+0.02,'*','horiz','center','FontSize',14); end
 fprintf('TT vs TR ranksum p = %.3g\n', p_tt_tr);
 fprintf('TT vs RR ranksum p = %.3g\n', p_tt_rr);
 
-% ==================== FR distributions & ROC ====================
-figure('Color','w','Position',[300 300 900 400]);
-subplot(1,2,1); hold on;
-finiteAll = [FRt_all(isfinite(FRt_all)), FRr_all(isfinite(FRr_all))];
-if isempty(finiteAll), finiteAll = 0; end
-edges = linspace(0, max(finiteAll), 50);
-histogram(FRt_all, 'Normalization','probability','FaceAlpha',.6,'BinEdges',edges);
-histogram(FRr_all, 'Normalization','probability','FaceAlpha',.6,'BinEdges',edges);
-set(gca,'YScale','log')
-xlabel('Firing rate (Hz)'); ylabel('Probability'); legend('Trace','Non-trial','Location','Best');
-title('Trace vs Non-trial FR Distributions');
+% ===== Figure 2: per-rat + pooled (2 columns × 6 rows) =====
+FRt_pool  = vertcat(FRt_meancell{:});
+FRr0_pool = vertcat(FRr0_meancell{:});
+FRrV_pool = vertcat(FRrV_meancell{:});
 
-nT = nnz(isfinite(FRt_all)); nR = nnz(isfinite(FRr_all));
-mT = mean(FRt_all,'omitnan'); mR = mean(FRr_all,'omitnan');
-semT = std(FRt_all,'omitnan')/sqrt(max(nT,1));
-semR = std(FRr_all,'omitnan')/sqrt(max(nR,1));
-fprintf('\nTrace FR:     mean=%.2f±%.2f Hz\n', mT, std(FRt_all,'omitnan'));
-fprintf('Non-trial FR: mean=%.2f±%.2f Hz\n', mR, std(FRr_all,'omitnan'));
+figure('Color','w','Position',[200 100 1100 1600]);
+tiledlayout(6,2,'Padding','compact','TileSpacing','compact');
 
-% two-sample (unpaired), paired (lengths may differ so show unpaired only if needed)
-[~,p_unpaired] = ttest2(FRt_all(~isnan(FRt_all)), FRr_all(~isnan(FRr_all)));
-fprintf('unpaired t test p = %.3g\n', p_unpaired);
-try
-  [~,p_paired] = ttest(FRt_all, FRr_all);
-  fprintf('paired t test p = %.3g\n', p_paired);
-catch
-  fprintf('paired t test skipped (length mismatch)\n');
+for rr = 1:6
+    if rr<=nR
+        tdat  = FRt_meancell{rr};
+        r0dat = FRr0_meancell{rr};
+        rvdat = FRrV_meancell{rr};
+        rowTitle = ratNames{rr};
+    else
+        tdat  = FRt_pool;
+        r0dat = FRr0_pool;
+        rvdat = FRrV_pool;
+        rowTitle = 'All rats (pooled)';
+    end
+
+    % -------- Column 1: BAR with SEM + significance lines ----------
+    nexttile; hold on;
+    m  = [mean(tdat,'omitnan'), mean(r0dat,'omitnan'), mean(rvdat,'omitnan')];
+    n  = [nnz(isfinite(tdat)),  nnz(isfinite(r0dat)),  nnz(isfinite(rvdat))];
+    se = [std(tdat,'omitnan')/max(sqrt(n(1)),1), ...
+          std(r0dat,'omitnan')/max(sqrt(n(2)),1), ...
+          std(rvdat,'omitnan')/max(sqrt(n(3)),1)];
+    bb = bar(1:3, m, 'FaceColor','flat'); bb.CData = cols;
+    errorbar(1:3, m, se, 'k.', 'LineWidth',1.2);
+    xlim([0.5 3.5]); set(gca,'XTick',1:3,'XTickLabel',{'Trace','Nontrial','Nontrial (vel≥thr)'});
+    ylabel('Mean FR (Hz)'); title(sprintf('%s — mean FR ± SEM', rowTitle)); box on;
+
+    % significance: Trace vs Nontrial (no filter) and Trace vs Nontrial (vel)
+    p12 = paired_or_not(tdat, r0dat);  % Trace vs Nontrial
+    p13 = paired_or_not(tdat, rvdat);  % Trace vs Nontrial (vel)
+    yl = ylim; ybase = yl(2);
+    yA = ybase*0.94; yB = ybase*0.98;
+    draw_sigline(gca, 1, 2, yA, p12);
+    draw_sigline(gca, 1, 3, yB, p13);
+
+    % -------- Column 2: HISTOGRAM (Trace vs ONE Nontrial condition) --------
+    nexttile; hold on;
+    if useVelFilter
+        ndat = rvdat; lab = 'Nontrial (vel≥thr)'; c2 = cols(3,:);
+    else
+        ndat = r0dat; lab = 'Nontrial';          c2 = cols(2,:);
+    end
+    finiteAll = [tdat(isfinite(tdat)); ndat(isfinite(ndat))];
+    if isempty(finiteAll), finiteAll = 0; end
+    edges = linspace(0, max(finiteAll), 50);
+    histogram(tdat, 'BinEdges',edges,'Normalization','probability','FaceColor',cols(1,:), 'FaceAlpha',.6);
+    histogram(ndat, 'BinEdges',edges,'Normalization','probability','FaceColor',c2,         'FaceAlpha',.6);
+    ax = gca; ax.YAxis.Exponent = 0; ytickformat('%.3f');  % no scientific notation
+    xlabel('Firing rate (Hz)'); ylabel('Probability');
+    legend('Trace', lab, 'Location','best'); box on;
+    title(sprintf('%s — FR distributions', rowTitle));
 end
-[~,p_ks] = kstest2(FRt_all(~isnan(FRt_all)), FRr_all(~isnan(FRr_all)));
-fprintf('kstest2 p = %.3g\n', p_ks);
-p_rank = ranksum(FRt_all(~isnan(FRt_all)), FRr_all(~isnan(FRr_all)));
-fprintf('Wilcoxon rank-sum p = %.3g\n', p_rank);
 
-subplot(1,2,2); hold on;
-bar([1 2], [mT mR], 'FaceColor','flat'); set(gca,'XTick',[1 2],'XTickLabel',{'Trace','Non-trial'});
-errorbar([1 2], [mT mR], [semT semR], 'k.', 'LineWidth',1.5);
-ylabel('Mean firing rate (Hz)'); title('Mean FR ± SEM'); xlim([0.5 2.5]);
-if p_unpaired < 0.05
-  yl = ylim; plot([1 2],[yl(2)*0.95 yl(2)*0.95],'k-','LineWidth',1); text(1.5,yl(2)*0.97,'*','FontSize',20,'HorizontalAlignment','center');
-end
-
-% ROC & AUC (drop NaNs)
+% ===== ROC & AUC (unchanged across-all) =====
 labels = [ ones(1, nnz(isfinite(FRt_all))) , zeros(1, nnz(isfinite(FRr_all))) ];
 scores = [ FRt_all(isfinite(FRt_all)) ,      FRr_all(isfinite(FRr_all))      ];
 [Xroc,Yroc,~,AUC] = perfcurve(labels(:), scores(:), 1);
-fprintf('Trace vs non-trial FR AUC = %.3f\n', AUC);
+fprintf('\nTrace vs non-trial FR AUC = %.3f\n', AUC);
 
 figure('Color','w','Position',[350 350 500 400]);
 plot(Xroc, Yroc, 'LineWidth',2); hold on; plot([0 1],[0 1],'k--');
@@ -163,7 +181,7 @@ title(sprintf('ROC curve (AUC = %.3f)', AUC)); axis square;
 
 % Permutation test for AUC
 nShuff = 500; permAUCs = nan(nShuff,1);
-fprintf('\nRunning permutation test for AUC (n=%d)...\n', nShuff);
+fprintf('Running permutation test for AUC (n=%d)...\n', nShuff);
 for s = 1:nShuff
     permLabels = labels(randperm(length(labels)));
     [~,~,~,permAUCs(s)] = perfcurve(permLabels, scores, 1);
@@ -178,12 +196,51 @@ fprintf('Permutation p-value for AUC = %.4f\n', permP);
 end
 
 
-function [FRt,FRr] = popVecSim(spikeCell, pos, csTimes, win, minSpikes, useTraceFilter, useNontrialFilter, velThresh)
-% popVecSim  Build FR matrices for CS vs. random windows
-%   FRt: per-trial trace window FRs; FRr: per-trial random-window FRs.
-%   If useTraceFilter or useNontrialFilter are true, only count spikes
-%   when speed ≥ velThresh and divide by running time in the window.
+function p = paired_or_not(x, y)
+% Try paired tests when overlapping cells exist; robust fallbacks.
+mask = isfinite(x) & isfinite(y);
+x = x(mask); y = y(mask);
+if numel(x) >= 3 && numel(y) >= 3
+    try
+        [~,p] = ttest(x, y);
+    catch
+        try
+            p = signrank(x, y);
+        catch
+            [~,p] = ttest2(x, y);
+            if isnan(p), p = ranksum(x, y); end
+        end
+    end
+else
+    % If almost no overlap, fall back to unpaired
+    x = x(isfinite(x)); y = y(isfinite(y));
+    try
+        [~,p] = ttest2(x, y);
+    catch
+        p = ranksum(x, y);
+    end
+end
+if isnan(p), p = 1; end
+end
 
+function draw_sigline(ax, x1, x2, y, p)
+% Draw horizontal line between bars x1 and x2 at height y with stars.
+if ~isfinite(p), p = 1; end
+stars = p_to_stars(p);
+plot(ax, [x1 x2], [y y], 'k-', 'LineWidth', 1.2);
+text(mean([x1 x2]), y*1.01, stars, 'HorizontalAlignment','center','FontSize',12);
+end
+
+function s = p_to_stars(p)
+if p < 1e-3, s = '***';
+elseif p < 1e-2, s = '**';
+elseif p < 0.05, s = '*';
+else, s = 'n.s.';
+end
+end
+
+function [FRt,FRr] = popVecSim(spikeCell, pos, csTimes, win, minSpikes, useTraceFilter, useNontrialFilter, velThresh)
+% (unchanged from your version)
   if ~iscell(spikeCell)
     [nCells, ~] = size(spikeCell);
     tmp = cell(nCells,1);
@@ -200,12 +257,10 @@ function [FRt,FRr] = popVecSim(spikeCell, pos, csTimes, win, minSpikes, useTrace
   windowLen = diff(win);
   dt        = median(diff(ts));
 
-  % velocity (on its own timebase)
   vel  = ca_velocity(pos);    % [speed; time]
   vt   = vel(2,:)';
   vmag = vel(1,:)';
 
-  % mask non-CS samples on ts (for choosing random windows)
   maskCS = false(size(ts));
   for t = 1:nTrials
     maskCS = maskCS | (ts >= csTimes(t)+win(1) & ts < csTimes(t)+win(2));
@@ -224,25 +279,20 @@ function [FRt,FRr] = popVecSim(spikeCell, pos, csTimes, win, minSpikes, useTrace
     t0 = csTimes(t) + win(1);
     t1 = t0 + windowLen;
 
-    % Precompute running time in trace window (if needed)
-    if useTraceFilter
-      [~, runT_trace] = countSpikesAndRunTime([], vt, vmag, t0, t1, velThresh);
-    end
-
     for c = 1:nCells
       st = spikeCell{c};
 
-      % ---- Trace window ----
+      % Trace window
       if ~useTraceFilter
         FRt(t,c) = sum(st>=t0 & st<t1) / windowLen;
       else
         [cntT, runT] = countSpikesAndRunTime(st, vt, vmag, t0, t1, velThresh);
-        FRt(t,c) = (runT>0) * (cntT / runT);  % NaN if runT==0
+        FRt(t,c) = (runT>0) * (cntT / runT);
         if runT==0, FRt(t,c) = NaN; end
       end
 
-      % ---- Random window ----
-      sIdx = randi(maxStart);  % random start in non-CS time
+      % Random window
+      sIdx = randi(maxStart);
       r0   = outs(sIdx);
       r1   = r0 + windowLen;
 
@@ -256,7 +306,6 @@ function [FRt,FRr] = popVecSim(spikeCell, pos, csTimes, win, minSpikes, useTrace
     end
   end
 
-  % filter out cells with too few spikes in CS (based on counts, not rate)
   totalCounts = nansum(FRt,1) * windowLen;   % approximate counts over trials
   keepCells   = totalCounts >= minSpikes;
   FRt = FRt(:, keepCells);
@@ -266,27 +315,22 @@ end
 
 function [cnt, runT] = countSpikesAndRunTime(st, vt, vmag, t0, t1, velThresh)
 % Count spikes with speed ≥ velThresh and compute running time within [t0,t1)
-
-  % spikes
   if isempty(st)
-    cnt = NaN;  % if asked only for runT (caller may ignore cnt)
+    cnt = NaN;
   else
     spd_at_spk = interp1(vt, vmag, st, 'linear', 'extrap');
     inWin = (st>=t0 & st<t1) & (spd_at_spk>=velThresh);
     cnt = sum(inWin);
   end
 
-  % running time
   use = (vt>=t0 & vt<t1) & isfinite(vmag);
   if ~any(use)
-    runT = 0;
-    return;
+    runT = 0; return;
   end
   vt_use = vt(use);
   vm_use = vmag(use) >= velThresh;
   if numel(vt_use) < 2
-    runT = 0;
-    return;
+    runT = 0; return;
   end
   dt = [diff(vt_use); median(diff(vt_use),'omitnan')];
   dt(~isfinite(dt) | dt<=0) = 0;

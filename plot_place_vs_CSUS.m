@@ -4,18 +4,23 @@ function f = plot_place_vs_CSUS(animal, neuronVec, dateStr, heatmapLOW, heatmapH
 
 nNeurons = numel(neuronVec);
 plotsPerFig = 3;
-plotCounter = 0;
+plotCounter = 1;
+n_idx = [];
 
-if nNeurons>20
-CSUSspikes_lim = 35;
-highspeedspikes_lim = 10;
+
+if nNeurons>10
+CSUSspikes_lim = 25;
+highspeedspikes_lim = 5;
+MI_lim = .9
 else
   CSUSspikes_lim = 0;
   highspeedspikes_lim = 0;
+  MI_lim = 0;
 end
 
 for ni = 1:nNeurons
     neuronIdx = neuronVec(ni);
+    MI_perc = animal.MI_noCSUS15_shuff.(['MI_' dateStr])(neuronIdx,3);
     pos = animal.pos.(['pos_' dateStr]);
     peaks_time = animal.Ca_peaks.(['CA_peaks_' dateStr])(neuronIdx,:);
     calcium_ts = animal.Ca_ts.(['CA_time_' dateStr]);
@@ -24,6 +29,10 @@ for ni = 1:nNeurons
     CSUS_id = animal.CSUS_id.(['CSUS_id_' dateStr]);
     nTrials = numel(cs_times);
     postimes = pos(:,1);
+
+    if MI_perc < MI_lim
+      continue
+    end
 
     if size(calcium_ts,2) > 1
         calcium_ts = calcium_ts(:,2) ./ 1000;
@@ -68,10 +77,15 @@ for ni = 1:nNeurons
 
     if length(CSUSspikes) <= CSUSspikes_lim || length(highspeedspikes) <= highspeedspikes_lim
         continue
+    else
+      plotCounter = plotCounter+1;
+      n_idx(end+1) = ni;
     end
 
-        figure('Color','w','Position',[300 300 1000 800]);
-        subplotRow = mod(plotCounter, plotsPerFig) + 1;
+
+
+    figure('Color','w','Position',[300 300 1000 800]);
+
 
 
     % --- Plot high-speed spikes ---
@@ -79,6 +93,7 @@ for ni = 1:nNeurons
     rate(isnan(rate)) = 0;
     rate = imgaussfilt(rate, .75);
 
+    subplotRow = mod(plotCounter, plotsPerFig) + 1;
     subplot(plotsPerFig, 2, (subplotRow-1)*2 + 1);
 
 
@@ -120,6 +135,9 @@ for ni = 1:nNeurons
     colormap('parula'); colorbar;
     title(sprintf('Neuron %d (CSUS)', neuronIdx));
 
-    plotCounter = plotCounter + 1;
+
+
 end
+
+f = n_idx;
 end
