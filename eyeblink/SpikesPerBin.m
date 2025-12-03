@@ -9,7 +9,7 @@ function SpikesPerBin(ratNames, varargin)
 
 % ---------- options ----------
 p = inputParser;
-p.addParameter('Demean', true, @(x)islogical(x) && isscalar(x));
+p.addParameter('Demean', false, @(x)islogical(x) && isscalar(x));
 p.addParameter('BaselineWindow', [-0.5 0], @(v)isnumeric(v) && numel(v)==2 && v(1)<v(2));
 p.addParameter('StoreBoth', true, @(x)islogical(x) && isscalar(x));   % if true, save both raw (cpb_) and de-meaned (cpbDM_)
 p.parse(varargin{:});
@@ -98,7 +98,7 @@ end
 
 % ---------- figure: mean ± SEM per rat + grand panel ----------
 nRats = numel(ratNames);
-figure('Color','w','Position',[200 200 1200 300]);
+%figure('Color','w','Position',[200 200 1200 300]);
 
 grandMat = [];  % collect per-rat means for final panel
 
@@ -122,12 +122,13 @@ for rr = 1:nRats
     mu  = nanmean(M,1);                           % 1 × nBins
     sem = nanstd(M,0,1) ./ sqrt(sum(~isnan(M),1));
 
-    subplot(1,nRats+1,rr); hold on;
+%    subplot(1,nRats+1,rr); hold on;
 
+hold on
     yTop = max(0, max(mu+sem)*1.1);
     fill([0 2 2 0], [0 0 yTop yTop], [.9 .9 .9], 'EdgeColor','none');  % trace shading
 
-    bar(tAxis, mu, 1, 'FaceColor',[.5 .5 .8], 'EdgeColor','none');
+    bar(tAxis, mu, 1, 'FaceColor',[.5 .5 .8]);
     errorbar(tAxis, mu, sem, '.k', 'CapSize',4);
 
     yl = ylim; line([0 0], yl, 'Color','r','LineStyle','--');         % CS
@@ -145,6 +146,7 @@ for rr = 1:nRats
 end
 
 % ----------- combined panel ------------------------------------------
+%{
 grandMu  = nanmean(grandMat,1);
 grandSem = nanstd (grandMat,0,1) ./ sqrt(sum(~isnan(grandMat),1));
 
@@ -166,4 +168,6 @@ title('All rats'); box off;
 
 sgtitle(sprintf('Mean event rate per %.3f-s bin  (%.2f → %.2f s, CS at 0)', ...
         binWidth, winFull(1), winFull(2)));
+
+%}
 end

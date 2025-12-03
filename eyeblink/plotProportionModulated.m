@@ -12,6 +12,11 @@ function change = plotProportionModulated(varargin)
 %   'Eps'    : numeric epsilon added to both rates (default 0)
 %   'Alpha'  : shuffle alpha (still computed; not used in plots) (default 0.05)
 %   'NPerm'  : # shuffles per cell (default 500)
+%   'Mode'   : 'allNonTrial' (default) | 'preTrial'
+%              'allNonTrial' -> trial vs all non-trial baseline,
+%                               shuffle: random windows vs session baseline
+%              'preTrial'    -> trial vs 2 s pre-CS baseline,
+%                               shuffle: post vs pre around pseudo-CS
 
 % ---------- options ----------
 p = inputParser;
@@ -19,16 +24,19 @@ addParameter(p,'Metric','logfold',@(s) any(strcmpi(s,{'logfold','fold','symdiff'
 addParameter(p,'Eps',0,@(x) isnumeric(x)&&isscalar(x)&&x>=0);
 addParameter(p,'Alpha',0.05,@(x) isnumeric(x)&&isscalar(x)&&x>0&&x<1);
 addParameter(p,'NPerm',500,@(x) isnumeric(x)&&isscalar(x)&&x>=1);
+addParameter(p,'Mode','allNonTrial',@(s) any(strcmpi(s,{'allNonTrial','preTrial'})));
+
 parse(p,varargin{:});
 Metric = lower(p.Results.Metric);
 Eps    = p.Results.Eps;
 alpha  = p.Results.Alpha;
 nPerm  = p.Results.NPerm;
+Mode   = lower(p.Results.Mode);
 
 % ---------- config ----------
 ratNames   = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
 win        = [0 2];   % trace window relative to CS (s)
-minSpikes  = 0;       % optional per-cell inclusion threshold
+minSpikes  = 0;       % optional per-cell inclusion threshold (currently unused)
 
 nRats  = numel(ratNames);
 change = NaN(nRats,3000);   % store metric per cell per rat (size generous)
@@ -153,27 +161,57 @@ for panelIdx = 1:(nRats+1)
         nT = numel(validCS);
         if nT<1, continue, end
 
-        % trial FRs
+        % trial FRs (post-CS window defined by win)
         FRt = nan(nT,1);
         for t = 1:nT
             a = validCS(t) + win(1);
             b = a + dur;
             FRt(t) = sum(st>=a & st<b)/dur;
         end
-        FRt_mean = mean(FRt);
+        FRt_mean = mean(FRt,'omitnan');
 
-        % non-trial FR (complement of real trial windows)
-        inWin = false(size(st));
-        for t = 1:nT
-            a = validCS(t) + win(1);
-            b = a + dur;
-            inWin = inWin | (st>=a & st<b);
+        % ---------- baseline FR (observed) ----------
+        switch Mode
+            case 'allnontrial'
+                % trial vs global non-trial baseline
+                inWin = false(size(st));
+                for t = 1:nT
+                    a = validCS(t) + win(1);
+                    b = a + dur;
+                    inWin = inWin | (st>=a & st<b);
+                end
+                nSpk_non = sum(~inWin);
+                totalTime = (t1_rec - t0_rec);
+                totalNon  = totalTime - nT*dur;
+                if totalNon <= 0
+                    FRr = NaN;
+                else
+                    FRr = nSpk_non / totalNon;
+                end
+
+            case 'pretrial'
+                % trial vs 2-sec pre-CS baseline
+                preDur = 2;   % seconds
+                FRr_vec = nan(nT,1);
+
+                for t = 1:nT
+                    a = validCS(t) - preDur;   % window start
+                    b = validCS(t);            % window end
+
+                    % must be inside recording
+                    if a < t0_rec || b > t1_rec
+                        continue
+                    end
+                    FRr_vec(t) = sum(st>=a & st<b) / preDur;
+                end
+
+                % mean baseline across all valid pre-CS windows
+                FRr = mean(FRr_vec,'omitnan');
         end
-        nSpk_non = sum(~inWin);
-        totalTime = (t1_rec - t0_rec);
-        totalNon  = totalTime - nT*dur;
-        if totalNon <= 0, continue, end
-        FRr = nSpk_non / totalNon;
+
+        if ~isfinite(FRr)
+            continue
+        end
 
         % observed metric for this cell
         obsM(i) = compute_metric(FRt_mean, FRr, Metric, Eps);
@@ -181,27 +219,85 @@ for panelIdx = 1:(nRats+1)
             change(panelIdx,i) = obsM(i);
         end
 
-        % null via shuffled starts (uniform over [t0_rec, t1_rec-dur])
-        tStarts = linspace(t0_rec, t1_rec - dur, 500);
+        % ---------- null via shuffled starts ----------
         nullM = nan(nPerm,1);
-        for ip = 1:nPerm
-            samp = randsample(tStarts, nT, true);
 
-            % shuffled trial FR
-            FRs = arrayfun(@(s) sum(st >= s & st < s+dur) / dur, samp);
-            t_shuf = mean(FRs);
+        switch Mode
+            % ---------------------- Mode: allNonTrial ----------------------
+            case 'allnontrial'
+                % session-baseline null: random windows vs session complement
+                if (t1_rec - t0_rec) <= dur
+                    % too short; leave nullM as NaN
+                    % (cell won't contribute to nullCat)
+                else
+                    tStarts = linspace(t0_rec, t1_rec - dur, 500);
+                    for ip = 1:nPerm
+                        samp = randsample(tStarts, nT, true);
 
-            % shuffled non-trial FR = complement of shuffled windows
-            inWin_shuf = false(size(st));
-            for tt = 1:nT
-                a = samp(tt); b = a + dur;
-                inWin_shuf = inWin_shuf | (st >= a & st < b);
-            end
-            nSpk_non_shuf = sum(st >= t0_rec & st < t1_rec & ~inWin_shuf);
-            totalNon_shuf = (t1_rec - t0_rec) - nT*dur;
-            b_shuf = nSpk_non_shuf / max(totalNon_shuf, eps);
+                        % shuffled trial FR
+                        FRs = arrayfun(@(s) sum(st >= s & st < s+dur) / dur, samp);
+                        t_shuf = mean(FRs,'omitnan');
 
-            nullM(ip) = compute_metric(t_shuf, b_shuf, Metric, Eps);
+                        % shuffled non-trial FR = complement of shuffled windows
+                        inWin_shuf = false(size(st));
+                        for tt = 1:nT
+                            a = samp(tt); b = a + dur;
+                            inWin_shuf = inWin_shuf | (st >= a & st < b);
+                        end
+                        nSpk_non_shuf = sum(st >= t0_rec & st < t1_rec & ~inWin_shuf);
+                        totalNon_shuf = (t1_rec - t0_rec) - nT*dur;
+                        if totalNon_shuf <= 0
+                            b_shuf = NaN;
+                        else
+                            b_shuf = nSpk_non_shuf / max(totalNon_shuf, eps);
+                        end
+
+                        nullM(ip) = compute_metric(t_shuf, b_shuf, Metric, Eps);
+                    end
+                end
+
+            % ---------------------- Mode: preTrial ------------------------
+            case 'pretrial'
+                % prePostMatched null: post vs pre around pseudo-CS times
+                preDur = 2;   % seconds (match observed)
+                if (t1_rec - t0_rec) <= (preDur + dur)
+                    % not enough span to place both pre and post windows
+                    % leave nullM as NaN
+                else
+                    % choose anchors so [cs_s-preDur, cs_s+dur] is inside recording
+                    tStarts = linspace(t0_rec + preDur, t1_rec - dur, 500);
+                    for ip = 1:nPerm
+                        samp = randsample(tStarts, nT, true);
+
+                        FRt_shuf = nan(nT,1);
+                        FRr_shuf = nan(nT,1);
+
+                        for tt = 1:nT
+                            cs_s   = samp(tt);
+
+                            % post (trial) window, defined by win
+                            a_post = cs_s + win(1);
+                            b_post = a_post + dur;
+
+                            % pre window (2 s before pseudo-CS)
+                            a_pre  = cs_s - preDur;
+                            b_pre  = cs_s;
+
+                            % these should already be inside [t0_rec, t1_rec]
+                            if a_pre < t0_rec || b_post > t1_rec
+                                continue
+                            end
+
+                            FRt_shuf(tt) = sum(st >= a_post & st < b_post) / dur;
+                            FRr_shuf(tt) = sum(st >= a_pre  & st < b_pre ) / preDur;
+                        end
+
+                        t_bar = mean(FRt_shuf,'omitnan');
+                        b_bar = mean(FRr_shuf,'omitnan');
+
+                        nullM(ip) = compute_metric(t_bar, b_bar, Metric, Eps);
+                    end
+                end
         end
 
         % append this cell's null to the panel's pool
@@ -275,9 +371,12 @@ for panelIdx = 1:(nRats+1)
             if isempty(obsUse) || isempty(shfUse)
                 text(0.5,0.5,'No finite nonnegative values','HorizontalAlignment','center');
             else
-                hi = max(1.5, prctile([obsUse(:); shfUse(:)], 99.5));
+
+                hi = max(3, prctile([obsUse(:); shfUse(:)], 99.9));
+                %hi = max(obsUse(:));
                 lo = 0;
-                nBins = 24;
+                nBins = round(hi.*5);
+                %nBins = 24;
                 edges = linspace(lo, hi, nBins+1);
                 % exact edge at 1 so <1 is guaranteed to have its own bins
                 if lo < 1 && 1 < hi
@@ -300,7 +399,8 @@ for panelIdx = 1:(nRats+1)
         case 'symdiff'  % symmetric difference in [-1,1]
             obsUse  = dataAll(isfinite(dataAll));
             shfUse  = nullCat(isfinite(nullCat));
-            edges = linspace(-1,1,41);
+            %edges = linspace(-1,1,41);
+            edges = linspace(-1,2.5,41);
 
             histogram(shfUse, 'BinEdges', edges, 'Normalization','probability', ...
                       'FaceColor',colShuf); hold on
@@ -317,7 +417,7 @@ for panelIdx = 1:(nRats+1)
 end
 
 % ---- print summaries ----
-fprintf('\n=== Fraction modulated by rat (%s) ===\n', Metric);
+fprintf('\n=== Fraction modulated by rat (%s, Mode=%s) ===\n', Metric, Mode);
 for r = 1:nRats
     if nValidRat(r) > 0
         fprintf('%s: n=%d | mod=%.1f%%\n', ratNames{r}, nValidRat(r), 100*fracRat(r));
@@ -360,7 +460,6 @@ switch Metric
         m = t ./ b;
     case 'symdiff'
         denom = t + b;
-        
         if denom==0
             m = NaN;
         else

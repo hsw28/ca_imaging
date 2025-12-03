@@ -34,9 +34,9 @@ function R = speedDependence_taskVsRun_population(ratNames, varargin)
 % ---------- args ----------
 p = inputParser;
 addParameter(p,'Win',[0 2]);
-addParameter(p,'binSize',1);
-addParameter(p,'SpeedThresh',0);
-addParameter(p,'SpeedBinWidth',3);
+addParameter(p,'binSize',1/7.5);
+addParameter(p,'SpeedThresh',4);
+addParameter(p,'SpeedBinWidth',3); %3 / 6 ok
 addParameter(p,'MinDurPerBin',1/7.5);
 addParameter(p,'MinBins',1);
 addParameter(p,'MinBinsPolicy','day',@(s) any(validatestring(lower(s),{'day','lenient'})));
@@ -122,13 +122,15 @@ for r = 1:nR
             [trialSpeed, trialRatePerCell, trialEffDur] = taskBinsSpeedAndRates_withDur( ...
                 S, CS, pos(:,1), vt, vv, Win, binSize, []);   % no speed gate
         end
-        trialRatePerCell_use = normalizePerCell(trialRatePerCell, popNorm);
+     trialRatePerCell_use = normalizePerCell(trialRatePerCell, popNorm);
+    %%%    trialRatePerCell_use = zscore(trialRatePerCell);
         trialPop = aggregateAcrossCells(trialRatePerCell_use, popAgg);
 
         % ---------- non-task side: bins of length binSize, v>=vThresh ----------
         [runSpeed, runRatePerCell, runEffDur] = runBinsSpeedAndRates_withDur( ...
             S, CS, pos(:,1), vt, vv, Win, binSize, vThresh);
-        runRatePerCell_use = normalizePerCell(runRatePerCell, popNorm);
+       runRatePerCell_use = normalizePerCell(runRatePerCell, popNorm);
+    %%%    runRatePerCell_use = zscore(runRatePerCell);
         runPop = aggregateAcrossCells(runRatePerCell_use, popAgg);
 
         if isempty(trialSpeed) || isempty(runSpeed)

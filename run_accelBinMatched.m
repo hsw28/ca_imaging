@@ -8,7 +8,6 @@ if nargin<1 || isempty(ratNames)
     ratNames = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
 end
 
-
 nRats = numel(ratNames);
 
 % defaults, override via varargin
@@ -24,9 +23,6 @@ p.addParameter('win',[0 2]);            % trial window
 p.addParameter('binSize',1);            % frame/bin width (s)
 p.parse(varargin{:});
 P = p.Results;
-
-
-
 
 abort_loops = false; % Initialize a flag variable
 
@@ -75,12 +71,12 @@ for r=1:nRats
 
         medp(end+1) = median(S.pVal(isfinite(S.pVal)),'omitnan');
 
-        % Early exit criteria (match your speed version behavior)
-      %  if isnan(pct(d)) || pct(d)==0 || medp(end)>0.15
-      %      abort_loops = true;
-      %      fprintf('breaking loop bc not enough points or med p too high\n');
-      %      break;
-      %  end
+        % Early exit criteria (commented out to match current speed version behavior)
+        % if isnan(pct(d)) || pct(d)==0 || medp(end)>0.15
+        %     abort_loops = true;
+        %     fprintf('breaking loop bc not enough points or med p too high\n');
+        %     break;
+        % end
     end
 
     if abort_loops
@@ -93,39 +89,55 @@ for r=1:nRats
     R(r).deltaRate_sig = delSig;
 end
 
-if abort_loops
-    return; % Exit early
-end
 
-% === Population summaries + PLOTS (exactly mirroring the speed version) ===
-Pop      = speedBin_population_summary(       R, 'nPerm', 500, 'useSignrank', false, 'titleTag', 'Accel-bin analysis'); %#ok<NASGU>
-PopSplit = speedBin_population_summary_split(  R, 'nPerm', 500, 'useSignrank', false, 'titleTag', 'Accel-bin analysis'); %#ok<NASGU>
 
-% Correct early-exit handling
-if isstruct(PopSplit) && isfield(PopSplit,'early_exit') && PopSplit.early_exit
-    fprintf('%s\n', PopSplit.reason);
-    return;
-end
+
+
+
+
+
+
+
+
+
+
+
+% === Population summaries + PLOTS (ACCEL version) ===
+fprintf('Running ACCEL population summaries on %d rats...\n', numel(R));
+
+Pop      = accel_population_summary(       R, 'nPerm', 500, 'useSignrank', false, ...
+                                           'titleTag', 'Accel-bin analysis'); %#ok<NASGU>
+PopSplit_POP = accel_population_summary_split_POP(R, ...
+    'nPerm', 500, 'titleTag', 'Accel-bin analysis'); %#ok<NASGU>
+
+    % Early-exit check (same pattern as before; based on population summary)
+    if isstruct(PopSplit_POP) && isfield(PopSplit_POP,'early_exit') && PopSplit_POP.early_exit
+        fprintf('%s\n', PopSplit_POP.reason);
+        R = NaN;
+        return;
+    end
 
 % Per-cell sig panels
 speedBin_cellwise_sigpanels(R, 'titleTag', 'Accel-bin analysis');
-
-% Split violins: Non vs Trial
 speedBin_population_taskNon_violin(R, 'titleTag','Accel-bin analysis', ...
     'ShowData', true, 'DataAlpha', 0.15, 'Bandwidth', 0.02);
 
-% Slopegraph (per-rat Non→Trial means)
 plot_per_rat_means(R, 'Accel-bin analysis');
-
-% Δ distribution only
 plot_delta_only_fromR(R, 'Accel-bin analysis');
 
-% Paired means slopegraph (redundant view)
 plot_paired_means_slopegraph(R, 'Accel-bin analysis');
+plot_paired_means_slopegraph_POP(R,  'Accel-bin analysis (population POP)'); % NEW
 
 % Change bars (percent + fold), with SEM like in speed version
 plot_rate_change_bars(R, 'Accel-bin analysis', 'metric','percent', 'errType','sem');
 plot_rate_change_bars(R, 'Accel-bin analysis', 'metric','fold',    'errType','sem');
+
+% POPULATION (speed-matched) bars + text
+plot_rate_change_bars_POP(R, 'Accel-bin analysis', 'metric','percent', 'errType','sem');
+plot_rate_change_bars_POP(R, 'Accel-bin analysis', 'metric','fold',   'errType','sem');
+
+speedBin_dayLevel_heatmap(R, 'titleTag','Speed-bin analysis');
+speedBin_dayLevel_bars(R,    'titleTag','Speed-bin analysis');
 
 % Combo panel: Δ violin, per-rat paired violins, permutation null
 speedBin_population_combo_plots(R, ...
@@ -136,7 +148,7 @@ speedBin_population_combo_plots(R, ...
 % Per-animal mean %sig + across bar
 speedBin_sigbar_acrossAnimals(R, 'titleTag','Accel-bin analysis');
 
-end
+end   % <-- end of run_accelBinMatched
 
 
 % ======================================================================
@@ -274,20 +286,22 @@ end
 keepTemplate         = (durTrial >= MinDurPerBin) & (durNon >= MinDurPerBin);
 drop.pairedBinsAvail = sum(keepTemplate);
 
+% POPULATION accumulators (across cells, per accel bin)
+popTrialSpikes = zeros(nBins,1);   % total spikes in trial intervals per bin
+popNonSpikes   = zeros(nBins,1);   % total spikes in non-trial intervals per bin
 
-% outputs
-pVal            = nan(nCells,1);
-sigDiffFDR      = false(nCells,1);
-nBinsUsed       = zeros(nCells,1);
-meanTrialRate   = nan(nCells,1);
-meanNonTrialRate= nan(nCells,1);
-deltaRate       = nan(nCells,1);
-binRatesTrial   = cell(nCells,1);
-binRatesNon     = cell(nCells,1);
-accBinsUsed     = cell(nCells,1);
+% outputs (per-cell stats)
+pVal             = nan(nCells,1);
+sigDiffFDR       = false(nCells,1);
+nBinsUsed        = zeros(nCells,1);
+meanTrialRate    = nan(nCells,1);
+meanNonTrialRate = nan(nCells,1);
+deltaRate        = nan(nCells,1);
+binRatesTrial    = cell(nCells,1);
+binRatesNon      = cell(nCells,1);
+accBinsUsed      = cell(nCells,1);
 
 % per-cell counting
-
 for c = 1:nCells
     if ~ratemask(c), continue; end
     st = spikeCell{c};
@@ -308,6 +322,10 @@ for c = 1:nCells
             spkNon(b) = countInIntervals(st, nonIntervals{b});
         end
     end
+
+    % accumulate for POPULATION stats (only included cells)
+    popTrialSpikes = popTrialSpikes + spkTrial;
+    popNonSpikes   = popNonSpikes   + spkNon;
 
     % rates per bin (Hz) for eligible paired bins
     keep  = keepTemplate;                 % same MinDurPerBin filter for everyone
@@ -338,7 +356,6 @@ for c = 1:nCells
     nBinsUsed(c) = numel(x);
     drop.nTested = drop.nTested + 1;
 
-
     % duration-unweighted means across used bins
     meanTrialRate(c)    = mean(x,'omitnan');
     meanNonTrialRate(c) = mean(y,'omitnan');
@@ -347,6 +364,35 @@ for c = 1:nCells
     binRatesTrial{c}    = x;
     binRatesNon{c}      = y;
     accBinsUsed{c}      = binCenters(binsUsed);
+end
+
+% ---------- POPULATION rates per accel bin (matched) ----------
+pop_keep = keepTemplate & (durTrial > 0) & (durNon > 0);
+if any(pop_keep)
+    % current POP rates are *sums* across cells (Hz); we'll convert to per-cell
+    trialRatePerBin_sum = popTrialSpikes(pop_keep) ./ max(durTrial(pop_keep), eps);
+    nonRatePerBin_sum   = popNonSpikes(pop_keep)   ./ max(durNon(pop_keep),   eps);
+
+    nCells_pop = sum(ratemask);               % # cells included in POP
+    if nCells_pop < 1
+        nCells_pop = 1;
+    end
+
+    % store both, but downstream code will use the per-cell versions
+    trialRatePerBin = trialRatePerBin_sum(:) / nCells_pop;   % Hz per cell
+    nonRatePerBin   = nonRatePerBin_sum(:)   / nCells_pop;   % Hz per cell
+    deltaPerBin     = trialRatePerBin - nonRatePerBin;
+
+    stats.pop = struct( ...
+        'trialRatePerBin', trialRatePerBin(:), ...   % Hz per cell
+        'nonRatePerBin',   nonRatePerBin(:),   ...   % Hz per cell
+        'deltaPerBin',     deltaPerBin(:),     ...
+        'accelBinCenters', binCenters(pop_keep), ...
+        'nCells',          nCells_pop,        ...   % keep this for reference
+        'trialRatePerBin_sum', trialRatePerBin_sum(:), ... % optional
+        'nonRatePerBin_sum',   nonRatePerBin_sum(:));      % optional
+else
+    stats.pop = [];
 end
 
 % FDR across tested cells
@@ -375,7 +421,6 @@ stats.params             = struct('win',win,'binSize',binSize,'AccelEdges',Accel
                                   'alpha',alpha,'test',testType);
 end
 
-
 % ======================================================================
 function [h, crit_p, adj_p] = fdr_bh_local(pvals, q)
 p = pvals(:); m = numel(p);
@@ -393,7 +438,10 @@ end
 tmp = adj_p; adj_p(idx) = tmp;
 end
 
-function Pop = speedBin_population_summary(R, varargin)
+
+% ======================================================================
+
+function Pop = accel_population_summary(R, varargin)
 % Population-level inference with ONE p (no FDR):
 % (A) one-sample t/signrank on per-cell deltaRate
 % (B) permutation (sign-flip) test on the mean deltaRate
@@ -412,13 +460,13 @@ useSignrank = p.Results.useSignrank;
 titleTag    = p.Results.titleTag;
 
 % ---- collect per-cell deltas (tested cells only) & per-rat summaries ----
-delta_all   = [];
-ratNames    = {R.rat};
+delta_all    = [];
+ratNames     = {R.rat};
 perRat_means = nan(numel(R),1);
 perRat_ns    = zeros(numel(R),1);
 
 for rr = 1:numel(R)
-    perDay = R(rr).perDay;
+    perDay      = R(rr).perDay;
     del_thisRat = [];
     for d = 1:numel(perDay)
         S = perDay{d};
@@ -432,16 +480,32 @@ for rr = 1:numel(R)
     delta_all        = [delta_all; del_thisRat]; %#ok<AGROW>
 end
 
+% --- NEW: handle no usable deltas gracefully ---
+if isempty(delta_all)
+    fprintf('[accel_population_summary] No cells with finite deltaRate for %s — skipping population t-test / perms.\n', titleTag);
+    Pop = struct();
+    Pop.early_exit   = true;
+    Pop.reason       = 'no_delta_data';
+    Pop.delta_all    = [];
+    Pop.perRat_means = perRat_means;
+    Pop.perRat_ns    = perRat_ns;
+    return;
+end
+
 % ---- A) One-sample test on per-cell deltas ----
 if useSignrank
     [pA,~,statsA] = signrank(delta_all, 0);
     testA_name = 'signrank';
     Tobs_text  = sprintf('median=%.3f Hz', median(delta_all,'omitnan'));
+    df_text    = 'N/A';
+    t_text     = 'N/A';
 else
     [~,pA,~,statsA] = ttest(delta_all, 0);
     testA_name = 'one-sample t';
     Tobs_text  = sprintf('mean=%.3f Hz, t(%d)=%.2f', ...
         mean(delta_all,'omitnan'), statsA.df, statsA.tstat);
+    df_text    = sprintf('%d', statsA.df);
+    t_text     = sprintf('%.3f', statsA.tstat);
 end
 
 % ---- B) Permutation (sign-flip) test on mean ----
@@ -452,6 +516,16 @@ for b=1:nPerm
     T_perm(b) = mean(delta_all .* flips,'omitnan');
 end
 p_perm = mean(abs(T_perm) >= abs(T_obs));
+
+% ---- POPULATION PRINTOUT ----
+fprintf('\n=== Population \\Delta-rate summary (%s) ===\n', titleTag);
+fprintf('nCells_total = %d\n', numel(delta_all));
+fprintf('One-sample test on per-cell \\Delta (trial−nontrial): %s\n', testA_name);
+fprintf('  mean(Delta) = %.4f Hz, median = %.4f Hz\n', ...
+    mean(delta_all,'omitnan'), median(delta_all,'omitnan'));
+fprintf('  t/stat = %s, df = %s, p = %.4g\n', t_text, df_text, pA);
+fprintf('Permutation test on mean(Delta):\n');
+fprintf('  T_obs = %.4f Hz, p_perm = %.4g   (nPerm = %d)\n\n', T_obs, p_perm, nPerm);
 
 % ---- PLOTS ----
 figure('Color','w','Position',[180 220 1200 480]);
@@ -473,11 +547,11 @@ end
 yline(0,'k--');
 xlim([0.7 1.6]); xticks([1]); xticklabels({'All cells'});
 ylabel('\Delta rate (trial − nontrial), Hz');
-title(sprintf('Population effect %s\n%s, p=%g', titleTag, Tobs_text, pA));
+title(sprintf('Population effect %s\n%s, p=%.3g', titleTag, Tobs_text, pA));
 
 % (Right) Permutation null of mean deltaRate
 subplot(1,2,2); hold on;
-histogram(T_perm, 'Normalization','pdf','EdgeColor','none');
+histogram(T_perm, 'Normalization','percentage','EdgeColor','none');
 xline(T_obs, 'r-', 'LineWidth',2);
 yL = ylim;
 text(T_obs, 0.9*yL(2), sprintf('obs=%.3f Hz\np_{perm}=%.4g', T_obs, p_perm), ...
@@ -496,7 +570,7 @@ Pop.oneSample      = struct('test',testA_name,'p',pA,'stats',statsA,'text',Tobs_
 Pop.permutation    = struct('nPerm',nPerm,'T_obs',T_obs,'T_perm',T_perm,'p',p_perm);
 end
 
-function Pop = speedBin_population_summary_split(R, varargin)
+function Pop = accel_population_summary_split(R, varargin)
 % Left: 6 violins (5 rats + pooled "All") of per-cell Δrate
 % Right: 3x2 permutation tests (per rat + pooled)
 % EARLY EXIT: if any rat’s permutation p exceeds alphaStop, return immediately.
@@ -525,23 +599,35 @@ perRat_meanNonHz   = nan(nR,1);
 perRat_nCells      = zeros(nR,1);
 
 for rr=1:nR
-    del = []; triHz = []; nonHz = [];
+    dDel = []; dTri = []; dNon = [];
     for d=1:numel(R(rr).perDay)
         S = R(rr).perDay{d};
-        if isempty(S), continue; end
-        tested = isfinite(S.pVal);
-        del   = [del;   S.deltaRate(tested)];        %#ok<AGROW>
-        triHz = [triHz; S.meanTrialRate(tested)];    %#ok<AGROW>
-        nonHz = [nonHz; S.meanNonTrialRate(tested)]; %#ok<AGROW>
-    end
-    perRat_cellDeltas{rr}  = del;
-    perRat_cellTrialHz{rr} = triHz;
-    perRat_cellNonHz{rr}   = nonHz;
+        if isempty(S) || ~isfield(S,'pop') || isempty(S.pop)
+            continue;
+        end
 
-    perRat_nCells(rr)      = numel(del);
-    perRat_meanDelta(rr)   = mean(del,'omitnan');
-    perRat_meanTrialHz(rr) = mean(triHz,'omitnan');
-    perRat_meanNonHz(rr)   = mean(nonHz,'omitnan');
+        % convert population-summed rates to per-cell rates
+        nC = 1;
+        if isfield(S.pop,'nCells') && ~isempty(S.pop.nCells) && S.pop.nCells > 0
+            nC = S.pop.nCells;
+        end
+
+        dDel = [dDel; S.pop.deltaPerBin(:)      / nC]; %#ok<AGROW>
+        dTri = [dTri; S.pop.trialRatePerBin(:)  / nC]; %#ok<AGROW>
+        dNon = [dNon; S.pop.nonRatePerBin(:)    / nC]; %#ok<AGROW>
+    end
+    dDel = dDel(isfinite(dDel));
+    dTri = dTri(isfinite(dTri));
+    dNon = dNon(isfinite(dNon));
+
+    perRat_binDeltas{rr}   = dDel;
+    perRat_binTrialHz{rr}  = dTri;
+    perRat_binNonHz{rr}    = dNon;
+
+    perRat_nBins(rr)       = numel(dDel);
+    perRat_meanDelta(rr)   = mean(dDel,'omitnan');   % Hz per cell
+    perRat_meanTrialHz(rr) = mean(dTri,'omitnan');   % Hz per cell
+    perRat_meanNonHz(rr)   = mean(dNon,'omitnan');   % Hz per cell
 end
 
 delta_all = vertcat(perRat_cellDeltas{:});
@@ -600,20 +686,29 @@ p_perm_all = mean(abs(T_perm_all) >= abs(T_obs_all));
 if useSignrank
     [p_all,~,st_all] = signrank(delta_all, 0);
     oneText = sprintf('median=%.3f Hz', median(delta_all,'omitnan'));
+    df_text = 'N/A';
+    t_text  = 'N/A';
 else
     [~,p_all,~,st_all] = ttest(delta_all, 0);
     oneText = sprintf('mean=%.3f Hz, t(%d)=%.2f', ...
         mean(delta_all,'omitnan'), st_all.df, st_all.tstat);
+    df_text = sprintf('%d', st_all.df);
+    t_text  = sprintf('%.3f', st_all.tstat);
 end
 
-fprintf('\n=== Mean firing rates (per rat; tested cells) ===\n');
-for rr=1:nR fprintf('%s: trial=%.4f Hz nontrial=%.4f Hz Δ=%.4f Hz nCells=%d p_perm=%.4g\n', ...
-  ratNames{rr}, perRat_meanTrialHz(rr), perRat_meanNonHz(rr), ...
-  perRat_meanDelta(rr), perRat_nCells(rr), p_perm_rats(rr));
+% ---- POPULATION-LEVEL PRINT TABLE (per rat + pooled) ----
+fprintf('\n=== Mean firing rates (per rat; tested cells) — %s ===\n', titleTag);
+fprintf('%-8s  nCells  Trial_Hz  Nontrial_Hz   Delta_Hz   p_perm\n', 'Rat');
+for rr=1:nR
+    fprintf('%-8s  %6d  %8.4f  %10.4f  %8.4f   %8.4g\n', ...
+        ratNames{rr}, perRat_nCells(rr), ...
+        perRat_meanTrialHz(rr), perRat_meanNonHz(rr), ...
+        perRat_meanDelta(rr), p_perm_rats(rr));
 end
-fprintf('Pooled: trial=%.4f Hz nontrial=%.4f Hz Δ=%.4f Hz nCells=%d p_perm=%.4g\n', ...
+fprintf('Pooled:  nCells=%d  Trial=%.4f Hz  Nontrial=%.4f Hz  Δ=%.4f Hz  p_perm=%.4g  p_one=%.4g  (stat=%s, df=%s)\n\n', ...
+  numel(delta_all), ...
   mean(trial_all,'omitnan'), mean(non_all,'omitnan'), mean(delta_all,'omitnan'), ...
-  numel(delta_all), p_perm_all);
+  p_perm_all, p_all, t_text, df_text);
 
 % ---- FIGURE: top-level tiling ----
 fig = figure('Color','w','Position',[160 200 1450 560]);
@@ -653,14 +748,14 @@ for rr=1:nR
         axis(ax,'off');
         continue;
     end
-    histogram(ax, Tperm, 'Normalization','pdf','EdgeColor','none');
+    histogram(ax, Tperm, 'Normalization','percentage','EdgeColor','none');
     xline(ax, T_obs_rats(rr), 'r-', 'LineWidth',2);
     title(ax, sprintf('%s  p_{perm}=%.3g', ratNames{rr}, p_perm_rats(rr)));
     xlabel(ax,'mean \Delta rate'); ylabel(ax,'pdf');
     box(ax,'on');
 end
 ax = nexttile(subTL); hold(ax,'on');
-histogram(ax, T_perm_all, 'Normalization','pdf','EdgeColor','none');
+histogram(ax, T_perm_all, 'Normalization','percentage','EdgeColor','none');
 xline(ax, T_obs_all, 'r-', 'LineWidth',2);
 title(ax, sprintf('All  p_{perm}=%.3g', p_perm_all));
 xlabel(ax,'mean \Delta rate'); ylabel(ax,'pdf');
@@ -1116,7 +1211,7 @@ box on;
 
 % (3) Permutation histogram of mean Δ-rate
 subplot(1,3,3); hold on;
-histogram(T_perm, 'Normalization','pdf','EdgeColor','none');
+histogram(T_perm, 'Normalization','percentage','EdgeColor','none');
 xline(T_obs, 'r-', 'LineWidth',2);
 yL = ylim;
 text(T_obs, 0.9*yL(2), sprintf('obs=%.3f Hz\np_{perm}=%.4g', T_obs, p_perm), ...
@@ -1322,7 +1417,7 @@ delta_all = delta_all(isfinite(delta_all));
 
 % Plot: histogram + KDE + mean/CI
 figure('Color','w','Position',[300 300 560 420]); hold on
-histogram(delta_all,'Normalization','pdf','FaceColor',[0.75 0.85 1],'EdgeColor','none');
+histogram(delta_all,'Normalization','percentage','FaceColor',[0.75 0.85 1],'EdgeColor','none');
 [f,x] = ksdensity(delta_all); plot(x,f,'k-','LineWidth',1.8);
 xline(0,'k--');
 
@@ -1386,6 +1481,8 @@ function plot_rate_change_bars(R, titleTag, varargin)
 % errType:
 %   'sd'  (default)  -> standard deviation of per-cell change
 %   'sem'            -> sd/sqrt(n)
+%
+% Console table now includes paired t-test p for Trial vs Non-trial per rat + pooled.
 
 p = inputParser;
 p.addParameter('metric','percent',@(s) any(validatestring(s,{'percent','fold','delta'})));
@@ -1421,11 +1518,12 @@ allTri = vertcat(perRat_tri{:});
 allNon = vertcat(perRat_non{:});
 
 % ---------- per-cell paired change -> mean & error ----------
-vals   = nan(nR,1);
-errs   = nan(nR,1);
-nCells = zeros(nR,1);
+vals    = nan(nR,1);
+errs    = nan(nR,1);
+nCells  = zeros(nR,1);
 meanNon = nan(nR,1);
 meanTri = nan(nR,1);
+p_pair  = nan(nR,1);  % paired t-test p for Trial vs Non-trial rates
 
 for rr = 1:nR
     t = perRat_tri{rr}; n = perRat_non{rr};
@@ -1433,7 +1531,7 @@ for rr = 1:nR
     K = min(numel(t),numel(n));   % paired (tested cells)
     t = t(1:K); n = n(1:K);
 
-    % per-cell change
+    % per-cell change for bars
     switch metric
         case 'percent', d = 100*((t - n) ./ max(n,epsDen));
         case 'fold',    d =  (t ./ max(n,epsDen));
@@ -1449,18 +1547,29 @@ for rr = 1:nR
 
     meanTri(rr) = mean(t,'omitnan');
     meanNon(rr) = mean(n,'omitnan');
+
+    % paired t-test on Trial vs Non-trial rates for info table
+    [~,p_pair(rr)] = ttest(t, n);  % per-rat paired test in Hz
 end
 
 % pooled “All”
+Kall = min(numel(allTri), numel(allNon));
+allTri_use = allTri(1:Kall);
+allNon_use = allNon(1:Kall);
 switch metric
-    case 'percent', dAll = 100*((allTri - allNon) ./ max(allNon,epsDen));
-    case 'fold',    dAll =  (allTri ./ max(allNon,epsDen));
-    otherwise,      dAll =  (allTri - allNon);
+    case 'percent', dAll = 100*((allTri_use - allNon_use) ./ max(allNon_use,epsDen));
+    case 'fold',    dAll =  (allTri_use ./ max(allNon_use,epsDen));
+    otherwise,      dAll =  (allTri_use - allNon_use);
 end
-dAll = dAll(isfinite(dAll));
+dAll   = dAll(isfinite(dAll));
 valAll = mean(dAll,'omitnan');
 errAll = (strcmp(errType,'sem') * (std(dAll,'omitnan')/sqrt(numel(dAll)))) + ...
          (strcmp(errType,'sd')  *  std(dAll,'omitnan'));
+
+% paired t-test on pooled Trial vs Non-trial rates
+[~,p_pair_all] = ttest(allTri_use, allNon_use);
+meanTri_all = mean(allTri_use,'omitnan');
+meanNon_all = mean(allNon_use,'omitnan');
 
 vals_plot = [vals; valAll];
 errs_plot = [errs; errAll];
@@ -1468,7 +1577,7 @@ labels    = [ratNames, {'All'}];
 
 % ---------- plot ----------
 figure('Color','w','Position',[460 260 780 420]); hold on
-b = bar(vals_plot, 'FaceColor', barColor, 'EdgeColor','none');
+b = bar(vals_plot, 'FaceColor', barColor, 'EdgeColor','none'); %#ok<NASGU>
 errorbar(1:numel(vals_plot), vals_plot, errs_plot, errs_plot, '.k', 'LineWidth',1.2, 'CapSize',10);
 yline(0,'k--','HandleVisibility','off');
 
@@ -1495,36 +1604,40 @@ ymin = min(vals_plot - errs_plot); ymax = max(vals_plot + errs_plot);
 rng  = ymax - ymin; if rng<=0, rng = 1; end
 ylim([ymin - 0.10*rng, ymax + 0.12*rng]);
 
-% ---------- console printout ----------
 % ---------- console printout (matches bars) ----------
 unitLabel = struct('percent','%','fold','x','delta','Hz');
 fprintf('\n=== Non -> Trial change per rat (%s) with %s bars — values match the bars ===\n', metric, upper(errType));
-fprintf('%-8s  nCells  BarMetric(%s)   %s_low   %s_high   Non(Hz)   Trial(Hz)   Delta(Hz)\n', ...
+fprintf('%-8s  nCells  BarMetric(%s)   %s_low   %s_high   Non_Hz   Trial_Hz   Delta_Hz   p_pair\n', ...
         'Rat', unitLabel.(metric), upper(errType), upper(errType));
 
 for rr = 1:nR
     if isnan(vals(rr)), continue; end
-    % already computed above:
-    %  - vals(rr): mean per-cell change in selected metric
-    %  - errs(rr): SD/SEM
     ciLo = vals(rr) - errs(rr);
     ciHi = vals(rr) + errs(rr);
-    fprintf('%-8s  %6d  %10s   %8s  %8s   %7.4f   %8.4f   %8.4f\n', ...
+    if isnan(p_pair(rr))
+        ptxt = '   n/a ';
+    else
+        ptxt = sprintf('%.4g', p_pair(rr));
+    end
+    fprintf('%-8s  %6d  %10s   %8s  %8s   %7.4f   %8.4f   %8.4f   %7s\n', ...
         ratNames{rr}, nCells(rr), ...
         pretty_val(vals(rr), metric), ...
         pretty_val(ciLo, metric), pretty_val(ciHi, metric), ...
-        meanNon(rr), meanTri(rr), (meanTri(rr)-meanNon(rr)));
+        meanNon(rr), meanTri(rr), (meanTri(rr)-meanNon(rr)), ptxt);
 end
 
 % pooled "All"
 ciLo = valAll - errAll; ciHi = valAll + errAll;
-meanTri_all = mean(allTri,'omitnan');
-meanNon_all = mean(allNon,'omitnan');
-fprintf('%-8s  %6d  %10s   %8s  %8s   %7.4f   %8.4f   %8.4f\n\n', ...
+if isnan(p_pair_all)
+    ptxt_all = '   n/a ';
+else
+    ptxt_all = sprintf('%.4g', p_pair_all);
+end
+fprintf('%-8s  %6d  %10s   %8s  %8s   %7.4f   %8.4f   %8.4f   %7s\n\n', ...
     'All', numel(dAll), ...
     pretty_val(valAll, metric), ...
     pretty_val(ciLo,  metric), pretty_val(ciHi, metric), ...
-    meanNon_all, meanTri_all, (meanTri_all - meanNon_all));
+    meanNon_all, meanTri_all, (meanTri_all - meanNon_all), ptxt_all);
 end
 
 % ---------- helpers ----------
@@ -1588,4 +1701,513 @@ patch([x0 - w; flipud(x0 + w)], [y; flipud(y)], [0.70 0.80 0.95], ...
 mu = mean(data,'omitnan'); se = std(data,'omitnan')/sqrt(numel(data));
 plot([x0-0.12 x0+0.12],[mu mu],'k-','LineWidth',1.2);
 plot([x0 x0],[mu-se mu+se],'k-','LineWidth',1.2);
+end
+
+function Pop = accel_population_summary_split_POP(R, varargin)
+% Population-level (across cells) speed-matched summary.
+% Uses per-day S.pop.* fields (bin-wise population rates).
+%
+% Prints:
+%   === Mean POPULATION firing rates (per rat; speed-matched bins) ===
+% in the same spirit as your per-cell summary, but with nBins instead of nCells.
+
+p = inputParser;
+p.addParameter('nPerm', 500);
+p.addParameter('titleTag', '');
+p.addParameter('alphaStop', .1);
+p.parse(varargin{:});
+nPerm     = p.Results.nPerm;
+titleTag  = p.Results.titleTag;
+alphaStop = p.Results.alphaStop;
+
+nR       = numel(R);
+ratNames = {R.rat};
+
+perRat_binDeltas  = cell(nR,1);
+perRat_binTrialHz = cell(nR,1);
+perRat_binNonHz   = cell(nR,1);
+perRat_meanDelta   = nan(nR,1);
+perRat_meanTrialHz = nan(nR,1);
+perRat_meanNonHz   = nan(nR,1);
+perRat_nBins       = zeros(nR,1);
+
+for rr=1:nR
+    dDel = []; dTri = []; dNon = [];
+    for d=1:numel(R(rr).perDay)
+        S = R(rr).perDay{d};
+        if isempty(S) || ~isfield(S,'pop') || isempty(S.pop)
+            continue;
+        end
+
+        % POP fields are now Hz per cell (we converted in accelBinMatched)
+        dDel = [dDel; S.pop.deltaPerBin(:)];        %#ok<AGROW>
+        dTri = [dTri; S.pop.trialRatePerBin(:)];    %#ok<AGROW>
+        dNon = [dNon; S.pop.nonRatePerBin(:)];      %#ok<AGROW>
+    end
+    dDel = dDel(isfinite(dDel));
+    dTri = dTri(isfinite(dTri));
+    dNon = dNon(isfinite(dNon));
+
+    perRat_binDeltas{rr}  = dDel;   % Hz per cell
+    perRat_binTrialHz{rr} = dTri;   % Hz per cell
+    perRat_binNonHz{rr}   = dNon;   % Hz per cell
+
+    perRat_nBins(rr)       = numel(dDel);
+    perRat_meanDelta(rr)   = mean(dDel,'omitnan');
+    perRat_meanTrialHz(rr) = mean(dTri,'omitnan');
+    perRat_meanNonHz(rr)   = mean(dNon,'omitnan');
+end
+
+delta_all = vertcat(perRat_binDeltas{:});
+trial_all = vertcat(perRat_binTrialHz{:});
+non_all   = vertcat(perRat_binNonHz{:});
+
+% ---- EARLY-EXIT permutation per rat (bins as samples) ----
+T_obs_rats  = nan(nR,1);
+p_perm_rats = nan(nR,1);
+T_perm_rats = cell(nR,1);
+
+for rr=1:nR
+    x = perRat_binDeltas{rr};
+    x = x(isfinite(x));
+    if isempty(x)
+        continue;
+    end
+    T_obs_rats(rr) = mean(x,'omitnan');
+
+    Tperm = zeros(nPerm,1);
+    for b=1:nPerm
+        flips   = (rand(size(x))<0.5)*2 - 1;
+        Tperm(b)= mean(x .* flips,'omitnan');
+    end
+    p_perm_rats(rr) = mean(abs(Tperm) >= abs(T_obs_rats(rr)));
+    T_perm_rats{rr} = Tperm;
+
+    if p_perm_rats(rr) > alphaStop
+        Pop = struct();
+        Pop.early_exit   = true;
+        Pop.reason       = sprintf('Rat %s exceeded alphaStop (p_{perm}=%.3g > %.3g).\n\n', ...
+                                   ratNames{rr}, p_perm_rats(rr), alphaStop);
+        Pop.offending_rat= ratNames{rr};
+        Pop.p_perm_rat   = p_perm_rats(rr);
+        Pop.nPerm        = nPerm;
+        Pop.titleTag     = titleTag;
+        Pop.partial      = struct('T_obs_rats', T_obs_rats, ...
+                                  'p_perm_rats', p_perm_rats, ...
+                                  'T_perm_rats', {T_perm_rats});
+        return;
+    end
+end
+
+% ---- pooled permutation on bin-level deltas ----
+T_obs_all  = mean(delta_all,'omitnan');
+T_perm_all = zeros(nPerm,1);
+for b=1:nPerm
+    flips        = (rand(size(delta_all))<0.5)*2 - 1;
+    T_perm_all(b)= mean(delta_all .* flips,'omitnan');
+end
+p_perm_all = mean(abs(T_perm_all) >= abs(T_obs_all));
+
+% ---- console print: POPULATION mean firing rates per rat ----
+fprintf('\n=== Mean POPULATION firing rates (per rat; speed-matched bins) ===\n');
+for rr=1:nR
+    fprintf('%s: trial=%.4f Hz nontrial=%.4f Hz Δ=%.4f Hz nBins=%d p_perm=%.4g\n', ...
+        ratNames{rr}, ...
+        perRat_meanTrialHz(rr), perRat_meanNonHz(rr), perRat_meanDelta(rr), ...
+        perRat_nBins(rr), p_perm_rats(rr));
+end
+fprintf('Pooled: trial=%.4f Hz nontrial=%.4f Hz Δ=%.4f Hz nBins=%d p_perm=%.4g\n', ...
+    mean(trial_all,'omitnan'), mean(non_all,'omitnan'), mean(delta_all,'omitnan'), ...
+    numel(delta_all), p_perm_all);
+
+% ---- simple pooled permutation figure ----
+fig = figure('Color','w','Position',[200 260 520 420]); hold on;
+histogram(T_perm_all,'Normalization','percentage','EdgeColor','none');
+xline(T_obs_all,'r-','LineWidth',2);
+yL = ylim;
+text(T_obs_all,0.9*yL(2),sprintf('obs=%.3f Hz\np_{perm}=%.4g',T_obs_all,p_perm_all), ...
+    'Color','r','FontWeight','bold','HorizontalAlignment','left','VerticalAlignment','top');
+xlabel('Mean \Delta rate under sign-flip null (POP bins)');
+ylabel('Density');
+title(sprintf('POPULATION permutation (sign flip) %s', titleTag));
+box on;
+
+% ---- pack outputs ----
+Pop = struct();
+Pop.early_exit = false;
+
+Pop.perRat = struct( ...
+    'name',           ratNames(:), ...
+    'nBins',          num2cell(perRat_nBins(:)), ...
+    'binDelta',       perRat_binDeltas(:), ...
+    'binTrialHz',     perRat_binTrialHz(:), ...
+    'binNontrialHz',  perRat_binNonHz(:), ...
+    'meanDelta',      num2cell(perRat_meanDelta(:)), ...
+    'meanTrialHz',    num2cell(perRat_meanTrialHz(:)), ...
+    'meanNontrialHz', num2cell(perRat_meanNonHz(:)), ...
+    'perm_Tobs',      num2cell(T_obs_rats(:)), ...
+    'perm_p',         num2cell(p_perm_rats(:)) );
+
+Pop.pooled = struct( ...
+    'binDelta',      delta_all, ...
+    'binTrialHz',    trial_all, ...
+    'binNontrialHz', non_all, ...
+    'meanDelta',     mean(delta_all,'omitnan'), ...
+    'meanTrialHz',   mean(trial_all,'omitnan'), ...
+    'meanNontrialHz',mean(non_all,'omitnan'), ...
+    'perm_Tobs',     T_obs_all, ...
+    'perm_p',        p_perm_all, ...
+    'T_perm_all',    T_perm_all );
+
+Pop.figure = fig;
+end
+
+function plot_rate_change_bars_POP(R, titleTag, varargin)
+% POPULATION-level bar chart of change Non-trial -> Trial per rat (+ pooled).
+% Samples = speed-matched POPULATION bins (S.pop.trialRatePerBin / nonRatePerBin).
+
+p = inputParser;
+p.addParameter('metric','percent',@(s) any(validatestring(s,{'percent','fold','delta'})));
+p.addParameter('errType','sd',@(s) any(validatestring(s,{'sd','sem'})));
+p.addParameter('barColor',[0.30 0.60 0.85]);
+p.addParameter('epsDen',1e-12,@(x) isnumeric(x)&&isscalar(x)&&x>0);
+p.parse(varargin{:});
+metric   = p.Results.metric;
+errType  = p.Results.errType;
+barColor = p.Results.barColor;
+epsDen   = p.Results.epsDen;
+
+ratNames = {R.rat};
+nR       = numel(R);
+
+perRat_non = cell(nR,1);
+perRat_tri = cell(nR,1);
+for rr = 1:nR
+    tri = []; non = [];
+    for d = 1:numel(R(rr).perDay)
+        S = R(rr).perDay{d};
+        if isempty(S) || ~isfield(S,'pop') || isempty(S.pop)
+            continue;
+        end
+
+        % POP fields are now Hz per cell; just append
+        tri = [tri; S.pop.trialRatePerBin(:)];
+        non = [non; S.pop.nonRatePerBin(:)];
+    end
+    perRat_tri{rr} = tri(:);   % Hz per cell
+    perRat_non{rr} = non(:);   % Hz per cell
+end
+
+allTri = vertcat(perRat_tri{:});
+allNon = vertcat(perRat_non{:});
+
+vals       = nan(nR,1);
+errs       = nan(nR,1);
+nBinsRat   = zeros(nR,1);
+meanNon    = nan(nR,1);
+meanTri    = nan(nR,1);
+meanDelta  = nan(nR,1);    % Hz
+p_ttest    = nan(nR,1);    % NEW: per-rat POP t-test p-values
+
+for rr = 1:nR
+    t = perRat_tri{rr};
+    n = perRat_non{rr};
+    if isempty(t) || isempty(n), continue; end
+
+    K = min(numel(t),numel(n));
+    t = t(1:K);
+    n = n(1:K);
+
+    % paired t-test on bin-wise POP rates for this rat
+    if K >= 2
+        [~, p_ttest(rr)] = ttest(t, n);
+    else
+        p_ttest(rr) = NaN;
+    end
+
+    deltaBins = t - n;
+    deltaBins = deltaBins(isfinite(deltaBins));
+    if isempty(deltaBins), continue; end
+
+    nBinsRat(rr)  = numel(deltaBins);
+    meanTri(rr)   = mean(t,'omitnan');
+    meanNon(rr)   = mean(n,'omitnan');
+    meanDelta(rr) = mean(deltaBins,'omitnan');  % Hz
+
+    sHz = std(deltaBins,'omitnan');
+    if strcmpi(errType,'sem')
+        errHz = sHz / sqrt(numel(deltaBins));
+    else
+        errHz = sHz;
+    end
+
+    denom = max(meanNon(rr), epsDen);
+    switch metric
+        case 'percent'
+            vals(rr) = 100 * (meanDelta(rr) / denom);
+            errs(rr) = 100 * (errHz       / denom);
+        case 'fold'
+            vals(rr) = meanTri(rr) / denom;
+            errs(rr) = errHz       / denom;
+        otherwise
+            vals(rr) = meanDelta(rr);
+            errs(rr) = errHz;
+    end
+end
+
+% pooled across rats
+K_all      = min(numel(allTri), numel(allNon));
+allTri_use = allTri(1:K_all);
+allNon_use = allNon(1:K_all);
+
+delta_all   = allTri_use - allNon_use;
+delta_all   = delta_all(isfinite(delta_all));
+meanTri_all = mean(allTri_use,'omitnan');
+meanNon_all = mean(allNon_use,'omitnan');
+meanDelta_all = mean(delta_all,'omitnan');
+
+sHz_all = std(delta_all,'omitnan');
+if strcmpi(errType,'sem')
+    errHz_all = sHz_all / sqrt(numel(delta_all));
+else
+    errHz_all = sHz_all;
+end
+
+denomAll = max(meanNon_all, epsDen);
+switch metric
+    case 'percent'
+        valAll = 100 * (meanDelta_all / denomAll);
+        errAll = 100 * (errHz_all     / denomAll);
+    case 'fold'
+        valAll = meanTri_all / denomAll;
+        errAll = errHz_all   / denomAll;
+    otherwise
+        valAll = meanDelta_all;
+        errAll = errHz_all;
+end
+
+% pooled POP t-test
+if K_all >= 2
+    [~, p_ttest_all] = ttest(allTri_use, allNon_use);
+else
+    p_ttest_all = NaN;
+end
+
+vals_plot = [vals; valAll];
+errs_plot = [errs; errAll];
+labels    = [ratNames, {'All'}];
+
+figure('Color','w','Position',[460 260 780 420]); hold on
+bar(vals_plot, 'FaceColor', barColor, 'EdgeColor','none');
+errorbar(1:numel(vals_plot), vals_plot, errs_plot, errs_plot, '.k', ...
+    'LineWidth',1.2, 'CapSize',10);
+yline(0,'k--','HandleVisibility','off');
+
+xticks(1:numel(vals_plot)); xticklabels(labels); xtickangle(15);
+ylabel(ylabel_for_POP(metric));
+title(sprintf('POPULATION change Non \\rightarrow Trial — %s  (%s bars)', ...
+      titleTag, upper(errType)));
+box on
+
+ymin = min(vals_plot - errs_plot); ymax = max(vals_plot + errs_plot);
+rng  = ymax - ymin; if rng<=0, rng = 1; end
+ylim([ymin - 0.10*rng, ymax + 0.12*rng]);
+
+unitLabel = struct('percent','%','fold','x','delta','Hz');
+fprintf('\n=== POPULATION Non -> Trial change per rat (%s) with %s bars ===\n', ...
+    metric, upper(errType));
+fprintf('%-8s  nBins  BarMetric(%s)   %s_low   %s_high   Non(Hz)   Trial(Hz)   Delta(Hz)   p_ttest\n', ...
+        'Rat', unitLabel.(metric), upper(errType), upper(errType));
+
+for rr = 1:nR
+    if isnan(vals(rr)), continue; end
+    ciLo = vals(rr) - errs(rr);
+    ciHi = vals(rr) + errs(rr);
+    fprintf('%-8s  %6d  %10s   %8s  %8s   %7.4f   %8.4f   %8.4f   %9.3g\n', ...
+        ratNames{rr}, nBinsRat(rr), ...
+        pretty_val_POP(vals(rr), metric), ...
+        pretty_val_POP(ciLo, metric), pretty_val_POP(ciHi, metric), ...
+        meanNon(rr), meanTri(rr), (meanTri(rr)-meanNon(rr)), p_ttest(rr));
+end
+
+ciLo = valAll - errAll; ciHi = valAll + errAll;
+fprintf('%-8s  %6d  %10s   %8s  %8s   %7.4f   %8.4f   %8.4f   %9.3g\n', ...
+    'All', numel(delta_all), ...
+    pretty_val_POP(valAll, metric), ...
+    pretty_val_POP(ciLo,  metric), pretty_val_POP(ciHi, metric), ...
+    meanNon_all, meanTri_all, (meanTri_all - meanNon_all), p_ttest_all);
+end
+
+% ---- helpers ----
+function lab = ylabel_for_POP(metric)
+switch metric
+    case 'percent', lab = 'POPULATION change from non-trial (%)';
+    case 'fold',    lab = 'POPULATION fold change (Trial / Non-trial)';
+    otherwise,      lab = 'POPULATION \Delta rate (Hz)   Trial - Non-trial';
+end
+end
+
+function s = pretty_val_POP(v, metric)
+switch metric
+    case 'percent', s = sprintf('%.1f%%', v);
+    case 'fold',    s = sprintf('%.2f×',  v);
+    otherwise,      s = sprintf('%.3f',   v);
+end
+end
+
+function plot_paired_means_slopegraph_POP(R, titleTag)
+% plot_paired_means_slopegraph_POP
+% Non-trial vs Trial POPULATION means per rat, using speed/accel-matched
+% POP bins stored in S.pop.trialRatePerBin / S.pop.nonRatePerBin.
+% RATES ARE CONVERTED TO Hz PER CELL using S.pop.nCells.
+
+if nargin < 2
+    titleTag = '';
+end
+
+ratNames = {R.rat};
+nR       = numel(R);
+
+meanNon_pop = nan(nR,1);   % mean POP non-trial rate per cell (Hz)
+meanTri_pop = nan(nR,1);   % mean POP trial rate per cell (Hz)
+
+for rr = 1:nR
+    triBins = [];
+    nonBins = [];
+
+    for d = 1:numel(R(rr).perDay)
+        S = R(rr).perDay{d};
+        if isempty(S) || ~isfield(S,'pop') || isempty(S.pop)
+            continue;
+        end
+
+        % raw POP rates (sum across cells for this day)
+        tri = S.pop.trialRatePerBin(:);
+        non = S.pop.nonRatePerBin(:);
+
+        % convert to per-cell Hz using stored nCells if available
+        nC = 1;
+        if isfield(S.pop,'nCells') && ~isempty(S.pop.nCells) && S.pop.nCells > 0
+            nC = S.pop.nCells;
+        end
+
+        triBins = [triBins; tri(:) ./ nC]; %#ok<AGROW>
+        nonBins = [nonBins; non(:) ./ nC]; %#ok<AGROW>
+    end
+
+    meanTri_pop(rr) = mean(triBins,'omitnan');  % Hz per cell
+    meanNon_pop(rr) = mean(nonBins,'omitnan');  % Hz per cell
+end
+
+% use only rats with finite POP means
+valid = isfinite(meanNon_pop) & isfinite(meanTri_pop);
+if ~any(valid)
+    warning('plot_paired_means_slopegraph_POP: no finite POP means; skipping plot.');
+    return;
+end
+
+figure('Color','w','Position',[320 280 520 420]); hold on
+
+% slope lines Non -> Trial
+for rr = find(valid)'
+    plot([1 2], [meanNon_pop(rr) meanTri_pop(rr)], '-', ...
+        'Color',[0.6 0.6 0.6], 'LineWidth',1.6);
+end
+
+% points at Non and Trial
+scatter(ones(sum(valid),1), meanNon_pop(valid), 40, [0.35 0.65 0.95], 'filled');
+scatter(2*ones(sum(valid),1), meanTri_pop(valid), 40, [0.95 0.45 0.45], 'filled');
+
+xlim([0.8 2.2]);
+xticks([1 2]);
+xticklabels({'Non-trial','Trial'});
+
+valsY = [meanNon_pop(valid); meanTri_pop(valid)];
+ymin = min(valsY);
+ymax = max(valsY);
+pad  = 0.1 * max(ymax - ymin, eps);
+ylim([ymin - pad, ymax + pad]);
+
+yline(0,'k--');
+box on
+ylabel('Mean POPULATION rate per cell (Hz)');
+title(sprintf('Non vs Trial (per-rat POPULATION means) %s', titleTag));
+
+% rat labels on Non-trial side (only for valid rats)
+vIdx = find(valid);
+for ii = 1:numel(vIdx)
+    rr = vIdx(ii);
+    text(0.98, meanNon_pop(rr), ratNames{rr}, ...
+        'HorizontalAlignment','right', 'Color',[0.4 0.4 0.4]);
+end
+end
+
+function speedBin_dayLevel_heatmap(R, varargin)
+p = inputParser;
+p.addParameter('titleTag',''); p.parse(varargin{:});
+titleTag = p.Results.titleTag;
+
+ratNames = {R.rat};
+nR = numel(R);
+Pmat = nan(nR,3); Delta = nan(nR,3); N = zeros(nR,3);
+
+for rr = 1:nR
+  for d = 1:3
+    S = R(rr).perDay{d};
+    if isempty(S) || ~isfield(S,'dayLevel'), continue; end
+    Pmat(rr,d) = S.dayLevel.p;
+    Delta(rr,d)= S.dayLevel.delta;
+    N(rr,d)    = S.dayLevel.nCells;
+  end
+end
+
+Z = -log10(Pmat);
+figure('Color','w','Position',[220 220 740 420]);
+imagesc(Z); colorbar; caxis([0 5]);
+colormap(parula);
+xticks(1:3); xticklabels({'day−2','day−1','day 0'});
+yticks(1:nR); yticklabels(ratNames);
+title(sprintf('Day-level paired t across cells: -log10(p) %s', titleTag));
+for rr=1:nR
+  for d=1:3
+    if ~isnan(Z(rr,d))
+      txt = sprintf('n=%d \\Delta=%.3f', N(rr,d), Delta(rr,d));
+      text(d, rr, txt, 'Color','w', 'HorizontalAlignment','center','FontSize',8);
+    end
+  end
+end
+end
+
+function speedBin_dayLevel_bars(R, varargin)
+p = inputParser; p.addParameter('titleTag',''); p.parse(varargin{:});
+titleTag = p.Results.titleTag;
+
+ratNames = {R.rat};
+nR = numel(R);
+D = nan(nR,3); SE = nan(nR,3);
+
+for rr = 1:nR
+  for d = 1:3
+    S = R(rr).perDay{d};
+    if isempty(S) || ~isfield(S,'dayLevel'), continue; end
+    tested = isfinite(S.meanTrialRate) & isfinite(S.meanNonTrialRate);
+    diffs  = S.meanTrialRate(tested) - S.meanNonTrialRate(tested);
+    D(rr,d)= mean(diffs,'omitnan');
+    SE(rr,d)= std(diffs,'omitnan')/sqrt(sum(isfinite(diffs)));
+  end
+end
+
+figure('Color','w','Position',[220 260 1100 420]); hold on
+ng = 3; bw = 0.22; off = [-bw, 0, bw];
+for d = 1:3
+  x = (1:nR) + off(d);
+  bar(x, D(:,d), bw, 'EdgeColor','none');
+  errorbar(x, D(:,d), SE(:,d), '.k', 'LineWidth',1.2, 'CapSize',10);
+end
+yline(0,'k--');
+xticks(1:nR); xticklabels(ratNames); xtickangle(15);
+legend({'day−2','day−1','day 0'},'Location','best');
+ylabel('\Delta rate (Hz)  Trial − Non (across cells)');
+title(sprintf('Day-level paired differences (means ± SE) %s', titleTag));
+box on
 end
