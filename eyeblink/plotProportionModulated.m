@@ -17,21 +17,27 @@ function change = plotProportionModulated(varargin)
 %                               shuffle: random windows vs session baseline
 %              'preTrial'    -> trial vs 2 s pre-CS baseline,
 %                               shuffle: post vs pre around pseudo-CS
+%   'SaveMod': true/false (default false)
+%              If true, save per-rat/day p-values as:
+%                ratXXXX.mod.mod_YYYY_MM_DD (vector, len = nCells)
+%              Value = p-value per cell; NaN = not analyzed.
 
 % ---------- options ----------
 p = inputParser;
-addParameter(p,'Metric','logfold',@(s) any(strcmpi(s,{'logfold','fold','symdiff'})));
+addParameter(p,'Metric','fold',@(s) any(strcmpi(s,{'logfold','fold','symdiff'})));
 addParameter(p,'Eps',0,@(x) isnumeric(x)&&isscalar(x)&&x>=0);
 addParameter(p,'Alpha',0.05,@(x) isnumeric(x)&&isscalar(x)&&x>0&&x<1);
 addParameter(p,'NPerm',500,@(x) isnumeric(x)&&isscalar(x)&&x>=1);
 addParameter(p,'Mode','allNonTrial',@(s) any(strcmpi(s,{'allNonTrial','preTrial'})));
+addParameter(p,'SaveMod',true,@(x) (islogical(x) || isnumeric(x)));
 
 parse(p,varargin{:});
-Metric = lower(p.Results.Metric);
-Eps    = p.Results.Eps;
-alpha  = p.Results.Alpha;
-nPerm  = p.Results.NPerm;
-Mode   = lower(p.Results.Mode);
+Metric  = lower(p.Results.Metric);
+Eps     = p.Results.Eps;
+alpha   = p.Results.Alpha;
+nPerm   = p.Results.NPerm;
+Mode    = lower(p.Results.Mode);
+SaveMod = logical(p.Results.SaveMod);
 
 % ---------- config ----------
 ratNames   = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
@@ -91,13 +97,16 @@ colShuf  = [0.70 0.70 0.70];  % shuffled (null)
     end
 
 % ---------- helper to gather cells for one rat or pooled ----------
-    function cells = gather_cells(ratIdx)
+    function [cells, meta] = gather_cells(ratIdx)
         cells = struct('st',{},'cs',{},'t0',{},'t1',{});
+        meta  = struct('ratIdx',{},'dayStr',{},'cellIdx',{});
+
         if ratIdx <= nRats
             ratsToDo = ratIdx;
         else
             ratsToDo = 1:nRats; % pooled
         end
+
         for rr = ratsToDo
             rat   = evalin('base', ratNames{rr});
             dates = autoDateList(rat);
@@ -109,11 +118,12 @@ colShuf  = [0.70 0.70 0.70];  % shuffled (null)
             days  = dates(max(1,idx-2):idx);
 
             for d = 1:numel(days)
-                spk      = rat.Ca_peaks.(sprintf('CA_peaks_%s',days{d}));
-                csTimes  = rat.CS_times.(sprintf('CS_%s',days{d}));
-                ratemask = rat.ratemask.(sprintf('ratemask_%s',days{d}));
+                dayStr   = days{d};
+                spk      = rat.Ca_peaks.(sprintf('CA_peaks_%s',dayStr));
+                csTimes  = rat.CS_times.(sprintf('CS_%s',dayStr));
+                ratemask = rat.ratemask.(sprintf('ratemask_%s',dayStr));
 
-                [T0_day, T1_day, ~] = fetch_day_ts(rat, days{d}, spk);
+                [T0_day, T1_day, ~] = fetch_day_ts(rat, dayStr, spk);
 
                 [nCells,~] = size(spk);
                 for c = 1:nCells
@@ -126,6 +136,10 @@ colShuf  = [0.70 0.70 0.70];  % shuffled (null)
                     cells(end).cs   = csTimes(:);
                     cells(end).t0   = T0_day;
                     cells(end).t1   = T1_day;
+
+                    meta(end+1).ratIdx = rr;
+                    meta(end).dayStr   = dayStr;
+                    meta(end).cellIdx  = c;
                 end
             end
         end
@@ -133,7 +147,7 @@ colShuf  = [0.70 0.70 0.70];  % shuffled (null)
 
 % ---------- loop panels: 1..nRats then pooled ----------
 for panelIdx = 1:(nRats+1)
-    cells = gather_cells(panelIdx);
+    [cells, meta] = gather_cells(panelIdx);
 
     % collect all shuffles for this panel
     nullCat = [];
@@ -144,6 +158,9 @@ for panelIdx = 1:(nRats+1)
     hCell  = false(nCells,1);   % kept for summary printing
     incCell = false(nCells,1);  % used only for symdiff summaries
     decCell = false(nCells,1);
+
+    % NEW: store p-values per cell in this panel (for SaveMod)
+    pVals = nan(nCells,1);
 
     for i = 1:nCells
         st = cells(i).st;
@@ -228,7 +245,6 @@ for panelIdx = 1:(nRats+1)
                 % session-baseline null: random windows vs session complement
                 if (t1_rec - t0_rec) <= dur
                     % too short; leave nullM as NaN
-                    % (cell won't contribute to nullCat)
                 else
                     tStarts = linspace(t0_rec, t1_rec - dur, 500);
                     for ip = 1:nPerm
@@ -262,7 +278,6 @@ for panelIdx = 1:(nRats+1)
                 preDur = 2;   % seconds (match observed)
                 if (t1_rec - t0_rec) <= (preDur + dur)
                     % not enough span to place both pre and post windows
-                    % leave nullM as NaN
                 else
                     % choose anchors so [cs_s-preDur, cs_s+dur] is inside recording
                     tStarts = linspace(t0_rec + preDur, t1_rec - dur, 500);
@@ -306,17 +321,34 @@ for panelIdx = 1:(nRats+1)
         % significance (kept for printed summaries only)
         switch Metric
             case 'symdiff'
-                p_right = mean(nullM >= obsM(i));   % increase
-                p_left  = mean(nullM <= obsM(i));   % decrease
-                p_two   = mean(abs(nullM) >= abs(obsM(i)));
+                nullUse = nullM(isfinite(nullM));
+                if isempty(nullUse)
+                    p_right = NaN; p_left = NaN; p_two = NaN;
+                else
+                    p_right = mean(nullUse >= obsM(i));   % increase
+                    p_left  = mean(nullUse <= obsM(i));   % decrease
+                    p_two   = mean(abs(nullUse) >= abs(obsM(i)));
+                end
                 hCell(i)  = (p_two < alpha);
                 incCell(i)= (p_right < alpha);
                 decCell(i)= (p_left  < alpha);
+
+                % store p-value for saving: use two-sided
+                pVals(i) = p_two;
+
             otherwise
-                p_right = mean(nullM >= obsM(i));
+                nullUse = nullM(isfinite(nullM));
+                if isempty(nullUse)
+                    p_right = NaN;
+                else
+                    p_right = mean(nullUse >= obsM(i));
+                end
                 hCell(i)  = (p_right < alpha);
                 incCell(i)= hCell(i);
                 decCell(i)= false;
+
+                % store p-value for saving: right-sided
+                pVals(i) = p_right;
         end
     end
 
@@ -331,6 +363,44 @@ for panelIdx = 1:(nRats+1)
         end
     end
 
+    % ---- SAVE per-rat/day p-values into rat.mod if requested ----
+  if SaveMod && panelIdx <= nRats && nCells>0
+      rat = evalin('base', ratNames{panelIdx});
+      if ~isfield(rat,'mod') || ~isstruct(rat.mod)
+          rat.mod = struct();
+      end
+
+      % group meta entries by day
+      dayList = unique({meta.dayStr});
+      for dIdx = 1:numel(dayList)
+          dayStr = dayList{dIdx};
+          maskDay = strcmp({meta.dayStr}, dayStr);
+          if ~any(maskDay), continue, end
+
+          % true number of cells that day from CA_peaks
+          spkDay    = rat.Ca_peaks.(sprintf('CA_peaks_%s', dayStr));
+          nCellsDay = size(spkDay,1);
+
+          % default NaN for all cells (not examined)
+          vec = nan(nCellsDay,1);
+
+          % fill in p-values for examined cells
+          inds = find(maskDay);
+          for kIdx = 1:numel(inds)
+              ii   = inds(kIdx);          % index into cells/pVals/meta
+              cIdx = meta(ii).cellIdx;    % cell index in that day
+              pVal = pVals(ii);
+              if isfinite(pVal)
+                  vec(cIdx) = pVal;       % p-value per cell
+              end
+          end
+
+          fld = sprintf('mod_%s', dayStr);
+          rat.mod.(fld) = vec;
+      end
+
+      assignin('base', ratNames{panelIdx}, rat);
+  end
     % ---- plot into this panel: Observed vs Shuffled ----
     nexttile; hold on;
 
@@ -373,10 +443,8 @@ for panelIdx = 1:(nRats+1)
             else
 
                 hi = max(3, prctile([obsUse(:); shfUse(:)], 99.9));
-                %hi = max(obsUse(:));
                 lo = 0;
                 nBins = round(hi.*5);
-                %nBins = 24;
                 edges = linspace(lo, hi, nBins+1);
                 % exact edge at 1 so <1 is guaranteed to have its own bins
                 if lo < 1 && 1 < hi
@@ -399,7 +467,6 @@ for panelIdx = 1:(nRats+1)
         case 'symdiff'  % symmetric difference in [-1,1]
             obsUse  = dataAll(isfinite(dataAll));
             shfUse  = nullCat(isfinite(nullCat));
-            %edges = linspace(-1,1,41);
             edges = linspace(-1,2.5,41);
 
             histogram(shfUse, 'BinEdges', edges, 'Normalization','probability', ...

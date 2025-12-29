@@ -64,6 +64,7 @@ pPopAll = NaN(nRats,1);  pPopInc = NaN(nRats,1);
 
 %% ================= MAIN RAT LOOP ======================================
 for r = 1:nRats
+  ratNames{r}
     rat      = evalin('base',ratNames{r});
     dList    = autoDateList(rat);
     idx      = find(strcmp(dList,rat.An));
@@ -75,6 +76,7 @@ for r = 1:nRats
 
     %% ----- per-day loop -------------------------------------------
     for d = 1:3
+        d
         day    = days{d};
         spkMat = rat.Ca_peaks.(['CA_peaks_' day]);
         posRaw = rat.pos.(['pos_'       day]);  % [t x y]
@@ -104,7 +106,7 @@ for r = 1:nRats
 
         % full shuffle matrix (trials×bins×shuffles)
         shSpeed = nan(nTr,nBins,nShuff);
-        for s = 1:nShuff
+        parfor s = 1:nShuff
             for t = 1:nTr
                 shSpeed(t,:,s) = speedBins(t,randperm(nBins));
             end

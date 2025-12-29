@@ -139,12 +139,13 @@ for rr = 1:6
           std(rvdat,'omitnan')/max(sqrt(n(3)),1)];
     bb = bar(1:3, m, 'FaceColor','flat'); bb.CData = cols;
     errorbar(1:3, m, se, 'k.', 'LineWidth',1.2);
-    xlim([0.5 3.5]); set(gca,'XTick',1:3,'XTickLabel',{'Trace','Nontrial','Nontrial (vel≥thr)'});
+    xlim([0.5 3.5]); set(gca,'XTick',1:3,'XTickLabel',{'Trace-Task','Non-Trace-Task','Non-Trace-Task (vel≥thr)'});
     ylabel('Mean FR (Hz)'); title(sprintf('%s — mean FR ± SEM', rowTitle)); box on;
 
     % significance: Trace vs Nontrial (no filter) and Trace vs Nontrial (vel)
     p12 = paired_or_not(tdat, r0dat);  % Trace vs Nontrial
     p13 = paired_or_not(tdat, rvdat);  % Trace vs Nontrial (vel)
+        [nanmean(tdat), nanmean(r0dat), nanmean(rvdat)]
     yl = ylim; ybase = yl(2);
     yA = ybase*0.94; yB = ybase*0.98;
     draw_sigline(gca, 1, 2, yA, p12);
@@ -164,7 +165,7 @@ for rr = 1:6
     histogram(ndat, 'BinEdges',edges,'Normalization','probability','FaceColor',c2,         'FaceAlpha',.6);
     ax = gca; ax.YAxis.Exponent = 0; ytickformat('%.3f');  % no scientific notation
     xlabel('Firing rate (Hz)'); ylabel('Probability');
-    legend('Trace', lab, 'Location','best'); box on;
+    legend('Trace-Task', lab, 'Location','best'); box on;
     title(sprintf('%s — FR distributions', rowTitle));
 end
 

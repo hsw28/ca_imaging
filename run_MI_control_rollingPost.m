@@ -8,9 +8,9 @@ function run_MI_control_rollingPost(WEdges)
 
 % ---- analysis windows (allow negatives) ----
 if nargin < 1 || isempty(WEdges)
-    starts = -4:.5:16;                 % window start times (s)
-
-    %starts = -2:.5:14;                 % window start times (s)
+%%%    starts = -4:.5:16;                 % window start times (s)
+%%%    starts = -4:.5:12;
+  starts = -4:.25:12;
     %widths = ones(numel(starts),1)*2;  % 2-s wide windows
     widths = ones(numel(starts),1)*2;  % 2-s wide windows
     WEdges = [starts(:), starts(:)+widths(:)];
@@ -18,7 +18,9 @@ end
 
 % ---- CONTROL MATCHING OPTIONS ----
 ControlMatch = 'speed';   % 'none' | 'speed' | 'space' | 'speedspace'
-NSpeedBins   = 200;       % used when ControlMatch includes 'speed'
+%%%NSpeedBins   = 200;       % used when ControlMatch includes 'speed'
+%%%NSpeedBins   = 100;       % used when ControlMatch includes 'speed'
+NSpeedBins   = 200;
 SpaceBinSize = [];        % [] => use MI 'dim'; else numeric bin size (same units as pos)
 
 % ---- config ----
@@ -66,7 +68,7 @@ for ii = 1:numel(ratNames)
                                  nIter, WEdges, ControlMatch, NSpeedBins, SpaceBinSize);
 
     % spike-count parity (optional)
-    print_spike_count_parity(out, ratVar);
+    %print_spike_count_parity(out, ratVar);
 
     % aggregate per animal: Δ, Rand, Win curves
     [centersW, curveDeltaW, curveRandW, curveWinW, delta_allPoints, dayMeans] = ...

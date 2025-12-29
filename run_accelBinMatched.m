@@ -13,7 +13,7 @@ nRats = numel(ratNames);
 % defaults, override via varargin
 p = inputParser;
 p.addParameter('AccelMode','signed', @(s) any(validatestring(lower(s),{'signed','magnitude'}))); % 'signed' = d|v|/dt; 'magnitude' = ||a||
-p.addParameter('AccelBinWidth',3);      % acceleration units (e.g., cm/s^2)
+p.addParameter('AccelBinWidth',2);      % acceleration units (e.g., cm/s^2)
 p.addParameter('AccelEdges',[]);
 p.addParameter('MinDurPerBin',(1/7.5));       % seconds required per side in each accel bin
 p.addParameter('MinBins',1);
@@ -147,6 +147,15 @@ speedBin_population_combo_plots(R, ...
 
 % Per-animal mean %sig + across bar
 speedBin_sigbar_acrossAnimals(R, 'titleTag','Accel-bin analysis');
+
+plot_cell_scatter_trial_vs_non(R, ...
+    'titleTag','Speed-bin analysis (ALL CELLS)', ...
+    'perRatPanels', false, ...   % <- single pooled panel
+    'logAxes', false, ...
+    'alpha', 0.12, ...
+    'markerSize', 8, ...
+    'unityLine', true, ...
+    'fitLine', false);
 
 end   % <-- end of run_accelBinMatched
 
@@ -369,28 +378,27 @@ end
 % ---------- POPULATION rates per accel bin (matched) ----------
 pop_keep = keepTemplate & (durTrial > 0) & (durNon > 0);
 if any(pop_keep)
-    % current POP rates are *sums* across cells (Hz); we'll convert to per-cell
-    trialRatePerBin_sum = popTrialSpikes(pop_keep) ./ max(durTrial(pop_keep), eps);
-    nonRatePerBin_sum   = popNonSpikes(pop_keep)   ./ max(durNon(pop_keep),   eps);
 
-    nCells_pop = sum(ratemask);               % # cells included in POP
-    if nCells_pop < 1
-        nCells_pop = 1;
-    end
+    % summed across included cells (Hz, NOT per cell)
+    trialRateHz_sum = popTrialSpikes(pop_keep) ./ max(durTrial(pop_keep), eps);
+    nonRateHz_sum   = popNonSpikes(pop_keep)   ./ max(durNon(pop_keep),   eps);
 
-    % store both, but downstream code will use the per-cell versions
-    trialRatePerBin = trialRatePerBin_sum(:) / nCells_pop;   % Hz per cell
-    nonRatePerBin   = nonRatePerBin_sum(:)   / nCells_pop;   % Hz per cell
-    deltaPerBin     = trialRatePerBin - nonRatePerBin;
+    nCells_pop = sum(ratemask);
+    nCells_pop = max(nCells_pop, 1);
+
+    % per-cell versions (Hz per cell)
+    trialRateHz_perCell = trialRateHz_sum / nCells_pop;
+    nonRateHz_perCell   = nonRateHz_sum   / nCells_pop;
+    deltaHz_perCell     = trialRateHz_perCell - nonRateHz_perCell;
 
     stats.pop = struct( ...
-        'trialRatePerBin', trialRatePerBin(:), ...   % Hz per cell
-        'nonRatePerBin',   nonRatePerBin(:),   ...   % Hz per cell
-        'deltaPerBin',     deltaPerBin(:),     ...
-        'accelBinCenters', binCenters(pop_keep), ...
-        'nCells',          nCells_pop,        ...   % keep this for reference
-        'trialRatePerBin_sum', trialRatePerBin_sum(:), ... % optional
-        'nonRatePerBin_sum',   nonRatePerBin_sum(:));      % optional
+        'trialRateHz_perCell', trialRateHz_perCell(:), ...
+        'nonRateHz_perCell',   nonRateHz_perCell(:),   ...
+        'deltaHz_perCell',     deltaHz_perCell(:),     ...
+        'trialRateHz_sum',     trialRateHz_sum(:),     ...
+        'nonRateHz_sum',       nonRateHz_sum(:),       ...
+        'accelBinCenters',     binCenters(pop_keep),   ...
+        'nCells',              nCells_pop );
 else
     stats.pop = [];
 end
@@ -1390,16 +1398,10 @@ for rr=1:numel(R)
     mTri(rr) = mean(tri,'omitnan');
 end
 
-figure('Color','w','Position',[300 300 650 420]); hold on
-x = (1:numel(R))';
-plot([x x]', [mNon mTri]','-','Color',[.7 .7 .7]);                 % connectors
-scatter(x-0.05,mNon,60,[0.50 0.70 0.95],'filled','MarkerEdgeColor','k');
-scatter(x+0.05,mTri,60,[0.95 0.60 0.50],'filled','MarkerEdgeColor','k');
-xlim([0.5 numel(R)+0.5]); xticks(x); xticklabels(names); xtickangle(15)
-ylabel('Mean rate per tested cell (Hz)'); yline(0,'k--'); box on
-legend({'paired mean per rat','Non-trial','Trial'},'Location','best')
-title(sprintf('Non vs Trial (per-rat means) %s',titleTag))
+
 end
+
+
 
 function plot_delta_only_fromR(R, titleTag)
 % Build pooled, within-cell deltas
@@ -1433,10 +1435,22 @@ title(sprintf('\\Delta = Trial − Non-trial  (mean=%.3f Hz, 95%% CI [%.3f %.3f]
 xlabel('\Delta rate (Hz)'); ylabel('Density'); box on
 end
 
-function plot_paired_means_slopegraph(R, titleTag)
+function plot_paired_means_slopegraph(R, titleTag, varargin)
+% plot_paired_means_slopegraph
+% Per-rat mean (across tested cells) Non-trial vs Trial, with grand-mean line.
+
 if nargin<2, titleTag = ''; end
+
+p = inputParser;
+p.addParameter('ShowSEM', true, @islogical);   % across-rat SEM on the grand mean
+p.addParameter('MeanColor', [0 0 0]);
+p.addParameter('MeanLineWidth', 3);
+p.parse(varargin{:});
+P = p.Results;
+
 ratNames = {R.rat};
 nR = numel(R);
+
 meanNon = nan(nR,1);
 meanTri = nan(nR,1);
 
@@ -1445,29 +1459,53 @@ for rr = 1:nR
     for d = 1:numel(R(rr).perDay)
         S = R(rr).perDay{d}; if isempty(S), continue; end
         tested = isfinite(S.pVal);
-        tri = [tri; S.meanTrialRate(tested)];
-        non = [non; S.meanNonTrialRate(tested)];
+        tri = [tri; double(S.meanTrialRate(tested))]; %#ok<AGROW>
+        non = [non; double(S.meanNonTrialRate(tested))]; %#ok<AGROW>
     end
     meanTri(rr) = mean(tri,'omitnan');
     meanNon(rr) = mean(non,'omitnan');
 end
 
+valid = isfinite(meanNon) & isfinite(meanTri);
+if ~any(valid), return; end
+
 figure('Color','w','Position',[300 260 520 420]); hold on
-for rr = 1:nR
+
+% per-rat slope lines
+for rr = find(valid)'
     plot([1 2], [meanNon(rr) meanTri(rr)], '-', 'Color',[.6 .6 .6], 'LineWidth',1.6);
 end
-scatter(ones(nR,1), meanNon, 40, [0.35 0.65 0.95], 'filled');
-scatter(2*ones(nR,1), meanTri, 40, [0.95 0.45 0.45], 'filled');
+scatter(ones(sum(valid),1), meanNon(valid), 40, [0.35 0.65 0.95], 'filled');
+scatter(2*ones(sum(valid),1), meanTri(valid), 40, [0.95 0.45 0.45], 'filled');
+
+% ----- grand mean across rats -----
+muNon = mean(meanNon(valid),'omitnan');
+muTri = mean(meanTri(valid),'omitnan');
+
+plot([1 2], [muNon muTri], '-', 'Color', P.MeanColor, 'LineWidth', P.MeanLineWidth);
+scatter(1, muNon, 80, P.MeanColor, 'filled');
+scatter(2, muTri, 80, P.MeanColor, 'filled');
+
+if P.ShowSEM
+    semNon = std(meanNon(valid),'omitnan') / sqrt(sum(valid));
+    semTri = std(meanTri(valid),'omitnan') / sqrt(sum(valid));
+    errorbar(1, muNon, semNon, 'Color', P.MeanColor, 'LineWidth',1.6, 'CapSize',10);
+    errorbar(2, muTri, semTri, 'Color', P.MeanColor, 'LineWidth',1.6, 'CapSize',10);
+end
+
+% cosmetics
 xlim([0.8 2.2]); xticks([1 2]); xticklabels({'Non-trial','Trial'});
-ymin = min([meanNon; meanTri]); ymax = max([meanNon; meanTri]); pad = 0.1*max(ymax-ymin,eps);
+valsY = [meanNon(valid); meanTri(valid)];
+ymin = min(valsY); ymax = max(valsY); pad = 0.1*max(ymax-ymin,eps);
 ylim([ymin - pad, ymax + pad]); yline(0,'k--'); box on
 ylabel('Mean rate per tested cell (Hz)');
 title(sprintf('Non vs Trial (per-rat means) %s', titleTag));
-for rr = 1:nR
+
+% rat labels on Non side
+for rr = find(valid)'
     text(0.98, meanNon(rr), ratNames{rr}, 'HorizontalAlignment','right','Color',[.4 .4 .4]);
 end
 end
-
 
 function plot_rate_change_bars(R, titleTag, varargin)
 % Bar chart of change from Non-trial -> Trial per rat (+ pooled "All").
@@ -1740,9 +1778,9 @@ for rr=1:nR
         end
 
         % POP fields are now Hz per cell (we converted in accelBinMatched)
-        dDel = [dDel; S.pop.deltaPerBin(:)];        %#ok<AGROW>
-        dTri = [dTri; S.pop.trialRatePerBin(:)];    %#ok<AGROW>
-        dNon = [dNon; S.pop.nonRatePerBin(:)];      %#ok<AGROW>
+        dDel = [dDel; S.pop.deltaHz_perCell(:)];
+        dTri = [dTri; S.pop.trialRateHz_perCell(:)];
+        dNon = [dNon; S.pop.nonRateHz_perCell(:)];
     end
     dDel = dDel(isfinite(dDel));
     dTri = dTri(isfinite(dTri));
@@ -1891,8 +1929,8 @@ for rr = 1:nR
         end
 
         % POP fields are now Hz per cell; just append
-        tri = [tri; S.pop.trialRatePerBin(:)];
-        non = [non; S.pop.nonRatePerBin(:)];
+        tri = [tri; S.pop.trialRateHz_perCell(:)];
+        non = [non; S.pop.nonRateHz_perCell(:)];
     end
     perRat_tri{rr} = tri(:);   % Hz per cell
     perRat_non{rr} = non(:);   % Hz per cell
@@ -2055,21 +2093,24 @@ switch metric
 end
 end
 
-function plot_paired_means_slopegraph_POP(R, titleTag)
+function plot_paired_means_slopegraph_POP(R, titleTag, varargin)
 % plot_paired_means_slopegraph_POP
-% Non-trial vs Trial POPULATION means per rat, using speed/accel-matched
-% POP bins stored in S.pop.trialRatePerBin / S.pop.nonRatePerBin.
-% RATES ARE CONVERTED TO Hz PER CELL using S.pop.nCells.
+% Per-rat POP means Non-trial vs Trial (Hz per cell), with grand-mean line.
 
-if nargin < 2
-    titleTag = '';
-end
+if nargin < 2, titleTag = ''; end
+
+p = inputParser;
+p.addParameter('ShowSEM', true, @islogical);   % across-rat SEM on the grand mean
+p.addParameter('MeanColor', [0 0 0]);
+p.addParameter('MeanLineWidth', 3);
+p.parse(varargin{:});
+P = p.Results;
 
 ratNames = {R.rat};
 nR       = numel(R);
 
-meanNon_pop = nan(nR,1);   % mean POP non-trial rate per cell (Hz)
-meanTri_pop = nan(nR,1);   % mean POP trial rate per cell (Hz)
+meanNon_pop = nan(nR,1);
+meanTri_pop = nan(nR,1);
 
 for rr = 1:nR
     triBins = [];
@@ -2077,29 +2118,26 @@ for rr = 1:nR
 
     for d = 1:numel(R(rr).perDay)
         S = R(rr).perDay{d};
-        if isempty(S) || ~isfield(S,'pop') || isempty(S.pop)
-            continue;
+        if isempty(S) || ~isfield(S,'pop') || isempty(S.pop), continue; end
+
+        % per-cell POP rates (Hz per cell)
+        if isfield(S.pop,'trialRateHz_perCell')
+            tri = S.pop.trialRateHz_perCell(:);
+            non = S.pop.nonRateHz_perCell(:);
+        else
+            % fallback if you haven't renamed yet
+            tri = S.pop.trialRatePerBin(:);
+            non = S.pop.nonRatePerBin(:);
         end
 
-        % raw POP rates (sum across cells for this day)
-        tri = S.pop.trialRatePerBin(:);
-        non = S.pop.nonRatePerBin(:);
-
-        % convert to per-cell Hz using stored nCells if available
-        nC = 1;
-        if isfield(S.pop,'nCells') && ~isempty(S.pop.nCells) && S.pop.nCells > 0
-            nC = S.pop.nCells;
-        end
-
-        triBins = [triBins; tri(:) ./ nC]; %#ok<AGROW>
-        nonBins = [nonBins; non(:) ./ nC]; %#ok<AGROW>
+        triBins = [triBins; tri]; %#ok<AGROW>
+        nonBins = [nonBins; non]; %#ok<AGROW>
     end
 
-    meanTri_pop(rr) = mean(triBins,'omitnan');  % Hz per cell
-    meanNon_pop(rr) = mean(nonBins,'omitnan');  % Hz per cell
+    meanTri_pop(rr) = mean(triBins,'omitnan');
+    meanNon_pop(rr) = mean(nonBins,'omitnan');
 end
 
-% use only rats with finite POP means
 valid = isfinite(meanNon_pop) & isfinite(meanTri_pop);
 if ~any(valid)
     warning('plot_paired_means_slopegraph_POP: no finite POP means; skipping plot.');
@@ -2108,37 +2146,39 @@ end
 
 figure('Color','w','Position',[320 280 520 420]); hold on
 
-% slope lines Non -> Trial
+% per-rat slope lines
 for rr = find(valid)'
-    plot([1 2], [meanNon_pop(rr) meanTri_pop(rr)], '-', ...
-        'Color',[0.6 0.6 0.6], 'LineWidth',1.6);
+    plot([1 2], [meanNon_pop(rr) meanTri_pop(rr)], '-', 'Color',[0.6 0.6 0.6], 'LineWidth',1.6);
 end
-
-% points at Non and Trial
 scatter(ones(sum(valid),1), meanNon_pop(valid), 40, [0.35 0.65 0.95], 'filled');
 scatter(2*ones(sum(valid),1), meanTri_pop(valid), 40, [0.95 0.45 0.45], 'filled');
 
-xlim([0.8 2.2]);
-xticks([1 2]);
-xticklabels({'Non-trial','Trial'});
+% ----- grand mean across rats -----
+muNon = mean(meanNon_pop(valid),'omitnan');
+muTri = mean(meanTri_pop(valid),'omitnan');
 
+plot([1 2], [muNon muTri], '-', 'Color', P.MeanColor, 'LineWidth', P.MeanLineWidth);
+scatter(1, muNon, 80, P.MeanColor, 'filled');
+scatter(2, muTri, 80, P.MeanColor, 'filled');
+
+if P.ShowSEM
+    semNon = std(meanNon_pop(valid),'omitnan') / sqrt(sum(valid));
+    semTri = std(meanTri_pop(valid),'omitnan') / sqrt(sum(valid));
+    errorbar(1, muNon, semNon, 'Color', P.MeanColor, 'LineWidth',1.6, 'CapSize',10);
+    errorbar(2, muTri, semTri, 'Color', P.MeanColor, 'LineWidth',1.6, 'CapSize',10);
+end
+
+% cosmetics
+xlim([0.8 2.2]); xticks([1 2]); xticklabels({'Non-trial','Trial'});
 valsY = [meanNon_pop(valid); meanTri_pop(valid)];
-ymin = min(valsY);
-ymax = max(valsY);
-pad  = 0.1 * max(ymax - ymin, eps);
+ymin = min(valsY); ymax = max(valsY); pad = 0.1*max(ymax-ymin,eps);
 ylim([ymin - pad, ymax + pad]);
+yline(0,'k--'); box on
+ylabel('Mean POP rate per cell (Hz)');
+title(sprintf('Non vs Trial (per-rat POP means) %s', titleTag));
 
-yline(0,'k--');
-box on
-ylabel('Mean POPULATION rate per cell (Hz)');
-title(sprintf('Non vs Trial (per-rat POPULATION means) %s', titleTag));
-
-% rat labels on Non-trial side (only for valid rats)
-vIdx = find(valid);
-for ii = 1:numel(vIdx)
-    rr = vIdx(ii);
-    text(0.98, meanNon_pop(rr), ratNames{rr}, ...
-        'HorizontalAlignment','right', 'Color',[0.4 0.4 0.4]);
+for rr = find(valid)'
+    text(0.98, meanNon_pop(rr), ratNames{rr}, 'HorizontalAlignment','right','Color',[0.4 0.4 0.4]);
 end
 end
 
@@ -2210,4 +2250,158 @@ legend({'day−2','day−1','day 0'},'Location','best');
 ylabel('\Delta rate (Hz)  Trial − Non (across cells)');
 title(sprintf('Day-level paired differences (means ± SE) %s', titleTag));
 box on
+end
+
+
+function plot_cell_scatter_trial_vs_non(R, varargin)
+% plot_cell_scatter_trial_vs_non
+% Scatter of each tested cell:
+%   x = speed-matched non-trial mean rate (S.meanNonTrialRate)
+%   y = trial mean rate (S.meanTrialRate)
+% Tested cells are defined by tested = isfinite(S.pVal).
+%
+% Works with R from run_speedBinMatched.
+
+p = inputParser;
+p.addParameter('titleTag','',@(s)ischar(s)||isstring(s));
+p.addParameter('perRatPanels',true,@islogical);     % true: one panel per rat; false: pooled only
+p.addParameter('includePooled',true,@islogical);    % if perRatPanels, adds an "All" panel
+p.addParameter('logAxes',false,@islogical);         % log-log axes (protects with epsLog)
+p.addParameter('alpha',0.15,@(x)isnumeric(x)&&isscalar(x)&&x>0&&x<=1);
+p.addParameter('markerSize',8,@(x)isnumeric(x)&&isscalar(x)&&x>0);
+p.addParameter('unityLine',true,@islogical);        % plot y=x
+p.addParameter('fitLine',false,@islogical);         % least-squares y = a + b x (linear space)
+p.addParameter('epsLog',1e-6,@(x)isnumeric(x)&&isscalar(x)&&x>0);
+p.parse(varargin{:});
+P = p.Results;
+
+ratNames = {R.rat};
+nR       = numel(R);
+
+% ---- collect per-rat paired points (x=non, y=trial) ----
+XY = cell(nR,1);
+for rr = 1:nR
+    x = []; y = [];
+    for d = 1:numel(R(rr).perDay)
+        S = R(rr).perDay{d};
+        if isempty(S), continue; end
+        if ~isfield(S,'pVal') || ~isfield(S,'meanTrialRate') || ~isfield(S,'meanNonTrialRate')
+            continue;
+        end
+
+        tested = isfinite(S.pVal);
+        xt = double(S.meanNonTrialRate(tested));
+        yt = double(S.meanTrialRate(tested));
+
+        ok = isfinite(xt) & isfinite(yt);
+        x  = [x; xt(ok)]; %#ok<AGROW>
+        y  = [y; yt(ok)]; %#ok<AGROW>
+    end
+    XY{rr} = [x y];
+end
+
+XY_all = vertcat(XY{:});
+if isempty(XY_all)
+    fprintf('plot_cell_scatter_trial_vs_non: no tested cells found.\n');
+    return;
+end
+
+% ---- figure layout ----
+if P.perRatPanels
+    nPanels = nR + double(P.includePooled);
+    nCols   = min(3, nPanels);
+    nRows   = ceil(nPanels / nCols);
+    figW = 420*nCols;
+    figH = 360*nRows;
+    figure('Color','w','Position',[120 140 figW figH]);
+    tiledlayout(nRows,nCols,'Padding','compact','TileSpacing','compact');
+else
+    figure('Color','w','Position',[240 240 520 460]);
+    tiledlayout(1,1,'Padding','compact','TileSpacing','compact');
+end
+
+% ---- helper for a single panel ----
+    function plot_one(ax, x, y, ttl)
+        axes(ax); %#ok<LAXES>
+        hold on;
+
+        if isempty(x)
+            title(ttl);
+            axis square; box on;
+            xlabel('Non-trial (speed-matched) rate (Hz)');
+            ylabel('Trial rate (Hz)');
+            return;
+        end
+
+        if P.logAxes
+            x = max(x, P.epsLog);
+            y = max(y, P.epsLog);
+            set(gca,'XScale','log','YScale','log');
+        end
+
+        h = scatter(x, y, P.markerSize, 'k', 'filled');
+        if isprop(h,'MarkerFaceAlpha')
+            h.MarkerFaceAlpha = P.alpha;
+            h.MarkerEdgeAlpha = P.alpha;
+        end
+
+        % axis limits shared by x and y so unity line is meaningful
+        xl = xlim; yl = ylim;
+        lo = min([xl(1) yl(1)]);
+        hi = max([xl(2) yl(2)]);
+        if ~(isfinite(lo) && isfinite(hi)) || lo==hi
+            lo = 0; hi = 1;
+        end
+        xlim([lo hi]); ylim([lo hi]);
+
+        if P.unityLine
+            plot([lo hi],[lo hi],'r--','LineWidth',1.1);
+        end
+
+        if P.fitLine && numel(x) >= 2
+            % simple linear fit in linear space; for logAxes this is still fit in linear values
+            X = [ones(size(x)) x];
+            beta = X \ y;
+            xx = linspace(lo, hi, 200);
+            yy = beta(1) + beta(2)*xx;
+            plot(xx, yy, 'b-', 'LineWidth',1.2);
+        end
+
+        axis square; box on
+        xlabel('Non-trial (speed-matched) rate (Hz)');
+        ylabel('Trial rate (Hz)');
+        title(ttl);
+
+        % lightweight stats readout
+        if numel(x) >= 3
+            r = corr(x(:), y(:), 'type','Pearson','rows','complete');
+        else
+            r = NaN;
+        end
+        fc = y ./ max(x, P.epsLog);
+        fc = fc(isfinite(fc));
+        if ~isempty(fc)
+            txt = sprintf('n=%d  med fold=%.3g  r=%.2f', numel(fc), median(fc,'omitnan'), r);
+            text(0.02, 0.98, txt, 'Units','normalized', 'VerticalAlignment','top', 'FontSize',9);
+        end
+    end
+
+% ---- draw panels ----
+if P.perRatPanels
+    for rr = 1:nR
+        ax = nexttile;
+        x = XY{rr}(:,1);
+        y = XY{rr}(:,2);
+        plot_one(ax, x, y, ratNames{rr});
+    end
+    if P.includePooled
+        ax = nexttile;
+        plot_one(ax, XY_all(:,1), XY_all(:,2), 'All rats');
+    end
+    sgtitle(sprintf('Trial vs speed-matched non-trial (tested cells) — %s', string(P.titleTag)));
+else
+    ax = nexttile;
+    plot_one(ax, XY_all(:,1), XY_all(:,2), sprintf('All rats — %s', string(P.titleTag)));
+end
+
 end

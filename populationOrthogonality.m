@@ -26,8 +26,8 @@ function R = populationOrthogonality(ratName, varargin)
 
 p = inputParser;
 addParameter(p,'WinSecs',[0 2], @(v) isnumeric(v) && numel(v)==2 && v(2)>v(1));
-addParameter(p,'NSplits',16, @(x) isnumeric(x) && isscalar(x) && x>=2);
-addParameter(p,'Mode','raw',@(s) any(validatestring(s,{'raw','demean','zscore'})));
+addParameter(p,'NSplits',15, @(x) isnumeric(x) && isscalar(x) && x>=2);
+addParameter(p,'Mode','demean',@(s) any(validatestring(s,{'raw','demean','zscore'})));
 addParameter(p,'Similarity','pearson',@(s) any(validatestring(lower(s),{'cosine','pearson','spearman'})));
 addParameter(p,'MICutoff',[],@(x) isempty(x) || (isscalar(x)&&isfinite(x)));
 addParameter(p,'MIExcludeCutoff',[],@(x) isempty(x) || (isscalar(x)&&isfinite(x)));

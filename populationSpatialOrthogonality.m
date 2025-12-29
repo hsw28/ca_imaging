@@ -5,11 +5,11 @@ function R = populationSpatialOrthogonality(ratName, varargin)
 
 % ---------------- parse shared args ----------------
 p = inputParser;
-addParameter(p,'NBins',16, @(x) isnumeric(x)&&isscalar(x)&&x>=2);
+addParameter(p,'NBins',15, @(x) isnumeric(x)&&isscalar(x)&&x>=2);
 addParameter(p,'GridRC',[],@(v) (isempty(v) || (isnumeric(v) && numel(v)==2 && all(v>=1))));
-addParameter(p,'BinMode','equal_size',@(s) any(strcmpi(s,{'equal_occ','equal_size'})));
+addParameter(p,'BinMode','equal_occ',@(s) any(strcmpi(s,{'equal_occ','equal_size'})));
 addParameter(p,'MinSpeed',4,@(x) isnumeric(x)&&isscalar(x)&&x>=0);
-addParameter(p,'Mode','raw',@(s) any(strcmpi(s,{'raw','demean','zscore'})));
+addParameter(p,'Mode','demean',@(s) any(strcmpi(s,{'raw','demean','zscore'})));
 addParameter(p,'Similarity','corr',@(s) any(strcmpi(s,{'cosine','corr','pearson'})));
 addParameter(p,'Adjacency','rook',@(s) any(strcmpi(s,{'moore','rook'})));
 addParameter(p,'Days',[],@(d) ischar(d) || isstring(d) || iscellstr(d) || isempty(d));
@@ -244,8 +244,10 @@ end
 
 % ===================== SINGLE-RAT VIEW (grid-aware) =====================
 function R = populationSpatialOrthogonality_singleRat(ratName, varargin)
-% Same computations as before, but now emits a 2x4 figure per-animal:
-% top row: day1, day2, day3, pooled; bottom row: bars (span 2), lag curve (span 2)
+% populationSpatialOrthogonality_singleRat
+% Emits a 2x4 figure per animal:
+%   top row: up to 3 day heatmaps + pooled heatmap
+%   bottom row: Adjacent vs Non-adjacent bars (span 2), distance-lag curve + shuffled band (span 2)
 
 p = inputParser;
 addParameter(p,'NBins',16, @(x) isnumeric(x)&&isscalar(x)&&x>=2);
@@ -303,14 +305,14 @@ clims    = tern(isCorr,[-1 1],[0 1]);
 meanOff_pool = mean(Cpool(offMask),'omitnan');
 meanAng_pool = tern(~isCorr, real(acos(max(-1,min(1,meanOff_pool)))) , NaN);
 
-% pooled spatial stats (used for bars + lag)
+% pooled spatial stats (used for bars + distance curve metadata)
 poolStats = [];
-if isfield(R.pooled,'binMeta')
+if isfield(R.pooled,'binMeta') && ~isempty(R.pooled.binMeta)
     poolStats = computeSpatialGridStats(Cpool, R.pooled.binMeta, ...
                  'Adjacency', adjStr, 'MantelPerms', 500, 'IsCorr', isCorr);
 end
 
-% ---------- observed distance-curve stats (no perms) ----------
+% observed distance-curve stats (no perms)
 distStats = [];
 if isfield(R.pooled,'binMeta') && ~isempty(R.pooled.binMeta) && ~isempty(Cpool)
     distStats = computeSpatialGridStats(Cpool, R.pooled.binMeta, ...
@@ -322,20 +324,23 @@ nullLo = []; nullHi = []; nullMean = []; goodCols = [];
 
 if ~isempty(distStats) && isfield(distStats,'dist_edges') && ~isempty(distStats.dist_edges)
     edges    = distStats.dist_edges;
-    dCenters = distStats.dist_centers;
+    dCenters = distStats.dist_centers; %#ok<NASGU>
     Kloc     = size(Cpool,1);
     UT       = triu(true(Kloc),1);
 
-    % Build UT masks using THE SAME edges as the observed curve
-    % (works for grid or PC1)
-    Dfull = nan(Kloc);
+    % Use bins from EDGES only (dist_centers may have a prepended 0)
+    nEdgeBins = numel(edges) - 1;
+    if nEdgeBins < 1
+        edges = [];
+    end
+
+    % build UT distance vector for the same geometry as observed
     if isfield(R.pooled.binMeta,'mode') && strcmpi(R.pooled.binMeta.mode,'grid') && ...
        isfield(R.pooled.binMeta,'centers2D') && size(R.pooled.binMeta.centers2D,2)==2
         XY = R.pooled.binMeta.centers2D;
         [I,J] = find(UT);
         dvec = sqrt(sum((XY(I,:) - XY(J,:)).^2,2));
     else
-        % 1D fallback
         if isfield(R.pooled.binMeta,'centers1D')
             c = R.pooled.binMeta.centers1D(:);
         else
@@ -345,8 +350,9 @@ if ~isempty(distStats) && isfield(distStats,'dist_edges') && ~isempty(distStats.
         dvec = abs(c(I) - c(J));
     end
 
-    dMasks = cell(1, numel(edges)-1);
-    for k = 1:numel(edges)-1
+    % distance-bin masks (UT-vector space), length = nEdgeBins
+    dMasks = cell(1, nEdgeBins);
+    for k = 1:nEdgeBins
         dMasks{k} = (dvec >= edges(k) & dvec < edges(k+1));
     end
 
@@ -360,78 +366,39 @@ if ~isempty(distStats) && isfield(distStats,'dist_edges') && ~isempty(distStats.
     end
 
     nCells = size(Mpool,2);
-    nSh    = 500;                               % 200–1000 typical
+    nSh    = 500;
     useCos = any(strcmpi(R.params.Similarity, {'cosine'}));
 
     if Kloc >= 2 && nCells >= 3 && ~isempty(dMasks)
-        % gridRC hint for 2D shuffle (falls back to 1D inside if mismatched)
-        gridRC = [];
-        if isfield(R.pooled,'binMeta') && isfield(R.pooled.binMeta,'gridRC') && ~isempty(R.pooled.binMeta.gridRC)
-            gridRC = R.pooled.binMeta.gridRC;
-        end
-
-        lagNull = nan(nSh, numel(dCenters));
+        lagNull_core = nan(nSh, nEdgeBins);
         for b = 1:nSh
-          Cb = shuffle_full_per_cell(Mpool, useCos);
+            Cb = shuffle_full_per_cell(Mpool, useCos);
             yb = Cb(UT);
-            for k = 1:numel(dCenters)
+            for k = 1:nEdgeBins
                 mk = dMasks{k};
                 if any(mk)
-                    lagNull(b,k) = mean(yb(mk), 'omitnan');
+                    lagNull_core(b,k) = mean(yb(mk), 'omitnan');
                 end
             end
         end
 
-        % Keep only columns that had any finite null values (some bins can be empty)
-        goodCols = find(any(isfinite(lagNull),1));
-        if ~isempty(goodCols)
-            lagNull  = lagNull(:, goodCols);
-            nullLo   = prctile(lagNull,  2.5, 1);
-            nullHi   = prctile(lagNull, 97.5, 1);
-            nullMean = mean(lagNull, 1, 'omitnan');
-        end
-    end
-end
+        % keep only columns with finite values
+        goodColsCore = find(any(isfinite(lagNull_core),1));
+        if ~isempty(goodColsCore)
+            lagNull_core = lagNull_core(:, goodColsCore);
+            nullLo_core   = prctile(lagNull_core,  2.5, 1);
+            nullHi_core   = prctile(lagNull_core, 97.5, 1);
+            nullMean_core = mean(lagNull_core, 1, 'omitnan');
 
-% ---- (optional) light bootstrap CI for observed curve (off by default) ----
-distLag = struct('centers',[],'mean',[],'ci_low',[],'ci_high',[],'rho',NaN,'p_rho',NaN);
-if isfield(R.pooled,'binMeta') && ~isempty(R.pooled.binMeta)
-    [~, edgesB, ctrsB, masksB] = buildDistanceBins(R.pooled.binMeta, size(Cpool,1), 8);
-    UTloc = triu(true(size(Cpool,1)),1);
-    yObs  = Cpool(UTloc);
-    means = nan(1,numel(masksB));
-    for k = 1:numel(masksB)
-        idxk = masksB{k}(UTloc); means(k) = mean(yObs(idxk),'omitnan');
-    end
-    distLag.centers = ctrsB; distLag.mean = means;
-    [distLag.rho, distLag.p_rho] = corr(ctrsB(:), means(:), 'Type','Spearman','Rows','complete');
+            % Optional: prepend 0-distance point to match distStats.dist_centers
+            % (common choice: similarity at distance 0 is 1)
+            nullLo   = [1, nullLo_core];
+            nullHi   = [1, nullHi_core];
+            nullMean = [1, nullMean_core];
 
-    % (disabled by default; set doCI=true to enable)
-    doCI = false;
-    if doCI
-        Mpool = [];
-        for d = 1:numel(R.perDay)
-            rr = R.perDay(d).rateKxN_raw;
-            if isempty(rr), continue; end
-            Xr = normalizeRatesPerCell(rr, R.params.Mode);
-            Mpool = [Mpool, Xr]; %#ok<AGROW>
-        end
-        nCells = size(Mpool,2);
-        if nCells >= 5
-            nBoot = 200;
-            lagBoot = nan(nBoot, numel(masksB));
-            useCosB  = any(strcmpi(R.params.Similarity, {'cosine'}));
-            for b = 1:nBoot
-                cols = randsample(nCells, nCells, true);
-                Cb   = pvSimFromRates_local(Mpool(:, cols), useCosB);
-                yb   = Cb(UTloc);
-                for k = 1:numel(masksB)
-                    idxk = masksB{k}(UTloc);
-                    lagBoot(b,k) = mean(yb(idxk),'omitnan');
-                end
-            end
-            distLag.ci_low  = prctile(lagBoot, 2.5, 1);
-            distLag.ci_high = prctile(lagBoot,97.5, 1);
+            goodCols = [1, goodColsCore + 1];  % shift core bins by +1 (prepended 0)
+        else
+            nullLo = []; nullHi = []; nullMean = []; goodCols = [];
         end
     end
 end
@@ -470,12 +437,8 @@ nexttile(4); cla
 imagesc(Cpool, clims); axis square; colormap(gca, parula); colorbar;
 xticks(1:K); yticks(1:K); xlabel('Bin'); ylabel('Bin');
 if ~isempty(poolStats)
-    if isCorr
-        title(sprintf('Pooled | mean off %s=%.2f | adj(%s)=%.2f', ...
-              labShort, meanOff_pool, adjStr, poolStats.mean_adj));
-    else
-        title(sprintf('Pooled | mean off %s=%.2f', labShort, meanOff_pool));
-    end
+    title(sprintf('Pooled | mean off %s=%.2f | adj(%s)=%.2f', ...
+          labShort, meanOff_pool, adjStr, poolStats.mean_adj));
 else
     if isCorr
         title(sprintf('Pooled | mean off %s=%.2f', labShort, meanOff_pool));
@@ -486,14 +449,15 @@ end
 
 % Bottom-left: Adjacent vs Non-adjacent bars (span 2 cols)
 nexttile(5, [1 2]); cla; hold on
-if ~isempty(poolStats) && ~isempty(Cpool)
-    % --- build adjacency mask for this rat's geometry ---
+if ~isempty(poolStats) && ~isempty(Cpool) && isfield(R.pooled,'binMeta') && ~isempty(R.pooled.binMeta)
     K  = size(Cpool,1);
     UT = triu(true(K),1);
     sUT = Cpool(UT);
 
-    if isfield(R.pooled,'binMeta') && strcmpi(R.pooled.binMeta.mode,'grid')
-        Rg = R.pooled.binMeta.gridRC(1); Cg = R.pooled.binMeta.gridRC(2);
+    % build adjacency mask in UT-vector space
+    bm = R.pooled.binMeta;
+    if isfield(bm,'mode') && strcmpi(bm.mode,'grid') && isfield(bm,'gridRC') && ~isempty(bm.gridRC)
+        Rg = bm.gridRC(1); Cg = bm.gridRC(2);
         [ri,cj] = ind2sub([Rg Cg], (1:K)');
         [I,J] = find(UT);
         dCheb = max(abs(ri(I)-ri(J)), abs(cj(I)-cj(J)));
@@ -503,7 +467,6 @@ if ~isempty(poolStats) && ~isempty(Cpool)
             case 'rook',   adjMaskVec = (dMan  == 1);
         end
     else
-        % 1D / PC1 fallback
         [I,J] = find(UT);
         dIdx = abs(I-J);
         adjMaskVec = (dIdx == 1);
@@ -515,28 +478,24 @@ if ~isempty(poolStats) && ~isempty(Cpool)
     mAdj = mean(sAdj,'omitnan');
     mNon = mean(sNonAdj,'omitnan');
 
-    % --- inferential stats (Welch t-test + Wilcoxon) ---
-    p_t  = NaN; p_w = NaN;
-    size(sNonAdj)
-    size(sAdj)
+    % inferential stats (Welch t-test + Wilcoxon)
+    p_t = NaN; p_w = NaN;
     try
-        [~,p_t] = ttest2(sAdj, sNonAdj);  % unequal variances
+        [~,p_t] = ttest2(sAdj, sNonAdj, 'Vartype','unequal');
         p_w     = ranksum(sAdj, sNonAdj);
     catch
-        % leave NaNs if any edge case
     end
 
-    % --- plot bars + error bars (SEM of pair dists) ---
     sem = @(v) std(v,0,'omitnan')/sqrt(max(1,nnz(isfinite(v))));
-    bh = bar([1 2],[mAdj mNon], 0.65, 'FaceColor',[0.80 0.85 1.00], 'EdgeColor','k'); %#ok<NASGU>
-    errorbar([1 2],[mAdj mNon],[sem(sAdj) sem(sNonAdj)],'k','LineStyle','none','LineWidth',1.3)
+    bar([1 2],[mAdj mNon], 0.65, 'FaceColor',[0.80 0.85 1.00], 'EdgeColor','k');
+    errorbar([1 2],[mAdj mNon],[sem(sAdj) sem(sNonAdj)],'k','LineStyle','none','LineWidth',1.3);
 
-    % scatter all pair values (jitter for visibility)
+    % scatter all pair values (jitter)
     rng(0);
     jadj  = 1 + 0.12*(rand(size(sAdj))-0.5);
     jnon  = 2 + 0.12*(rand(size(sNonAdj))-0.5);
-    plot(jadj, sAdj,  '.', 'MarkerSize',10, 'Color',[0.10 0.35 0.80])
-    plot(jnon, sNonAdj,'.', 'MarkerSize',10, 'Color',[0.55 0.15 0.15])
+    plot(jadj, sAdj,  '.', 'MarkerSize',10, 'Color',[0.10 0.35 0.80]);
+    plot(jnon, sNonAdj,'.', 'MarkerSize',10, 'Color',[0.55 0.15 0.15]);
 
     xticks([1 2]); xticklabels({'Adjacent','Non-adjacent'});
     ylabel( tern(isCorr,'Pearson similarity','Cosine similarity') );
@@ -544,19 +503,17 @@ if ~isempty(poolStats) && ~isempty(Cpool)
 
     yl = ylim;
     yb = yl(2) - 0.06*range(yl);
-    plot([1 1 2 2],[yb-0.01 yb yb yb-0.01],'k-','LineWidth',1.25)
-    txt = sprintf('%s (t p=%.2g; rank p=%.2g)', sigStars(p_t), p_t, p_w);
+    plot([1 1 2 2],[yb-0.01 yb yb yb-0.01],'k-','LineWidth',1.25);
+    txt = sprintf('%s (Welch p=%.2g; rank p=%.2g)', sigStars(p_t), p_t, p_w);
     text(1.5, yb+0.01*range(yl), txt, 'HorizontalAlignment','center', 'FontSize',12, 'FontWeight','bold');
 
     title('Adjacent vs Non-adjacent (pooled pairs within rat)');
-    ylim([min([sAdj; sNonAdj],[],'omitnan')-0.05*range([sAdj; sNonAdj])  yl(2)*1.05]);
 else
     axis off
     text(0.5,0.5,'No adjacency stats available','HorizontalAlignment','center','VerticalAlignment','middle');
 end
 
-
-% -------- Bottom-right: similarity vs physical distance (tiles 7–8) --------
+% Bottom-right: similarity vs physical distance (tiles 7–8)
 nexttile(7, [1 2]); cla; hold on
 hasStats = ~isempty(distStats) && isfield(distStats,'dist_centers') && isfield(distStats,'dist_mean');
 if hasStats
@@ -564,7 +521,7 @@ if hasStats
     y = distStats.dist_mean(:);
     ok = isfinite(x) & isfinite(y);
 
-    % --- plot shuffled null band + dashed mean (if available) ---
+    % null band + dashed mean (if available)
     if ~isempty(nullLo) && ~isempty(nullHi) && ~isempty(goodCols)
         xNull = x(goodCols);
         xx = [xNull; flipud(xNull)];
@@ -575,35 +532,28 @@ if hasStats
         plot(x(goodCols), nullMean(:), '--', 'LineWidth', 1.4);
     end
 
-    % --- observed curve ---
+    % observed curve
     if nnz(ok) >= 2
         plot(x(ok), y(ok), 'k-', 'LineWidth', 1.8);
     end
 
     xlabel('Bin center distance');
     ylabel(sprintf('Mean %s similarity', labShort));
-    if isfield(distStats,'mantel_r') && isfinite(distStats.mantel_r)
-        if isfield(distStats,'mantel_p') && isfinite(distStats.mantel_p)
-            title(sprintf('Similarity vs distance'));
-        else
-            title(sprintf('Similarity vs distance'));
-        end
-    else
-        title('Similarity vs distance');
-    end
+    title('Similarity vs distance');
     box off
 
-    % Optional legend
-    lg = {}; lh = [];
+    % legend (optional)
+    lh = []; lg = {};
     if ~isempty(nullLo) && ~isempty(nullHi) && ~isempty(goodCols)
-        lg{end+1} = 'Shuffled 95% band';  %#ok<AGROW>
+        lg{end+1} = 'Shuffled 95% band'; %#ok<AGROW>
         lh(end+1) = plot(nan,nan,'-','Color',[0.8 0.85 1],'LineWidth',8); %#ok<AGROW>
     end
     if ~isempty(nullMean) && ~isempty(goodCols)
-        lg{end+1} = 'Shuffled mean';      %#ok<AGROW>
+        lg{end+1} = 'Shuffled mean'; %#ok<AGROW>
         lh(end+1) = plot(nan,nan,'--k','LineWidth',1.4); %#ok<AGROW>
     end
-    lg{end+1} = 'Observed'; lh(end+1) = plot(nan,nan,'k-','LineWidth',1.8); %#ok<AGROW>
+    lg{end+1} = 'Observed'; %#ok<AGROW>
+    lh(end+1) = plot(nan,nan,'k-','LineWidth',1.8); %#ok<AGROW>
     if ~isempty(lh), legend(lh, lg, 'Location','northeast'); end
 else
     axis off
@@ -635,11 +585,12 @@ if doSave
   exportgraphics(figPer, figName, 'Resolution', 300);
 end
 
-% summaries (unchanged bits)
+% summaries (unchanged)
 R.summary.meanOff_pooled  = meanOff_pool;
 R.summary.meanAng_pooled  = meanAng_pool;
 R.spatialStats_pooled     = poolStats;
 R.params.Adjacency        = adjStr;
+
 end
 
 

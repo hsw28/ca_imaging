@@ -67,7 +67,7 @@ end
 pos.(fieldName) = current_pos;
 end
 
-fixed_pos = pos; new(3:end,2)
+fixed_pos = pos; 
 
 
 

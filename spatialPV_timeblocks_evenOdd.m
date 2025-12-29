@@ -12,7 +12,7 @@ function Rall = spatialPV_timeblocks_evenOdd(ratNames, varargin)
 % ---------- args ----------
 p = inputParser;
 addParameter(p,'Days','An-2:An');
-addParameter(p,'NBins',16,@(x)isnumeric(x)&&isscalar(x)&&x>=2);
+addParameter(p,'NBins',15,@(x)isnumeric(x)&&isscalar(x)&&x>=2);
 addParameter(p,'GridRC',[],@(v) isempty(v) || (isnumeric(v)&&numel(v)==2&&all(v>=1)));
 addParameter(p,'BinMode','equal_occ',@(s) any(strcmpi(s,{'equal_occ','equal_size'})));
 addParameter(p,'MinSpeed',4,@(x) isnumeric(x)&&isscalar(x)&&x>=0);
@@ -31,9 +31,9 @@ addParameter(p,'Debug',false,@islogical);
 addParameter(p,'SaveFig',false,@islogical);
 addParameter(p,'FigName','',@(s) ischar(s) || isstring(s));
 addParameter(p,'SubsampleN',0,@(x) isnumeric(x)&&isscalar(x)&&x>=0);  % 0 = off
-addParameter(p,'SplitMode','withinbin_evenodd', ...   % 'withinbin_evenodd' | 'withinbin_random' | 'blocks'
+addParameter(p,'SplitMode','withinbin_random', ...   % 'withinbin_evenodd' | 'withinbin_random' | 'blocks'
     @(s) any(strcmpi(s,{'withinbin_evenodd','withinbin_random','blocks'})));
-addParameter(p,'NormAcrossCells',true,@islogical);   % extra row-wise (bin-wise) zscore
+addParameter(p,'NormAcrossCells',false,@islogical);   % extra row-wise (bin-wise) zscore
 
 parse(p,varargin{:});
 opt = p.Results;

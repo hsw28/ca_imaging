@@ -19,8 +19,8 @@ function R = epoch_populationSummary(ratNames, varargin)
 %     and all subsequent edges define the trial epochs.
 
   p = inputParser;
-  %addParameter(p,'EpochEdges',[-2 0 0.25 0.75 0.85 2.00]);
-  addParameter(p,'EpochEdges',[-20 0 0.85 2.00]);
+  addParameter(p,'EpochEdges',[-2 0 0.25 0.75 0.85 2.00]);
+  %addParameter(p,'EpochEdges',[-2 0 0.85 2.00]);
   addParameter(p,'MinTrialSpk',0);
   addParameter(p,'MinBaseSpk',0);
   addParameter(p,'Eps',1e-5);

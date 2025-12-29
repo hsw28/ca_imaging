@@ -153,7 +153,7 @@ for r=1:nRats
         % only label first subplot
         if r==1 && col==1
             xlabel(ax,xLab);
-            ylabel(ax,'Task');
+            ylabel(ax,'Trace-task');
         end
         % only title first row
         if r==1
@@ -196,7 +196,7 @@ for col=1:5
     else
         [rv,pv] = partialcorr(x(mask), y(mask), ALL.ratePre(mask),'Rows','complete');
     end
-    xlabel(ax,xLab); ylabel(ax,'Task'); title(ax,ttl);
+    xlabel(ax,xLab); ylabel(ax,'Trace-task'); title(ax,ttl);
     rMat(row,col)=rv; pMat(row,col)=pv;
     % after computing rv, pv and after addUnity(...)
     xlim_ = get(ax,'XLim'); ylim_ = get(ax,'YLim');

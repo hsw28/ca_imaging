@@ -2,7 +2,9 @@ function rolling_struct = MI_control_rollingPost(spike_structure, pos_structure,
 % MI_control_rollingPost  (CS-aligned rolling removal/control; negatives allowed)
 %
 % Test  : remove spikes ONLY in the CURRENT CS-aligned window from the movement MI pool.
-% Control: remove the SAME number of spikes ONLY from OUTSIDE the full span,
+% Control: remove the SAME number of spikes from a WINDOW-LOCAL pool that EXCLUDES:
+%           (1) trial time: [CS, CS+2]  (hard-coded here as TrialWinSecs = [0 2])
+%           (2) and the current window ± guard.
 %          with optional matching of SPEED and/or SPACE.
 %
 % ControlMatch  : 'none' | 'speed' | 'space' | 'speedspace'|'speed_space'|'both'
@@ -20,6 +22,10 @@ if nargin < 8 || isempty(winEdges),    winEdges = [0 2; 1 3; 2 4; 3 5; 4 6; 5 7;
 if nargin < 9 || isempty(ControlMatch), ControlMatch = 'none'; end
 if nargin < 10 || isempty(NSpeedBins),  NSpeedBins = 5; end
 if nargin < 11 || isempty(SpaceBinSize),SpaceBinSize = dim; end
+
+% ---- NEW: local control pool definition ----
+TrialWinSecs = [0 2];     % exclude [CS, CS+2] from control sampling (your request)
+GuardSecs    = 0.5;      % exclude current window ± guard from control sampling
 
 % normalize ControlMatch string
 cm = lower(strrep(ControlMatch,'_',''));
@@ -40,12 +46,8 @@ fields_CS     = fields_CS(    max(1,end-2):end);
 
 rolling_struct = struct();
 
-% global CS-aligned bounds for control pool
-WMIN = min(winEdges(:));
-WMAX = max(winEdges(:));
-
 for iDay = 1:numel(fields_spikes)
-  iDay
+    iDay
     fieldName_sp  = fields_spikes{iDay};
     fieldName_pos = fields_pos{iDay};
     fieldName_ts  = fields_cats{iDay}; %#ok<NASGU>
@@ -69,12 +71,12 @@ for iDay = 1:numel(fields_spikes)
     if isempty(cs_times)
         warning('No CS times for %s; skipping day.', fieldName_CS);
         out = struct('winEdges',winEdges,'MI_win',nan(size(winEdges,1),size(peaks_time,1)), ...
-                     'MI_rand',nan(size(winEdges,1),size(peaks_time,1)), ...
-                     'MI_base',nan(1,size(peaks_time,1)),'dMI',nan(size(winEdges,1),size(peaks_time,1)));
+            'MI_rand',nan(size(winEdges,1),size(peaks_time,1)), ...
+            'MI_base',nan(1,size(peaks_time,1)),'dMI',nan(size(winEdges,1),size(peaks_time,1)));
         out.counts = struct('N_move',nan(1,size(peaks_time,1)), 'N_inWin',nan(size(winEdges,1),size(peaks_time,1)), ...
-                            'N_keep_win',nan(size(winEdges,1),size(peaks_time,1)), 'N_ctrl_idx',nan(size(winEdges,1),size(peaks_time,1)), ...
-                            'N_keep_ctrl',nan(size(winEdges,1),size(peaks_time,1)), 'Iter_OK',nan(size(winEdges,1),size(peaks_time,1)), ...
-                            'N_removed_ctrl',nan(size(winEdges,1),size(peaks_time,1)));
+            'N_keep_win',nan(size(winEdges,1),size(peaks_time,1)), 'N_ctrl_idx',nan(size(winEdges,1),size(peaks_time,1)), ...
+            'N_keep_ctrl',nan(size(winEdges,1),size(peaks_time,1)), 'Iter_OK',nan(size(winEdges,1),size(peaks_time,1)), ...
+            'N_removed_ctrl',nan(size(winEdges,1),size(peaks_time,1)));
         rolling_struct.(sprintf('MI_%s', spikes_date)) = out; continue;
     end
 
@@ -92,7 +94,7 @@ for iDay = 1:numel(fields_spikes)
     % ---- spike-count diagnostics ----
     N_inWin        = nan(nWins, nCells);   % spikes removed by TEST (nRemove)
     N_keep_win     = nan(nWins, nCells);   % spikes kept for MI_win
-    N_ctrl_idx     = nan(nWins, nCells);   % control candidate pool size (outside-span, pre-matching)
+    N_ctrl_idx     = nan(nWins, nCells);   % control candidate pool size (pre-matching)
     N_keep_ctrl    = nan(nWins, nCells);   % spikes kept for MI_rand (should equal move-nRemove when success)
     N_removed_ctrl = nan(nWins, nCells);   % spikes removed by CONTROL (should equal nRemove when success)
     N_move         = nan(1,    nCells);    % movement spikes available before any removal
@@ -184,160 +186,147 @@ for iDay = 1:numel(fields_spikes)
         end
 
         for w = 1:nWins
-          wstart = winEdges(w,1);
-          wend   = winEdges(w,2);
+            wstart = winEdges(w,1);
+            wend   = winEdges(w,2);
 
-          % ---- define the test window ON THE MOVEMENT SPIKES ----
-          w_mask_on_move = (rel_t_move > wstart) & (rel_t_move <= wend);   % logical idx over move_spikes
-          w_idx          = find(w_mask_on_move);                            % indices into move_spikes for this window
-          nRemove        = numel(w_idx);
+            % ---- define the test window ON THE MOVEMENT SPIKES ----
+            w_mask_on_move = (rel_t_move > wstart) & (rel_t_move <= wend);   % logical idx over move_spikes
+            w_idx          = find(w_mask_on_move);                            % indices into move_spikes for this window
+            nRemove        = numel(w_idx);
 
-          % record counts early
-          N_inWin_k(w)    = nRemove;
+            % record counts early
+            N_inWin_k(w)    = nRemove;
 
-          if nRemove < 2
-              % no meaningful MI after removal; also record control pool size for visibility
-              N_keep_win_k(w)     = NaN;
-              N_ctrl_idx_k(w)     = sum((rel_t_move < WMIN) | (rel_t_move > WMAX));
-              N_keep_ctrl_k(w)    = NaN;
-              N_removed_ctrl_k(w) = NaN;
-              Iter_OK_k(w)        = 0;
-              MI_win_k(w)         = NaN;
-              MI_rand_k(w)        = NaN;
-              continue;
-          end
+            if nRemove < 2
+                N_keep_win_k(w)     = NaN;
+                % control pool size for visibility (local ctrl definition)
+                in_trial = (rel_t_move >= TrialWinSecs(1)) & (rel_t_move <= TrialWinSecs(2));
+                in_win_guard = (rel_t_move > (wstart-GuardSecs)) & (rel_t_move <= (wend+GuardSecs));
+                ctrl_mask_tmp = ~in_trial & ~in_win_guard;
+                N_ctrl_idx_k(w) = sum(ctrl_mask_tmp);
+                N_keep_ctrl_k(w)    = NaN;
+                N_removed_ctrl_k(w) = NaN;
+                Iter_OK_k(w)        = 0;
+                MI_win_k(w)         = NaN;
+                MI_rand_k(w)        = NaN;
+                continue;
+            end
 
-          % ---------------- TEST (deterministic): remove those indices from move_spikes ----------------
-          keep_mask_win = true(size(move_spikes));
-          keep_mask_win(w_idx) = false;                      % drop all window spikes
-          keep_win = move_spikes(keep_mask_win);
+            % ---------------- TEST (deterministic): remove those indices from move_spikes ----------------
+            keep_mask_win = true(size(move_spikes));
+            keep_mask_win(w_idx) = false;                      % drop all window spikes
+            keep_win = move_spikes(keep_mask_win);
 
-          % counts for test
-          N_keep_win_k(w) = numel(keep_win);
+            % counts for test
+            N_keep_win_k(w) = numel(keep_win);
 
-          % sanity (exact nRemove removed)
-          % assert(numel(move_spikes) - numel(keep_win) == nRemove);
+            % compute MI_win if enough remain
+            if numel(keep_win) >= 2
+                [~,~,~,~,spikeprobW,occprobW] = CA_normalizePosData(keep_win, posDat, dim, 1.0);
+                if size(spikeprobW,1) < size(spikeprobW,2), spikeprobW = spikeprobW'; end
+                if size(occprobW,1)  < size(occprobW,2),  occprobW  = occprobW';  end
+                MI_win_k(w) = mutualinfo([spikeprobW, occprobW]);
+            else
+                MI_win_k(w) = NaN;
+            end
 
-          % compute MI_win if enough remain
-          if numel(keep_win) >= 2
-              [~,~,~,~,spikeprobW,occprobW] = CA_normalizePosData(keep_win, posDat, dim, 1.0);
-              if size(spikeprobW,1) < size(spikeprobW,2), spikeprobW = spikeprobW'; end
-              if size(occprobW,1)  < size(occprobW,2),  occprobW  = occprobW';  end
-              MI_win_k(w) = mutualinfo([spikeprobW, occprobW]);
-          else
-              MI_win_k(w) = NaN;
-          end
+            % ---------------- CONTROL (UPDATED): window-local, trial-excluded ----------------
+            % Exclude:
+            %   - trial time [0,2]
+            %   - current window (± GuardSecs) so control isn’t drawn from the same time band
+            in_trial = (rel_t_move >= TrialWinSecs(1)) & (rel_t_move <= TrialWinSecs(2));
+            in_win_guard = (rel_t_move > (wstart-GuardSecs)) & (rel_t_move <= (wend+GuardSecs));
 
-          % ---------------- CONTROL: sample nRemove indices from OUTSIDE the span ----------------
-          % current window
-          in_win   = (rel_t_move > wstart) & (rel_t_move <= wend);
-          % sets
-          pre_all  = (rel_t_move < 0);        % all pre-CS spikes
-          far_post = (rel_t_move > WMAX);     % post spikes outside analysis span
-          if wend <= 0
-              % test window is pre: exclude THIS pre window from the control pool
-              ctrl_mask = (pre_all & ~in_win) | far_post;
-          else
-              % test window is post: allow any pre + far post
-              ctrl_mask = pre_all | far_post;
-          end
+            ctrl_mask = ~in_trial & ~in_win_guard;
 
+            ctrl_idx  = find(ctrl_mask);                        % candidate indices (into move_spikes)
+            N_ctrl_idx_k(w) = numel(ctrl_idx);
 
-          %%%ctrl_mask = (rel_t_move < WMIN) | (rel_t_move > WMAX);
-          ctrl_idx  = find(ctrl_mask);                        % candidate indices (into move_spikes)
-          N_ctrl_idx_k(w) = numel(ctrl_idx);
+            % prepare window attributes for matching options
+            w_speed = move_speed(w_idx);
+            w_x     = move_x(w_idx);
+            w_y     = move_y(w_idx);
 
-          % prepare window attributes for matching options
-          w_speed = move_speed(w_idx);
-          w_x     = move_x(w_idx);
-          w_y     = move_y(w_idx);
+            mi_accum = 0;
+            n_ok = 0;
 
-          mi_accum = 0;
-          n_ok = 0;
+            for it = 1:nIter
+                switch cm
+                    case 'none'
+                        if numel(ctrl_idx) < nRemove
+                            sample_idx = [];
+                        else
+                            sample_idx = randsample(ctrl_idx, nRemove, false);
+                        end
 
+                    case 'speed'
+                        ctrl_speed = move_speed(ctrl_idx);
+                        edges = make_quant_edges([w_speed(:); ctrl_speed(:)], NSpeedBins);
+                        wbins    = discretize(w_speed,    edges);
+                        ctrlbins = discretize(ctrl_speed, edges);
+                        sample_idx = stratified_sample(ctrl_idx, ctrlbins, wbins, nRemove);
 
-          for it = 1:nIter
-              switch cm
-                  case 'none'
-                      if numel(ctrl_idx) < nRemove
-                          sample_idx = [];
-                      else
-                          sample_idx = randsample(ctrl_idx, nRemove, false);
-                      end
+                    case 'space'
+                        if isempty(edgesX) || isempty(edgesY)
+                            sample_idx = (numel(ctrl_idx) >= nRemove) * randsample(ctrl_idx, min(nRemove,numel(ctrl_idx)), false);
+                            if isscalar(sample_idx) && sample_idx==0, sample_idx = []; end
+                        else
+                            [wBX,wBY]  = deal(discretize(w_x, edgesX), discretize(w_y, edgesY));
+                            [cBX,cBY]  = deal(discretize(move_x(ctrl_idx), edgesX), discretize(move_y(ctrl_idx), edgesY));
+                            w_joint    = wBX.*1e6 + wBY;
+                            ctrl_joint = cBX.*1e6 + cBY;
+                            sample_idx = stratified_sample(ctrl_idx, ctrl_joint, w_joint, nRemove);
+                        end
 
-                  case 'speed'
-                      ctrl_speed = move_speed(ctrl_idx);
-                      edges = make_quant_edges([w_speed(:); ctrl_speed(:)], NSpeedBins);
-                      %edges = make_quant_edges([w_speed(:); ctrl_speed(:)], length([w_speed(:); ctrl_speed(:)]));
+                    case 'speedspace'
+                        ctrl_speed = move_speed(ctrl_idx);
+                        edges = make_quant_edges([w_speed(:); ctrl_speed(:)], NSpeedBins);
+                        wbins    = discretize(w_speed,    edges);
+                        ctrlbins = discretize(ctrl_speed, edges);
+                        if isempty(edgesX) || isempty(edgesY)
+                            sample_idx = stratified_sample(ctrl_idx, ctrlbins, wbins, nRemove);   % speed-only fallback
+                        else
+                            [wBX,wBY]  = deal(discretize(w_x, edgesX), discretize(w_y, edgesY));
+                            [cBX,cBY]  = deal(discretize(move_x(ctrl_idx), edgesX), discretize(move_y(ctrl_idx), edgesY));
+                            wjoint     = wbins.*1e8 + wBX.*1e4 + wBY;           % joint (speed, xBin, yBin)
+                            cjoint     = ctrlbins.*1e8 + cBX.*1e4 + cBY;
+                            sample_idx = stratified_sample(ctrl_idx, cjoint, wjoint, nRemove);
+                        end
 
-                      wbins    = discretize(w_speed,    edges);
-                      ctrlbins = discretize(ctrl_speed, edges);
-                      sample_idx = stratified_sample(ctrl_idx, ctrlbins, wbins, nRemove);
+                    otherwise
+                        if numel(ctrl_idx) < nRemove
+                            sample_idx = [];
+                        else
+                            sample_idx = randsample(ctrl_idx, nRemove, false);
+                        end
+                end
 
-                  case 'space'
-                      if isempty(edgesX) || isempty(edgesY)
-                          sample_idx = (numel(ctrl_idx) >= nRemove) * randsample(ctrl_idx, min(nRemove,numel(ctrl_idx)), false);
-                          if isscalar(sample_idx) && sample_idx==0, sample_idx = []; end
-                      else
-                          [wBX,wBY]  = deal(discretize(w_x, edgesX), discretize(w_y, edgesY));
-                          [cBX,cBY]  = deal(discretize(move_x(ctrl_idx), edgesX), discretize(move_y(ctrl_idx), edgesY));
-                          w_joint    = wBX.*1e6 + wBY;
-                          ctrl_joint = cBX.*1e6 + cBY;
-                          sample_idx = stratified_sample(ctrl_idx, ctrl_joint, w_joint, nRemove);
-                      end
+                % must remove EXACTLY nRemove; otherwise skip this iteration
+                if isempty(sample_idx) || numel(sample_idx) ~= nRemove, continue; end
 
-                  case 'speedspace'
-                      ctrl_speed = move_speed(ctrl_idx);
-                      edges = make_quant_edges([w_speed(:); ctrl_speed(:)], NSpeedBins);
-                      wbins    = discretize(w_speed,    edges);
-                      ctrlbins = discretize(ctrl_speed, edges);
-                      if isempty(edgesX) || isempty(edgesY)
-                          sample_idx = stratified_sample(ctrl_idx, ctrlbins, wbins, nRemove);   % speed-only fallback
-                      else
-                          [wBX,wBY]  = deal(discretize(w_x, edgesX), discretize(w_y, edgesY));
-                          [cBX,cBY]  = deal(discretize(move_x(ctrl_idx), edgesX), discretize(move_y(ctrl_idx), edgesY));
-                          wjoint     = wbins.*1e8 + wBX.*1e4 + wBY;           % joint (speed, xBin, yBin)
-                          cjoint     = ctrlbins.*1e8 + cBX.*1e4 + cBY;
-                          sample_idx = stratified_sample(ctrl_idx, cjoint, wjoint, nRemove);
-                      end
+                keep_rd = move_spikes;
+                keep_rd(sample_idx) = [];         % remove by index (no set/value issues)
 
-                  otherwise
-                      if numel(ctrl_idx) < nRemove
-                          sample_idx = [];
-                      else
-                          sample_idx = randsample(ctrl_idx, nRemove, false);
-                      end
-              end
+                if numel(keep_rd) < 2, continue; end
 
-              % must remove EXACTLY nRemove; otherwise skip this iteration
-              if isempty(sample_idx) || numel(sample_idx) ~= nRemove, continue; end
+                [~,~,~,~,spikeprobR,occprobR] = CA_normalizePosData(keep_rd, posDat, dim, 1.0);
+                if size(spikeprobR,1) < size(spikeprobR,2), spikeprobR = spikeprobR'; end
+                if size(occprobR,1)  < size(occprobR,2),  occprobR  = occprobR';  end
+                mi_accum = mi_accum + mutualinfo([spikeprobR, occprobR]);
+                n_ok = n_ok + 1;
+            end
 
-              keep_rd = move_spikes;
-              keep_rd(sample_idx) = [];         % remove by index (no set/value issues)
-
-              if numel(keep_rd) < 2, continue; end
-
-              [~,~,~,~,spikeprobR,occprobR] = CA_normalizePosData(keep_rd, posDat, dim, 1.0);
-              if size(spikeprobR,1) < size(spikeprobR,2), spikeprobR = spikeprobR'; end
-              if size(occprobR,1)  < size(occprobR,2),  occprobR  = occprobR';  end
-              mi_accum = mi_accum + mutualinfo([spikeprobR, occprobR]);
-              n_ok = n_ok + 1;
-          end
-
-          Iter_OK_k(w) = n_ok;
-          if n_ok > 0
-              MI_rand_k(w)       = mi_accum / n_ok;
-              N_removed_ctrl_k(w)= nRemove;
-              N_keep_ctrl_k(w)   = numel(move_spikes) - nRemove;   % identical to test by construction
-              % final parity sanity:
-              % assert(N_keep_ctrl_k(w) == N_keep_win_k(w));
-          else
-              MI_rand_k(w)       = NaN;
-              N_removed_ctrl_k(w)= NaN;
-              N_keep_ctrl_k(w)   = NaN;
-          end
-      end
-
+            Iter_OK_k(w) = n_ok;
+            if n_ok > 0
+                MI_rand_k(w)        = mi_accum / n_ok;
+                N_removed_ctrl_k(w) = nRemove;
+                N_keep_ctrl_k(w)    = numel(move_spikes) - nRemove;   % identical to test by construction
+            else
+                MI_rand_k(w)        = NaN;
+                N_removed_ctrl_k(w) = NaN;
+                N_keep_ctrl_k(w)    = NaN;
+            end
+        end
 
         MI_win(:,k)  = MI_win_k;
         MI_rand(:,k) = MI_rand_k;
@@ -418,7 +407,6 @@ if isempty(ctrl_idx) || nRemove <= 0
     return;
 end
 
-% ----- determine ordered bin set K (works for speed bins 1..K) -----
 all_bins = [ctrl_bins; w_bins];
 all_bins = all_bins(isfinite(all_bins));
 if isempty(all_bins)
@@ -431,7 +419,6 @@ if isempty(all_bins)
 end
 
 ub = unique(all_bins);
-% Map any integer-like labels to 1..K order (keeps order if already 1..K)
 map = containers.Map(num2cell(ub.'), num2cell(1:numel(ub)));
 remap = @(v) cell2mat(values(map, num2cell(v(isfinite(v)).')));
 ctrl_isfinite = isfinite(ctrl_bins);
@@ -447,10 +434,8 @@ if any(w_isfinite)
 end
 K = numel(ub);
 
-% ----- target per-bin counts that sum to nRemove (largest-remainder) -----
 hist_w = accumarray(w_b(~isnan(w_b)), 1, [K,1], @sum, 0);
 if sum(hist_w) == 0
-    % No window movement spikes with speed → uniform draw
     if numel(ctrl_idx) < nRemove, sample_idx = []; return; end
     sample_idx = randsample(ctrl_idx, nRemove, false); sample_idx = sample_idx(:);
     return;
@@ -463,20 +448,17 @@ if left > 0
     [~, ord] = sort(frac, 'descend');
     tgt(ord(1:left)) = tgt(ord(1:left)) + 1;
 end
-% tgt(b) = desired removals from bin b (sums to nRemove)
 
-% ----- candidates per bin (indices are into ctrl_idx) -----
 cands = cell(K,1);
 avail = zeros(K,1);
 for b = 1:K
-    cands{b} = find(ctrl_b == b);   % positions within ctrl_idx
+    cands{b} = find(ctrl_b == b);
     avail(b) = numel(cands{b});
 end
 if sum(avail) < nRemove
-    sample_idx = []; return; % not enough total supply
+    sample_idx = []; return;
 end
 
-% ----- take what we can from each target bin -----
 taken  = zeros(K,1);
 chosen = cell(K,1);
 for b = 1:K
@@ -486,16 +468,14 @@ for b = 1:K
     if take > 0
         pick = randsample(cands{b}, take, false);
         chosen{b} = pick(:);
-        % remove picked from that bin's candidate list
         cands{b} = setdiff(cands{b}, pick, 'stable');
         avail(b) = numel(cands{b});
         taken(b) = take;
     end
 end
 
-deficit = tgt - taken;  % remaining needed per bin (>=0)
+deficit = tgt - taken;
 
-% ----- nearest-bin top-up to satisfy deficits -----
 maxRadius = K-1;
 for radius = 1:maxRadius
     todo = find(deficit > 0);
@@ -506,16 +486,14 @@ for radius = 1:maxRadius
         if need <= 0, continue; end
 
         neigh = [];
-        L = b - radius; if L >= 1, neigh = [neigh, L]; end
-        R = b + radius; if R <= K, neigh = [neigh, R]; end
+        L = b - radius; if L >= 1, neigh = [neigh, L]; end %#ok<AGROW>
+        R = b + radius; if R <= K, neigh = [neigh, R]; end %#ok<AGROW>
         if isempty(neigh), continue; end
 
-        % total avail in neighbors at this radius
         neigh_av = sum(avail(neigh));
         if neigh_av <= 0, continue; end
 
         take_tot = min(need, neigh_av);
-        % split proportionally across available neighbors (greedy)
         take_each = zeros(size(neigh));
         if numel(neigh) == 1
             take_each(1) = take_tot;
@@ -524,7 +502,7 @@ for radius = 1:maxRadius
             take_each = floor(take_tot * prop);
             rem = take_tot - sum(take_each);
             if rem > 0
-                [~, nnord] = sort(prop - take_each./max(1,take_tot), 'descend');
+                [~, nnord] = sort(prop, 'descend');
                 take_each(nnord(1:rem)) = take_each(nnord(1:rem)) + 1;
             end
         end
@@ -544,26 +522,21 @@ for radius = 1:maxRadius
     end
 end
 
-% If we still have deficit, fail (not enough supply even after borrowing)
 if any(deficit > 0)
     sample_idx = [];
     return;
 end
 
-% ----- assemble final picks in original ctrl_idx coordinate -----
-pick_pos_within_ctrl = vertcat(chosen{:});  % positions into ctrl_idx
+pick_pos_within_ctrl = vertcat(chosen{:});
 sample_idx = ctrl_idx(pick_pos_within_ctrl);
 sample_idx = sample_idx(:);
 
-% safety
 if numel(sample_idx) ~= nRemove
     sample_idx = [];
 end
 end
 
-
 function suf = extract_date_suffix(fieldName)
-% expects something like 'peaks_2023_05_03' or 'CS_2023_05_03'
 us = strfind(fieldName, '_');
 if numel(us) >= 2
     suf = fieldName(us(end-2)+1:end);

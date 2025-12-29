@@ -23,7 +23,7 @@ function Rall = postShockPV_evenOdd(ratNames, varargin)
 % ---------- args ----------
 p = inputParser;
 addParameter(p,'Days','An-2:An');
-addParameter(p,'PostWin',[0 4],@(v)isnumeric(v)&&numel(v)==2&&v(2)>v(1));
+addParameter(p,'PostWin',[0 6],@(v)isnumeric(v)&&numel(v)==2&&v(2)>v(1));
 %addParameter(p,'BinSec',(1/7.5)*3,@isscalar);
 addParameter(p,'BinSec',(1/7.5),@isscalar);
 
@@ -35,7 +35,7 @@ addParameter(p,'Debug',false,@islogical);
 addParameter(p,'UseSpeedMask',false,@islogical);
 addParameter(p,'SpeedThresh',4,@isscalar);
 addParameter(p,'SpeedMaskFrac',0.5,@(x)isscalar(x)&&x>=0&&x<=1);
-addParameter(p,'Preprocess','none',@(s) ischar(s)||isstring(s));
+addParameter(p,'Preprocess','demean',@(s) ischar(s)||isstring(s));
 parse(p,varargin{:});
 opts = p.Results;
 

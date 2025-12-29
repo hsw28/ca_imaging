@@ -8,6 +8,7 @@ if nargin < 1, csusNum = 15; end
 
 
 ratNames = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
+
 Fs  = 7.5;
 dim = 2.5;
 nIter = 100;

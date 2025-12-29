@@ -1,5 +1,6 @@
 function epochModulation(ratNames, k)
 % epochModulation Build 4-epoch modulation indices and cluster them
+%%%%% NOT THE MAIN WAY TO FIND OUT SIG
 %
 %   epochModulationFingerprints({'rat0222', ...}, 4)
 %
@@ -12,8 +13,8 @@ function epochModulation(ratNames, k)
 if nargin < 2, k = 4; end
 
 % ---- epoch boundaries relative to CS onset ----------------------------
-edges = [-5 0     0.25 0.75 0.85 2.00];   % 5 epochs → 4 modulation scores
-nEpoch = 4;
+edges = [-2 0     0.25 0.75 0.85 2.00];   % 5 epochs → 4 modulation scores
+nEpoch = 5;
 
 allIdx   = [];          % [nCellsTotal × 4] modulation matrix
 cellRat  = [];          % rat ID per cell (for prevalence plot)
@@ -32,39 +33,57 @@ for r = 1:numel(ratNames)
         maskCell = rat.ratemask.(sprintf('ratemask_%s',dayStr)) == 1;
 
         nCells   = size(spk,1);
-        for c = 1:nCells
-            if ~maskCell(c), continue, end
 
-            st = spk(c,:); st = st(~isnan(st)&st>0);
-            if isempty(st), continue, end
+        % --- NEW: per-day epoch vector, default NaN for cells NOT analyzed -------
+          epochVec = nan(nCells,1);   % NaN = not analyzed
+
+          for c = 1:nCells
+              if ~maskCell(c), continue, end
+
+              st = spk(c,:);
+              st = st(~isnan(st) & st>0);
+              if isempty(st), continue, end
+
+              % ----- compute firing rates per epoch -----
+              fr = zeros(1,numel(edges)-1);
+              for e = 1:numel(edges)-1
+                  cnt = 0;
+                  for t = 1:numel(csTimes)
+                      t0  = csTimes(t) + edges(e);
+                      t1  = csTimes(t) + edges(e+1);
+                      cnt = cnt + sum(st >= t0 & st < t1);
+                  end
+                  fr(e) = cnt / ((edges(e+1)-edges(e)) * numel(csTimes)); % Hz
+              end
+
+              baseFR = fr(1);
+              if baseFR == 0
+                  continue   % remains NaN
+              end
+
+              % ----- Δ-modulation -----
+              modIdx = (fr(2:end) - baseFR) ./ (fr(2:end) + baseFR);   % 1×4
+
+              allIdx  = [allIdx ; modIdx];
+              cellRat = [cellRat;  r];
+
+              % =======================================================
+              % NEW LOGIC FOR EPOCH LABEL
+              % =======================================================
+              thr = 0.05;                       % threshold for modulation
+              [mx, eDom] = max(abs(modIdx));    % best epoch
+              if mx < thr
+                  epochVec(c) = 0;              % analyzed but NOT modulated
+              else
+                  epochVec(c) = eDom;           % 1=CS,2=Trace,3=US,4=Post
+              end
+          end
 
 
-            fr = zeros(1,numel(edges)-1);                % firing-rate per epoch
-            for e = 1:numel(edges)-1
-                cnt = 0;
-                for t = 1:numel(csTimes)
-                    t0  = csTimes(t)+edges(e);
-                    t1  = csTimes(t)+edges(e+1);
-                    cnt = cnt + sum(st>=t0 & st<t1);
-                end
-                fr(e) = cnt / ((edges(e+1)-edges(e))*numel(csTimes));   % Hz
-            end
-
-            baseFR = fr(1);                              % 5-s pre-CS baseline
-            if baseFR==0                                  % completely silent cell
-                continue                                  % …skip it
-            end
-
-            % -------- Δ-modulation relative to that baseline -----------------
-            modIdx = (fr(2:end) - baseFR) ./ (fr(2:end) + baseFR);   % 1 × 4
-                     %               ^ exclude the baseline itself
-                     %               | result columns = [CS Trace US Post]
-
-            allIdx  = [allIdx ; modIdx];     % grow matrix (nCells × 4)
-            cellRat = [cellRat;  r];         % bookkeeping
-
-        end
     end
+
+    % --- NEW: write updated rat struct back to base workspace --------------
+    assignin('base', ratNames{r}, rat);
 end
 
 % ---------- k-means clustering & deterministic ordering -----------------
@@ -101,32 +120,6 @@ xticks(1:4); xticklabels({'CS','Trace','US','Post'});
 ylabel('Cells (CS → Trace → US → Post)'); title('Modulation fingerprints');
 colorbar;
 
-
-% (b) Radar plot of centroids
-%subplot(1,4,2);
-%theta = linspace(0, 2*pi, nEpoch+1);
-%for j = 1:k
-%    rho = [C(j,:) C(j,1)];
-%    polarplot(theta, rho, 'LineWidth',2); hold on;
-%end
-%rticks([-1 0 1]); thetaticks(0:90:270);
-%title('Cluster centroids (Δ modulation)'); legend("C1","C2","C3","C4");
-
-%(b) bar plot
-%subplot(1,4,2); cla
-%x = 1:4;                    % CS, Trace, US, Post
-%barH = bar(x, C','grouped');   % C is k×4 centroids
-
-% Colour each cluster distinctly
-%cols = lines(k);
-%for j = 1:k,  barH(j).FaceColor = cols(j,:); end
-
-%yline(0,'k-');              % baseline reference
-%ylim([-1 1]); xlim([0.5 4.5])
-%xticks(x); xticklabels({'CS','Trace','US','Post'});
-%ylabel('Δ modulation'); title('Cluster centroids');
-%box off
-%hold off
 
 % ---------- (panel-2) centroid Δ modulation with error bars ------------
 subplot(1,4,2); cla; hold on
@@ -282,7 +275,8 @@ end
 % -------- percentages of + / – cells in each cluster -------------------
 labels = {'CS+','CS-','Trace+','Trace-','US+','US-','Post+','Post-'};
 fprintf('\n%% of cells in each sign/epoch category:\n');
-hdr = '%6s'; for j = 1:numel(labels), hdr = [hdr '  %7s']; end
+hdr = '%6s';
+for j = 1:numel(labels), hdr = [hdr '  %7s']; end
 fprintf([hdr '\n'], 'Cluster', labels{:});
 
 for c = 1:k
@@ -291,7 +285,8 @@ for c = 1:k
              mean(allIdx(rows,2)>0)  mean(allIdx(rows,2)<0) ...
              mean(allIdx(rows,3)>0)  mean(allIdx(rows,3)<0) ...
              mean(allIdx(rows,4)>0)  mean(allIdx(rows,4)<0) ] * 100;
-    fmt  = '%6s'; for j = 1:numel(tab), fmt = [fmt '  %6.1f']; end
+    fmt  = '%6s';
+    for j = 1:numel(tab), fmt = [fmt '  %6.1f']; end
     fprintf([fmt '\n'], ['C' num2str(c)], tab);
 end
 
