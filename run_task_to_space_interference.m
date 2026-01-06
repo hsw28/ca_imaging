@@ -56,7 +56,7 @@ addParameter(p,'NumBins',[]);
 
 addParameter(p,'VelThresh',4);
 addParameter(p,'UseSpeedMask',true);
-addParameter(p,'CellNorm','demean');  % 'zscore'|'demean'|'none'
+addParameter(p,'CellNorm','none');  % 'zscore'|'demean'|'none'
 
 % frame-based gates
 addParameter(p,'MinCtrlFrames',2);
@@ -67,10 +67,12 @@ addParameter(p,'FramesPerBin',[]);
 % (C) perms
 addParameter(p,'NPerm_C',500);
 addParameter(p,'NullMode_C','frame-redistribute');
+addParameter(p,'DeltaPermType','flip', @(s) any(strcmpi(s,{'derange','flip','both'})));
 
 addParameter(p,'DoPlots',true);
 parse(p,varargin{:});
 opt = p.Results;
+
 
 ratNames = cellstr(ratNames);
 R = struct([]);
@@ -156,6 +158,7 @@ end
 
 % ================================ PLOTS ==================================
 summarize_taskSpacePV_clean(R);
+plot_taskToSpace_deltaPermHist_perRat(R, 'PermType', opt.DeltaPermType);
 end
 
 % =========================================================================
@@ -421,10 +424,44 @@ end
 
 % day-level delta (WITH minus WITHOUT) in Fisher-z
 delta_day = z_day - z_ctrl_day;      % [D x 1], may have NaNs
-C.bin.byDay.delta_z = delta_day;
-C.bin.group.delta_z_mean = mean(delta_day(isfinite(delta_day)), 'omitnan');
-C.bin.group.delta_r_mean = tanh(C.bin.group.delta_z_mean);
 
+
+% --------- choose which delta is "active" ----------
+C.delta = [];
+
+% --- Make WITH/WITHOUT daywise r available to downstream stats/plots ---
+C.byDay.withTask.r    = with_byDay;
+C.byDay.withoutTask.r = without_byDay;
+
+% --- Build within-day (bin-level) flip permutation null ---
+C.delta_flip = build_flip_perm_withinDayPairs(C, o.NPerm);
+if isfield(C,'delta_flip') && isfield(C.delta_flip,'p_two')
+    fprintf('[%s] within-day-pair flip: obs Δz=%.3f (r≈%.3f), p_two=%.3g (NPerm=%d)\n', ...
+        L, C.delta_flip.obs_z, tanh(C.delta_flip.obs_z), C.delta_flip.p_two, numel(C.delta_flip.perm_z));
+end
+
+
+% --- choose which delta is "active" (DO THIS LAST) ---
+C.delta = [];
+which = 'flip';
+if isfield(o,'DeltaPermType') && ~isempty(o.DeltaPermType)
+    which = lower(char(o.DeltaPermType));
+end
+
+switch which
+    case 'flip'
+        if isfield(C,'delta_flip') && ~isempty(C.delta_flip) && ~isempty(C.delta_flip.perm_z)
+            C.delta = C.delta_flip;
+        end
+    case 'derange'
+        if isfield(C,'delta_derange') && ~isempty(C.delta_derange) && ~isempty(C.delta_derange.perm_z)
+            C.delta = C.delta_derange;
+        end
+    otherwise
+        if isfield(C,'delta_flip') && ~isempty(C.delta_flip) && ~isempty(C.delta_flip.perm_z)
+            C.delta = C.delta_flip;
+        end
+end
 
 
 % --- PERMUTATION: spatial-bin derangement null for Δz (per day, then group) ---
@@ -567,22 +604,24 @@ if P > 0
         pr = NaN; pl = NaN; pt = NaN;
     end
 
-    fprintf('p value against shuff')
-    pt
+  %  fprintf('p value against derange shuff')
+  %  pt
 
     % store Δ-based null + p-values
-    C.delta = struct();
-    C.delta.obs_z     = delta_obs;
-    C.delta.obs_r     = tanh(delta_obs);
-    C.delta.perm_z    = delta_perm_anim;
-    C.delta.p_right   = pr;
-    C.delta.p_left    = pl;
-    C.delta.p_two     = pt;
+    C.delta_derange = struct();
+    C.delta_derange.obs_z     = delta_obs;
+    C.delta_derange.obs_r     = tanh(delta_obs);
+    C.delta_derange.perm_z    = delta_perm_anim;
+    C.delta_derange.p_right   = pr;
+    C.delta_derange.p_left    = pl;
+    C.delta_derange.p_two     = pt;
 end
 
 % --- Make WITH/WITHOUT daywise r available to downstream stats/plots ---
 C.byDay.withTask.r    = with_byDay;      % cell{day} of r per spatial bin
 C.byDay.withoutTask.r = without_byDay;   % cell{day} of r per spatial bin (CTRL split-half)
+% within-day (bin-level) flip permutation null
+C.delta_flip = build_flip_perm_withinDayPairs(C, o.NPerm);
 end
 
 % ---------- (C) per-day paired z + pooled + sign-flip ----------
@@ -637,6 +676,8 @@ end
 p_right = (sum(perm_stat >= obs_cluster_mean) + 1) / (nnz(isfinite(perm_stat)) + 1);
 p_left  = (sum(perm_stat <= obs_cluster_mean) + 1) / (nnz(isfinite(perm_stat)) + 1);
 p_two   = 2*min(p_right, p_left);
+
+
 if ~isfield(C,'distStats'), C.distStats = struct(); end
 C.distStats.perDay  = dayStats;
 C.distStats.pooled  = struct('t',st_all.tstat,'df',st_all.df,'p',p_all,'dz',dz_all, 'nBins', nnz(mask));
@@ -995,6 +1036,7 @@ end
 % 2) Per-rat dark means (in r, from tanh of per-rat mean z)
 rat_with_r    = tanh(rat_mean_with_z);
 rat_without_r = tanh(rat_mean_without_z);
+rat_with_r-rat_without_r
 
 for i = 1:nA
     if isfinite(rat_with_r(i)) && isfinite(rat_without_r(i))
@@ -1090,4 +1132,193 @@ df = st.df;
 
 d  = z1 - z2;
 dz = mean(d,'omitnan') / std(d, 0, 'omitnan');  % Cohen's dz (paired)
+end
+
+
+function plot_taskToSpace_deltaPermHist_perRat(R, varargin)
+% plot_taskToSpace_deltaPermHist_perRat
+% One panel per rat: histogram of permuted Δz with vertical line at observed Δz.
+%
+% PermType:
+%   'derange' (ctrl-bin derangement null)
+%   'flip'    (day-level WITH/WITHOUT label-swap via sign flips)
+%
+% NOTE: This version has NO nested functions (more robust in big files).
+
+p = inputParser;
+addParameter(p,'NBins',30, @(x) isnumeric(x)&&isscalar(x)&&x>=5);
+addParameter(p,'ShowTwoSided',true, @(x) islogical(x)&&isscalar(x));
+addParameter(p,'PermType','derange', @(s) any(strcmpi(s,{'derange','flip'})));
+parse(p,varargin{:});
+NBins = p.Results.NBins;
+ShowTwoSided = p.Results.ShowTwoSided;
+PermType = lower(char(p.Results.PermType));
+
+nRats = numel(R);
+
+figure('Color','w','Position',[200 200 1100 700]);
+
+for ii = 1:nRats
+    % rat name
+    if isfield(R(ii),'animal') && ~isempty(R(ii).animal)
+        ratName = R(ii).animal;
+    else
+        ratName = sprintf('rat%02d', ii);
+    end
+
+    if ~isfield(R(ii),'C') || isempty(R(ii).C)
+        continue
+    end
+
+    dlt = get_delta_struct(R(ii).C, PermType);
+    if isempty(dlt) || ~isfield(dlt,'obs_z') || ~isfield(dlt,'perm_z')
+        continue
+    end
+
+    obs  = dlt.obs_z;
+    perm = dlt.perm_z;
+
+    if ~isfinite(obs) || isempty(perm), continue; end
+    perm = perm(isfinite(perm));
+    if isempty(perm), continue; end
+
+    subplot(3,2,ii); hold on;
+
+    histogram(perm, NBins, 'Normalization','pdf', 'EdgeColor','none');
+    yl = ylim;
+    plot([obs obs], yl, 'k-', 'LineWidth', 2);
+
+    xlabel('\Delta z = (WITH - WITHOUT) Fisher z');
+    ylabel('Null density');
+    title(sprintf('%s: %s null', ratName, PermType));
+    grid on; box on
+
+    % p-values
+    pR = NaN; pL = NaN; pT = NaN;
+    if isfield(dlt,'p_right'), pR = dlt.p_right; end
+    if isfield(dlt,'p_left'),  pL = dlt.p_left;  end
+    if isfield(dlt,'p_two'),   pT = dlt.p_two;   end
+
+    txt = sprintf('obs \\Delta z = %.3f  (r \\approx %.3f)\n', obs, tanh(obs));
+    if ShowTwoSided
+        if isfinite(pT)
+            txt = [txt, sprintf('p_{two} = %.3g', pT)];
+        else
+            pR_ = mean(perm >= obs);
+            pL_ = mean(perm <= obs);
+            txt = [txt, sprintf('p_{two} \\approx %.3g', 2*min(pR_,pL_))];
+        end
+    else
+        if isfinite(pR)
+            txt = [txt, sprintf('p_{right} = %.3g', pR)];
+        else
+            txt = [txt, sprintf('p_{right} \\approx %.3g', mean(perm >= obs))];
+        end
+    end
+
+    text(obs, yl(2), ['  ', txt], 'VerticalAlignment','top', 'HorizontalAlignment','left');
+    ylim(yl);
+end
+end
+
+function dlt = get_delta_struct(C, permType)
+% Helper: choose delta struct based on permType
+dlt = [];
+
+switch lower(permType)
+  case 'flip'
+      if isfield(C,'delta_flip') && ~isempty(C.delta_flip)
+          dlt = C.delta_flip;
+      end
+    case 'derange'
+        if isfield(C,'delta_derange') && ~isempty(C.delta_derange)
+            dlt = C.delta_derange;
+        elseif isfield(C,'delta') && ~isempty(C.delta)
+            dlt = C.delta; % fallback
+        end
+end
+end
+
+function OUT = build_flip_perm_withinDayPairs(C, NPerm)
+% Flip labels within each day across paired bins (cluster-aware by day).
+% Uses C.byDay.withTask.r{d} and C.byDay.withoutTask.r{d}.
+% Returns animal-level Δz null for mean(Δz_day) across days.
+
+OUT = struct('obs_z',NaN,'obs_r',NaN,'perm_z',[],'p_right',NaN,'p_left',NaN,'p_two',NaN, ...
+             'nPairsByDay',[],'nDays',0);
+
+if ~isfield(C,'byDay') || ~isfield(C.byDay,'withTask') || ~isfield(C.byDay,'withoutTask')
+    return
+end
+if ~isfield(C.byDay.withTask,'r') || ~isfield(C.byDay.withoutTask,'r')
+    return
+end
+
+rw = C.byDay.withTask.r;
+ru = C.byDay.withoutTask.r;
+
+D = min(numel(rw), numel(ru));
+day_delta_mu = nan(D,1);          % observed mean Δz per day
+day_delta_vec = cell(D,1);        % per-bin Δz vector per day
+nPairs = zeros(D,1);
+
+for d = 1:D
+    if isempty(rw{d}) || isempty(ru{d}), continue; end
+    a = rw{d}(:); b = ru{d}(:);
+    m = isfinite(a) & isfinite(b);
+    if nnz(m) < 2, continue; end
+
+    zw = atanh(max(min(a(m),0.999999),-0.999999));
+    zu = atanh(max(min(b(m),0.999999),-0.999999));
+    dv = zw - zu;                         % per-bin Δz within day
+
+    day_delta_vec{d} = dv;
+    day_delta_mu(d)  = mean(dv,'omitnan'); % day mean Δz
+    nPairs(d)        = numel(dv);
+end
+
+validDays = find(isfinite(day_delta_mu) & ~cellfun(@isempty, day_delta_vec));
+OUT.nDays = numel(validDays);
+OUT.nPairsByDay = nPairs;
+
+if OUT.nDays < 1
+    return
+end
+
+% observed animal-level statistic = mean(day means)
+obs = mean(day_delta_mu(validDays), 'omitnan');
+
+if nargin < 2 || isempty(NPerm) || NPerm < 5
+    OUT.obs_z = obs;
+    OUT.obs_r = tanh(obs);
+    return
+end
+
+perm = nan(NPerm,1);
+
+for p = 1:NPerm
+    day_mu_perm = nan(OUT.nDays,1);
+
+    for j = 1:OUT.nDays
+        d = validDays(j);
+        dv = day_delta_vec{d};
+
+        % flip sign per paired bin (equivalent to swapping WITH/WITHOUT label per pair)
+        s = (rand(size(dv)) > 0.5)*2 - 1;     % +/-1 per pair
+        day_mu_perm(j) = mean(s .* dv, 'omitnan');
+    end
+
+    perm(p) = mean(day_mu_perm, 'omitnan');   % animal stat
+end
+
+pr = mean(perm >= obs);
+pl = mean(perm <= obs);
+pt = 2*min(pr, pl);
+
+OUT.obs_z   = obs;
+OUT.obs_r   = tanh(obs);
+OUT.perm_z  = perm;
+OUT.p_right = pr;
+OUT.p_left  = pl;
+OUT.p_two   = pt;
 end

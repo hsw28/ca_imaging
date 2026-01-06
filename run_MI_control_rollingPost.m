@@ -10,8 +10,7 @@ function run_MI_control_rollingPost(WEdges)
 if nargin < 1 || isempty(WEdges)
 %%%    starts = -4:.5:16;                 % window start times (s)
 %%%    starts = -4:.5:12;
-  starts = -4:.25:12;
-    %widths = ones(numel(starts),1)*2;  % 2-s wide windows
+  starts = -4:.5:10;
     widths = ones(numel(starts),1)*2;  % 2-s wide windows
     WEdges = [starts(:), starts(:)+widths(:)];
 end
@@ -20,14 +19,14 @@ end
 ControlMatch = 'speed';   % 'none' | 'speed' | 'space' | 'speedspace'
 %%%NSpeedBins   = 200;       % used when ControlMatch includes 'speed'
 %%%NSpeedBins   = 100;       % used when ControlMatch includes 'speed'
-NSpeedBins   = 200;
+NSpeedBins   = 100;
 SpaceBinSize = [];        % [] => use MI 'dim'; else numeric bin size (same units as pos)
 
 % ---- config ----
 ratNames  = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
 velthresh = 4;    % cm/s
 dim       = 2.5;
-nIter     = 5;
+nIter     = 100;
 alpha     = 0.05;
 
 fprintf('\n===== Running MI_control_rollingPost (CS-aligned; control outside span; match=%s) =====\n', ControlMatch);
@@ -62,10 +61,11 @@ for ii = 1:numel(ratNames)
     pos      = filterFieldsByDay(rat.pos,       daysToUse);
     ts       = filterFieldsByDay(rat.Ca_ts,     daysToUse); %#ok<NASGU>
     cs_times = filterFieldsByDay(rat.CS_times,  daysToUse); % ACTUAL CS onsets
+    RM_structure = filterFieldsByDay(rat.ratemask, daysToUse);
 
     % run rolling CS-aligned analysis with control-matching options
     out = MI_control_rollingPost(spikes, pos, velthresh, dim, ts, cs_times, ...
-                                 nIter, WEdges, ControlMatch, NSpeedBins, SpaceBinSize);
+                                 nIter, WEdges, ControlMatch, NSpeedBins, SpaceBinSize, RM_structure);
 
     % spike-count parity (optional)
     %print_spike_count_parity(out, ratVar);

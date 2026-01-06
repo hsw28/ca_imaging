@@ -335,7 +335,6 @@ rate_task(rate_task==0) = NaN;
 mu_task = nanmean(rate_task(:));
 sd_task = nanstd(rate_task(:));
 mask_task = rate_task > (mu_task + N*sd_task);
-mask_task = rate_task > 0;
 
 % Non-task map (run>=4 & non-trial; uses goodpos)
 rate_non = CA_normalizePosData(nonTaskSpikes(:), goodpos, 2.5, 1);

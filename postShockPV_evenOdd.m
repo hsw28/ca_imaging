@@ -244,6 +244,17 @@ for d = 1:numel(dayNames)
         error('Unsupported Ca_peaks datatype for %s (got %s).', day, class(CaMat));
     end
 
+    %%% NEW: apply ratemask==1 (BEFORE MinEvents) %%%
+    Mfld = sprintf('ratemask_%s', day);
+    if isfield(rat,'ratemask') && isstruct(rat.ratemask) && isfield(rat.ratemask, Mfld)
+        rm = rat.ratemask.(Mfld) == 1;
+        rm = rm(:);
+        if numel(rm) == numel(evByCell)
+            evByCell = evByCell(rm);
+        end
+    end
+    %%% END NEW %%%
+
     % MinEvents per cell
     totEv = cellfun(@numel, evByCell);
     keepC = totEv >= opts.MinEvents;
@@ -307,7 +318,7 @@ for d = 1:numel(dayNames)
         end
     end
 
-    % ---------- NEW: per-cell preprocessing ----------
+    % ---------- per-cell preprocessing ----------
     switch lower(string(opts.Preprocess))
         case "none"
             % do nothing

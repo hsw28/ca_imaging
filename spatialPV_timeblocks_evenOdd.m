@@ -102,6 +102,7 @@ if ~isempty(pooled_Z_stack)
         figure('Color','w','Position',[100 100 1050 430]);
         subplot(1,2,1);
         clim = chooseClim(opt.Similarity);
+        clim = [-.5,.8];
         imagesc(Cg, clim); axis image; colormap(gca, parula); colorbar;
         xlabel('B bins'); ylabel('A bins');
         title('POOLED across rats: PV corr (A vs B)');
@@ -211,6 +212,24 @@ for d = 1:numel(perDayRun)
         Sfld  = sprintf('CA_peaks_%s', day);
         if ~isfield(rat.Ca_peaks, Sfld), warning('Missing %s; skip day.', Sfld); continue; end
         Spk = rat.Ca_peaks.(Sfld);
+
+        %%% NEW: apply ratemask==1 (filter cells before rate matrices) %%%
+        Mfld = sprintf('ratemask_%s', day);
+        if isfield(rat,'ratemask') && isstruct(rat.ratemask) && isfield(rat.ratemask, Mfld)
+            rm = rat.ratemask.(Mfld) == 1;
+            rm = rm(:);
+            if iscell(Spk)
+                if numel(rm) == numel(Spk)
+                    Spk = Spk(rm);
+                end
+            else
+                if size(Spk,1) == numel(rm)
+                    Spk = Spk(rm,:);
+                end
+            end
+        end
+        %%% END NEW %%%
+
         csTimes = getCSTimes(rat, day);
         [rateA, rateB] = rateMatrices_AB(Spk, vt, xv, yv, labVT, csTimes, binMeta, opt.GridRC, occA, occB);
 

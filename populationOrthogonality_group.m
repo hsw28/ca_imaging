@@ -121,6 +121,7 @@ tl  = tiledlayout(nRows, nCols, 'Padding','compact','TileSpacing','compact');
 %end
 
 % (2) Across-rat mean heatmap
+clim = [-.7, 1];
 nexttile; imagesc(simMean, clim); axis square
 colormap(parula); colorbar; title('Across-rat mean');
 xticks(1:nSplits); yticks(1:nSplits); xlabel('Split'); ylabel('Split');

@@ -1,20 +1,23 @@
 function plotTaskVar_InOut_vs_Distance(ratNames, varargin)
 % plotTaskVar_InOut_vs_Distance
-% Core outputs (per rat + pooled):
-%   1) Paired per-cell means: in-PF vs out-PF (cells that have both)
-%   2) Distance between trial centroids vs variability (|Δ|/mean) (all trial pairs)
-%   3) Trial firing rate vs distance to PF center (all trials)
+% Figure with three columns and (#rats + 1 pooled) rows:
+%   - Col 1: Paired per-cell means (in-PF vs out-PF) [cells with both]
+%   - Col 2: Bar + error bars (mean ± SEM) of ALL trial rates (in-PF vs out-PF)
+%            [includes cells that only fired in one condition]; Welch t-test
+%   - Col 3: Distance between trial centroids vs variability (|Δ|/mean), all pairs
 %
-% RATEMASK RULE:
-%   For each day 'YYYY_MM_DD', use rat.ratemask.ratemask_YYYY_MM_DD (Ncells x 1).
-%   Keep cells where mv==1. If ratemask missing or size mismatch, skip that day.
+% Usage:
+%   plotTaskVar_InOut_vs_Distance({'rat0222','rat0314'}, 'Days',[], 'WinSecs',[0 2], ...)
+%
+% Pass-through options: 'Days', 'WinSecs',[0 2], 'SpeedThresh',4, 'NSD',1,
+% 'MinTrials',10, 'MinSpikes',3
 
 % ---------- args ----------
 p = inputParser;
-addParameter(p,'Days',[],@(d) ischar(d) || isstring(d) || iscellstr(d) || isempty0(d));
+addParameter(p,'Days',[],@(d) ischar(d) || isstring(d) || iscellstr(d) || isempty(d));
 addParameter(p,'WinSecs',[0 2], @(v) isnumeric(v)&&numel(v)==2&&v(2)>v(1));
 addParameter(p,'SpeedThresh',4, @(x) isnumeric(x)&&isscalar(x)&&x>=0);
-addParameter(p,'NSD',1, @(x) isnumeric(x)&&isscalar(x)&&isfinite(x));
+addParameter(p,'NSD',1, @(x) isnumeric(x)&&isscalar(x)&&isfinite(x)); % number of SDs for PF mask
 addParameter(p,'MinTrials',10, @(x) isnumeric(x)&&isscalar(x)&&x>=1);
 addParameter(p,'MinSpikes',0, @(x) isnumeric(x)&&isscalar(x)&&x>=0);
 addParameter(p,'CentroidMethod','mode', ...
@@ -30,162 +33,178 @@ minSpk         = p.Results.MinSpikes;
 centroidMethod = lower(p.Results.CentroidMethod);
 centroidBinCm  = p.Results.CentroidBinCm;
 
-if ischar(ratNames) || isstring(ratNames), ratNames = cellstr(ratNames); end
+if ischar(ratNames) || isstring(ratNames)
+    ratNames = cellstr(ratNames);
+end
 nRats = numel(ratNames);
 
-% ---------- compute R per rat ----------
+% Containers for pooled row
+pooled_in_means   = [];
+pooled_out_means  = [];
+pooled_in_trials  = [];
+pooled_out_trials = [];
+pooled_dist       = [];
+pooled_cv         = [];
+pooled_dist_pf    = [];
+pooled_rates_all  = [];
+
+% Precompute results per rat
 ratResults = cell(1, nRats);
 for r = 1:nRats
-    ratName = ratNames{r};
-    ratResults{r} = getRatR(ratName, daysArg, winSecs, vMin, Nsd, minT, minSpk, centroidMethod, centroidBinCm);
+    rat = ratNames{r};
+    R = getRatR(rat, daysArg, winSecs, vMin, Nsd, minT, minSpk, centroidMethod, centroidBinCm);
+    ratResults{r} = R;
 end
 
-% ---------- pooled containers ----------
-pooled_in_means  = [];
-pooled_out_means = [];
-
-pooled_dist      = [];
-pooled_cv        = [];
-
-pooled_dist_pf   = [];
-pooled_rates_all = [];
-
-% ---------- FIG 1: paired in/out per cell ----------
+% ---------- build figure ----------
+figure
 nRows = nRats + 1;
-figure('Color','w','Position',[100 50 900 250 + 180*nRows]);
-t1 = tiledlayout(nRows,1,'TileSpacing','compact','Padding','compact');
+nCols =  1;  % two active tiles per row
+figure('Color','w','Position',[100 50 1500 320 + 220*nRows]);
+t = tiledlayout(nRows, nCols, 'TileSpacing','compact','Padding','compact');
 
 for r = 1:nRats
     R = ratResults{r};
-    ratName = ratNames{r};
-
-    [inVec, outVec] = collectInOutPerCell(R, ratName);
-
+  %  --- Col 1: paired per-cell in-PF vs out-PF means ---
+    [inVec, outVec] = collectInOutPerCell(R);
     nexttile; hold on; box on
-    if isempty0(inVec)
-        text(0.5,0.5,'No cells with both in/out-PF (after ratemask)','HorizontalAlignment','center');
+    if isempty(inVec)
+        text(0.5,0.5,'No cells with both in/out-PF','HorizontalAlignment','center');
         axis off
     else
         pairedDotPlot(inVec, outVec);
         [~,p_pair,~,stats] = ttest(inVec, outVec);
-        title(sprintf('%s | paired in/out  (p=%.3g, t=%.2f, n=%d)', ratName, p_pair, stats.tstat, numel(inVec)));
+        title(sprintf('%s | paired in/out  (p=%.3g, t=%.2f, n=%d)', ...
+              ratNames{r}, p_pair, stats.tstat, numel(inVec)));
     end
-    ylabel(ratName);
-    if r==nRats, xlabel('Condition'); end
-
-    pooled_in_means  = [pooled_in_means;  inVec];   %#ok<AGROW>
-    pooled_out_means = [pooled_out_means; outVec];  %#ok<AGROW>
+    ylabel(ratNames{r});
+    if r == nRats
+        xlabel('Condition');
+    end
 end
 
-% pooled row for Fig 1
-nexttile; hold on; box on
-if isempty0(pooled_in_means)
-    text(0.5,0.5,'No pooled cells with both in/out-PF (after ratemask)','HorizontalAlignment','center');
-    axis off
+
+
+figure
+nRows = nRats + 1;
+nCols =  1;  % two active tiles per row
+figure('Color','w','Position',[100 50 1500 320 + 220*nRows]);
+t = tiledlayout(nRows, nCols, 'TileSpacing','compact','Padding','compact');
+
+for r = 1:nRats
+    R = ratResults{r};
+
+    % --- ACTIVE Col A: distance vs variability (PF ignored) ---
+    [distAll, cvAll] = collectDistVsVarAllTrials(R);
+
+    % --- ACTIVE Col B: rate vs distance to PF center ---
+    [distPF, trialRates] = collectRateVsPFdistance(R);
+
+    axB = nexttile;  % <— capture axes
+    if isempty(distPF)
+        box(axB,'off'); axis(axB,'off');
+        text(axB,0.5,0.5,'No rate/dist-to-PF data','HorizontalAlignment','center');
+    else
+        tallBinScatterFit(axB, distPF, trialRates, 60, 'Nshow', 5e4);
+        xlabel(axB,'Distance to PF center (cm)');
+        ylabel(axB,'In-trial firing rate (Hz)');
+        [m2,b2,r2,p2] = fitLineAndCorr(distPF, trialRates);
+        xx2 = linspace(min(distPF), max(distPF), 200);
+        hold(axB,'on'); plot(axB, xx2, m2*xx2 + b2, 'k-', 'LineWidth',1.2);
+        title(axB, sprintf('%s | rate vs PF-dist  r=%.2f, p=%.3g  (n=%d trials)', ...
+                ratNames{r}, r2, p2, numel(trialRates)));
+    end
+
+    % add to pooled (keep these even if Col 1/2 are commented)
+    [inVec, outVec] = collectInOutPerCell(R);
+    [inTrials, outTrials] = collectAllTrialRates(R);
+    pooled_in_means   = [pooled_in_means;  inVec];          %#ok<AGROW>
+    pooled_out_means  = [pooled_out_means; outVec];         %#ok<AGROW>
+    pooled_in_trials  = [pooled_in_trials;  inTrials(:)];   %#ok<AGROW>
+    pooled_out_trials = [pooled_out_trials; outTrials(:)];  %#ok<AGROW>
+    pooled_dist       = [pooled_dist; distAll];             %#ok<AGROW>
+    pooled_cv         = [pooled_cv;   cvAll];               %#ok<AGROW>
+    pooled_dist_pf    = [pooled_dist_pf;   distPF(:)];      %#ok<AGROW>
+    pooled_rates_all  = [pooled_rates_all; trialRates(:)];  %#ok<AGROW>
+end
+
+figure
+nRows = nRats + 1;
+nCols =  1;  % two active tiles per row
+figure('Color','w','Position',[100 50 1500 320 + 220*nRows]);
+t = tiledlayout(nRows, nCols, 'TileSpacing','compact','Padding','compact');
+
+for r = 1:nRats
+[distAll, cvAll] = collectDistVsVarAllTrials(R);
+
+axA = nexttile;  
+if isempty(distAll)
+    box(axA,'off'); axis(axA,'off');
+    text(axA,0.5,0.5,'No trial pairs','HorizontalAlignment','center');
+else
+    tallBinScatterFit(axA, distAll, cvAll, 60, 'Nshow', 5e4);
+    xlabel(axA,'Centroid distance between trials (cm)');
+    ylabel(axA,'|Δ rate| / mean');
+    [m,b,rho,pv] = fitLineAndCorr(distAll, cvAll);
+    xx = linspace(min(distAll), max(distAll), 200);
+    hold(axA,'on'); plot(axA, xx, m*xx + b, 'k-', 'LineWidth',1.2);
+    title(axA, sprintf('%s | r=%.2f, p=%.3g  (n=%d pairs)', ratNames{r}, rho, pv, numel(cvAll)));
+end
+end
+% ---------- pooled row ----------
+
+figure
+% Col 1 pooled (paired means)
+hold on; box on
+if isempty(pooled_in_means)
+    text(0.5,0.5,'No pooled cells with both in/out-PF','HorizontalAlignment','center'); axis off
 else
     pairedDotPlot(pooled_in_means, pooled_out_means);
     [~,p_pair,~,stats] = ttest(pooled_in_means, pooled_out_means);
-    title(sprintf('POOLED | paired in/out  (p=%.3g, t=%.2f, n=%d)', p_pair, stats.tstat, numel(pooled_in_means)));
+    title(sprintf('POOLED | paired in/out  (p=%.3g, t=%.2f, n=%d)', ...
+          p_pair, stats.tstat, numel(pooled_in_means)));
 end
-ylabel('POOLED');
-title(t1,'Paired per-cell means (ratemask-filtered)','FontWeight','bold');
+ylabel('POOLED'); xlabel('Condition');
 
-% ---------- FIG 2: dist vs var (rows) ----------
-figure('Color','w','Position',[100 50 900 250 + 180*nRows]);
-t2 = tiledlayout(nRows,1,'TileSpacing','compact','Padding','compact');
-
-for r = 1:nRats
-    R = ratResults{r};
-    ratName = ratNames{r};
-
-    [distAll, cvAll] = collectDistVsVarAllTrials(R, ratName);
-
-    nexttile; hold on; box on
-    if isempty0(distAll)
-        axis off
-        text(0.5,0.5,'No trial pairs (after ratemask)','HorizontalAlignment','center');
-        title(sprintf('%s | dist vs var', ratName));
-    else
-        tallBinScatterFit(gca, distAll, cvAll, 60, 'Nshow', 5e4);
-        xlabel('Centroid distance between trials (cm)');
-        ylabel('|Δ rate| / mean');
-        [m,b,rho,pv] = fitLineAndCorr(distAll, cvAll);
-        xx = linspace(min(distAll), max(distAll), 200);
-        plot(xx, m*xx + b, 'k-', 'LineWidth',1.2);
-        title(sprintf('%s | dist vs var  r=%.2f, p=%.3g  (n=%d pairs)', ratName, rho, pv, numel(cvAll)));
-    end
-
-    pooled_dist = [pooled_dist; distAll]; %#ok<AGROW>
-    pooled_cv   = [pooled_cv;   cvAll];   %#ok<AGROW>
-end
-
-% pooled row for Fig 2
-nexttile; hold on; box on
-if isempty0(pooled_dist)
-    axis off
-    text(0.5,0.5,'No pooled trial pairs (after ratemask)','HorizontalAlignment','center');
+% Col 3 pooled (distance vs variability)
+figure
+axP1 = nexttile;                           % << capture the axes
+if isempty(pooled_dist)
+    box(axP1,'off'); axis(axP1,'off');
+    text(axP1,0.5,0.5,'No pooled trial pairs','HorizontalAlignment','center');
 else
-    tallBinScatterFit(gca, pooled_dist, pooled_cv, 80, 'Nshow', 1e5);
-    xlabel('Centroid distance between trials (cm)');
-    ylabel('|Δ rate| / mean');
+    tallBinScatterFit(axP1, pooled_dist, pooled_cv, 80, 'Nshow', 1e5);  % << pass ax
+    xlabel(axP1,'Centroid distance between trials (cm)');
+    ylabel(axP1,'|Δ rate| / mean');
     [m,b,rho,pv] = fitLineAndCorr(pooled_dist, pooled_cv);
     xx = linspace(min(pooled_dist), max(pooled_dist), 300);
-    plot(xx, m*xx + b, 'k-', 'LineWidth',1.2);
-    title(sprintf('POOLED | dist vs var  r=%.2f, p=%.3g  (n=%d pairs)', rho, pv, numel(pooled_cv)));
-end
-title(t2,'Distance vs variability (ratemask-filtered)','FontWeight','bold');
-
-% ---------- FIG 3: rate vs PF distance (rows) ----------
-figure('Color','w','Position',[100 50 900 250 + 180*nRows]);
-t3 = tiledlayout(nRows,1,'TileSpacing','compact','Padding','compact');
-
-for r = 1:nRats
-    R = ratResults{r};
-    ratName = ratNames{r};
-
-    [distPF, trialRates] = collectRateVsPFdistance(R, ratName);
-
-    nexttile; hold on; box on
-    if isempty0(distPF)
-        axis off
-        text(0.5,0.5,'No rate vs PF-distance data (after ratemask)','HorizontalAlignment','center');
-        title(sprintf('%s | rate vs PF-dist', ratName));
-    else
-        tallBinScatterFit(gca, distPF, trialRates, 60, 'Nshow', 5e4);
-        xlabel('Distance to PF center (cm)');
-        ylabel('In-trial firing rate (Hz)');
-        [m2,b2,r2,p2] = fitLineAndCorr(distPF, trialRates);
-        xx2 = linspace(min(distPF), max(distPF), 200);
-        plot(xx2, m2*xx2 + b2, 'k-', 'LineWidth',1.2);
-        title(sprintf('%s | rate vs PF-dist  r=%.2f, p=%.3g  (n=%d trials)', ratName, r2, p2, numel(trialRates)));
-    end
-
-    pooled_dist_pf   = [pooled_dist_pf;   distPF(:)];      %#ok<AGROW>
-    pooled_rates_all = [pooled_rates_all; trialRates(:)];  %#ok<AGROW>
+    hold(axP1,'on'); plot(axP1, xx, m*xx + b, 'k-', 'LineWidth',1.2);
+    title(axP1, sprintf('POOLED | r=%.2f, p=%.3g  (n=%d pairs)', rho, pv, numel(pooled_cv)));
 end
 
-% pooled row for Fig 3
-nexttile; hold on; box on
-if isempty0(pooled_dist_pf)
-    axis off
-    text(0.5,0.5,'No pooled rate vs PF-distance data (after ratemask)','HorizontalAlignment','center');
+% NEW pooled: firing rate vs distance from PF center
+figure
+axP2 = nexttile;
+if isempty(pooled_dist_pf)
+    box off; axis off
+    text(0.5,0.5,'No pooled rate/dist-to-PF data','HorizontalAlignment','center');
 else
-    tallBinScatterFit(gca, pooled_dist_pf, pooled_rates_all, 80, 'Nshow', 1e5);
+    tallBinScatterFit(axP2, pooled_dist_pf, pooled_rates_all, 80, 'Nshow', 1e5);
     xlabel('Distance to PF center (cm)');
     ylabel('In-trial firing rate (Hz)');
     [m2,b2,r2,p2] = fitLineAndCorr(pooled_dist_pf, pooled_rates_all);
     xx2 = linspace(min(pooled_dist_pf), max(pooled_dist_pf), 300);
-    plot(xx2, m2*xx2 + b2, 'k-', 'LineWidth',1.2);
-    title(sprintf('POOLED | rate vs PF-dist  r=%.2f, p=%.3g  (n=%d trials)', r2, p2, numel(pooled_rates_all)));
+    hold on; plot(xx2, m2*xx2 + b2, 'k-', 'LineWidth',1.2);
+    title(sprintf('POOLED | rate vs PF-dist  r=%.2f, p=%.3g  (n=%d trials)', ...
+          r2, p2, numel(pooled_rates_all)));
 end
-title(t3,'Rate vs distance-to-PF (ratemask-filtered)','FontWeight','bold');
 
-end % main
+title(t, 'Task firing variability: (A) Distance vs Variability  |  (B) Rate vs Distance-to-PF', ...
+      'FontWeight','bold');
 
+end % main function
 
-% ======================================================================
-% Helpers
-% ======================================================================
+% -------------------- helpers --------------------
 
 function R = getRatR(ratName, daysArg, winSecs, vMin, Nsd, minT, minSpk, centroidMethod, centroidBinCm)
 R = taskFiringVariability(ratName, ...
@@ -196,33 +215,32 @@ R = taskFiringVariability(ratName, ...
         'Plot',false);
 end
 
-function [inVec, outVec] = collectInOutPerCell(R, ratName)
+function [inVec, outVec] = collectInOutPerCell(R)
+% Per-cell paired means (only cells with >=1 trial in both in/out)
 inVec  = [];
 outVec = [];
-if ~isfield(R,'perDay') || isempty0(R.perDay), return, end
-
+if ~isfield(R,'perDay') || isempty(R.perDay), return, end
 for d = 1:numel(R.perDay)
-    if ~isfield(R.perDay(d),'perCell'), continue, end
     PC = R.perDay(d).perCell;
-    if isempty0(PC), continue, end
+    if isempty(PC), continue, end
 
-    dayStr  = getDayStr(R.perDay(d));
-    keepIdx = ratemask_keepIdx(ratName, dayStr, numel(PC));
-    if isempty0(keepIdx), continue, end
+    % --- RATEMASK (added) ---
+    mask = getDayRatemask_local(R.ratVar, R.perDay(d).date, numel(PC));
+    % ------------------------
 
-    for c = keepIdx
-        if ~isfield(PC(c),'rates') || isempty0(PC(c).rates) || ~isfield(PC(c),'inPF_trial') || isempty0(PC(c).inPF_trial)
+    for c = 1:numel(PC)
+        if c <= numel(mask) && mask(c)==0, continue; end
+
+        if ~isfield(PC(c),'rates') || isempty(PC(c).rates) || ~isfield(PC(c),'inPF_trial')
             continue
         end
         rates = PC(c).rates(:);
         inpf  = PC(c).inPF_trial(:);
         if numel(inpf) ~= numel(rates), continue, end
-
         mi = mean(rates(inpf==1), 'omitnan');
         mo = mean(rates(inpf==0), 'omitnan');
         ni = nnz(inpf==1 & isfinite(rates));
         no = nnz(inpf==0 & isfinite(rates));
-
         if isfinite(mi) && isfinite(mo) && ni>=1 && no>=1
             inVec  = [inVec;  mi]; %#ok<AGROW>
             outVec = [outVec; mo]; %#ok<AGROW>
@@ -231,109 +249,74 @@ for d = 1:numel(R.perDay)
 end
 end
 
-function [distAll, cvAll] = collectDistVsVarAllTrials(R, ratName)
-distAll = [];
-cvAll   = [];
-if ~isfield(R,'perDay') || isempty0(R.perDay), return, end
+function [inTrials, outTrials] = collectAllTrialRates(R)
+% ALL individual trial rates pooled (includes one-sided cells)
+% NOTE: if R.extra.* was computed without ratemask, this helper recomputes from perCell using ratemask.
+inTrials  = [];
+outTrials = [];
 
+if ~isfield(R,'perDay') || isempty(R.perDay), return, end
 for d = 1:numel(R.perDay)
-    if ~isfield(R.perDay(d),'perCell'), continue, end
     PC = R.perDay(d).perCell;
-    if isempty0(PC), continue, end
+    if isempty(PC), continue, end
 
-    dayStr  = getDayStr(R.perDay(d));
-    keepIdx = ratemask_keepIdx(ratName, dayStr, numel(PC));
-    if isempty0(keepIdx), continue, end
+    % --- RATEMASK (added) ---
+    mask = getDayRatemask_local(R.ratVar, R.perDay(d).date, numel(PC));
+    % ------------------------
 
-    for c = keepIdx
-        if ~isfield(PC(c),'rates')     || isempty0(PC(c).rates) || ...
-           ~isfield(PC(c),'centroids') || isempty0(PC(c).centroids)
+    for c = 1:numel(PC)
+        if c <= numel(mask) && mask(c)==0, continue; end
+        if ~isfield(PC(c),'rates') || isempty(PC(c).rates) || ~isfield(PC(c),'inPF_trial')
             continue
         end
+        r = PC(c).rates(:);
+        inpf = PC(c).inPF_trial(:);
+        if numel(inpf) ~= numel(r), continue, end
+        inTrials  = [inTrials;  r(inpf==1)]; %#ok<AGROW>
+        outTrials = [outTrials; r(inpf==0)]; %#ok<AGROW>
+    end
+end
 
+inTrials  = inTrials(isfinite(inTrials));
+outTrials = outTrials(isfinite(outTrials));
+end
+
+function [distAll, cvAll] = collectDistVsVarAllTrials(R)
+% For each perDay/perCell, form all trial pairs (i<j):
+%   distance = euclidean distance between trial centroids
+%   variability = |Δ rate| / mean(rate_i, rate_j)
+% Ignores in/out PF.
+distAll = [];
+cvAll   = [];
+if ~isfield(R,'perDay') || isempty(R.perDay), return, end
+for d = 1:numel(R.perDay)
+    PC = R.perDay(d).perCell;
+    if isempty(PC), continue, end
+
+    % --- RATEMASK (added) ---
+    mask = getDayRatemask_local(R.ratVar, R.perDay(d).date, numel(PC));
+    % ------------------------
+
+    for c = 1:numel(PC)
+        if c <= numel(mask) && mask(c)==0, continue; end
+
+        if ~isfield(PC(c),'rates') || isempty(PC(c).rates) || ...
+           ~isfield(PC(c),'centroids') || isempty(PC(c).centroids)
+            continue
+        end
         rates = PC(c).rates(:);
         cents = PC(c).centroids;
-
-        if size(cents,1) ~= numel(rates)
-            n = min(numel(rates), size(cents,1));
-            if n < 2, continue, end
-            rates = rates(1:n);
-            cents = cents(1:n,:);
-        end
-
         keep  = isfinite(rates) & all(isfinite(cents),2);
         rates = rates(keep);
         cents = cents(keep,:);
         if numel(rates) < 2, continue, end
-
         D = squareform(pdist(cents,'euclidean'));
         [I,J] = find(triu(true(size(D)),1));
         dvec  = D(sub2ind(size(D), I, J));
         diffA = abs(rates(I) - rates(J));
         cv    = diffA ./ max(eps, 0.5*(rates(I)+rates(J)));
-
         distAll = [distAll; dvec(:)]; %#ok<AGROW>
         cvAll   = [cvAll;   cv(:)];   %#ok<AGROW>
-    end
-end
-end
-
-function [distPF, rates] = collectRateVsPFdistance(R, ratName)
-distPF = [];
-rates  = [];
-if ~isfield(R,'perDay') || isempty0(R.perDay), return, end
-
-for d = 1:numel(R.perDay)
-    if ~isfield(R.perDay(d),'perCell'), continue, end
-    PC = R.perDay(d).perCell;
-    if isempty0(PC), continue, end
-
-    dayStr  = getDayStr(R.perDay(d));
-    keepIdx = ratemask_keepIdx(ratName, dayStr, numel(PC));
-    if isempty0(keepIdx), continue, end
-
-    for c = keepIdx
-        if ~isfield(PC(c),'rates') || isempty0(PC(c).rates)
-            continue
-        end
-        r = PC(c).rates(:);
-
-        % Prefer stored dist_to_pf, else recompute from centroids + pf_center
-        dp = [];
-        have_dp     = isfield(PC(c),'dist_to_pf') && ~isempty0(PC(c).dist_to_pf);
-        have_cent   = isfield(PC(c),'centroids') && ~isempty0(PC(c).centroids);
-        have_center = isfield(PC(c),'pf_center') && numel(PC(c).pf_center)==2 && all(isfinite(PC(c).pf_center));
-
-        if have_dp
-            dp = PC(c).dist_to_pf(:);
-        end
-
-        if isempty0(dp) || numel(dp) ~= numel(r)
-            if have_cent && have_center
-                cents = PC(c).centroids;
-                n = min(numel(r), size(cents,1));
-                if n < 1, continue, end
-                r = r(1:n);
-                cents = cents(1:n,:);
-                ctr = PC(c).pf_center(:).';
-                dp = sqrt(sum((cents - ctr).^2, 2));
-            else
-                if ~isempty0(dp)
-                    n = min(numel(r), numel(dp));
-                    if n < 1, continue, end
-                    r  = r(1:n);
-                    dp = dp(1:n);
-                else
-                    continue
-                end
-            end
-        end
-
-        good = isfinite(r) & isfinite(dp);
-        if any(good)
-            distPF = [distPF; dp(good)]; %#ok<AGROW>
-            rates  = [rates;  r(good)];  %#ok<AGROW>
-        end
     end
 end
 end
@@ -363,7 +346,77 @@ m = P(1); b = P(2);
 [rho,pv] = corr(x,y,'Rows','complete','Type','Pearson');
 end
 
+function [distPF, rates] = collectRateVsPFdistance(R)
+% Concatenate per-trial distance-to-PF-center and trial firing rate.
+% Robust to length mismatches by recomputing from centroids/pf_center when available,
+% otherwise truncates to the common minimum length.
+
+distPF = [];
+rates  = [];
+if ~isfield(R,'perDay') || isempty(R.perDay), return, end
+
+for d = 1:numel(R.perDay)
+    PC = R.perDay(d).perCell;
+    if isempty(PC), continue, end
+
+    % --- RATEMASK (added) ---
+    mask = getDayRatemask_local(R.ratVar, R.perDay(d).date, numel(PC));
+    % ------------------------
+
+    for c = 1:numel(PC)
+        if c <= numel(mask) && mask(c)==0, continue; end
+
+        if ~isfield(PC(c),'rates') || isempty(PC(c).rates)
+            continue
+        end
+        r = PC(c).rates(:);
+
+        dp = [];  % candidate distances
+        have_dp = isfield(PC(c),'dist_to_pf') && ~isempty(PC(c).dist_to_pf);
+        have_cent = isfield(PC(c),'centroids') && ~isempty(PC(c).centroids);
+        have_center = isfield(PC(c),'pf_center') && numel(PC(c).pf_center)==2 && all(isfinite(PC(c).pf_center));
+
+        if have_dp
+            dp = PC(c).dist_to_pf(:);
+        end
+
+        % If lengths mismatch, try to recompute from centroids + pf_center
+        if isempty(dp) || numel(dp) ~= numel(r)
+            if have_cent && have_center
+                cents = PC(c).centroids;
+                % align lengths to be safe
+                n = min(numel(r), size(cents,1));
+                if n < 1, continue, end
+                r = r(1:n);
+                cents = cents(1:n,:);
+                ctr = PC(c).pf_center(:).';  % [1x2]
+                dp = sqrt(sum((cents - ctr).^2, 2));
+            else
+                % Last resort: truncate to common min length if we at least have dp
+                if ~isempty(dp)
+                    n = min(numel(r), numel(dp));
+                    if n < 1, continue, end
+                    r  = r(1:n);
+                    dp = dp(1:n);
+                else
+                    % No way to form matched pairs
+                    continue
+                end
+            end
+        end
+
+        % Final clean
+        good = isfinite(r) & isfinite(dp);
+        if any(good)
+            distPF = [distPF; dp(good)]; %#ok<AGROW>
+            rates  = [rates;  r(good)];  %#ok<AGROW>
+        end
+    end
+end
+end
+
 function tallBinScatterFit(ax, x, y, nbins, varargin)
+% Efficient scatter for large N with binned median ± IQR overlay.
 ip = inputParser;
 addParameter(ip,'Nshow',5e4,@(z)isnumeric(z)&&isscalar(z)&&z>=0);
 parse(ip,varargin{:});
@@ -376,63 +429,44 @@ good = isfinite(x) & isfinite(y);
 x = x(good); y = y(good);
 n = numel(x);
 
-if Nshow>0 && n>Nshow
-    idx = randperm(n, Nshow);
-else
-    idx = 1:n;
-end
+% backdrop subsample
+if Nshow>0 && n>Nshow, idx = randperm(n, Nshow); else, idx = 1:n; end
 scatter(ax, x(idx), y(idx), 10, 'filled', 'MarkerFaceAlpha',0.25);
-
-% (bin overlay intentionally omitted, like your current version)
 end
 
-% ---------- ratemask + day helpers ----------
-
-function dayStr = getDayStr(perDayStruct)
-% Pull a day string like '2023_05_09' from common perDay fields.
-dayStr = '';
-cands = {'day','date','dayStr','dateStr','Day','Date'};
-for i = 1:numel(cands)
-    f = cands{i};
-    if isfield(perDayStruct,f) && ~isempty0(perDayStruct.(f))
-        v = perDayStruct.(f);
-        if isstring(v) || ischar(v)
-            dayStr = char(v);
-            return
-        end
-    end
-end
-end
-
-function keepIdx = ratemask_keepIdx(ratName, dayStr, nCells)
-% rat.ratemask.ratemask_YYYY_MM_DD is Ncells x 1, with 1=keep, 0=drop.
-% Strict: missing/mismatch => [] (skip day).
-keepIdx = [];
-
-if isempty0(dayStr), return, end
-if ~evalin('base', sprintf('exist(''%s'',''var'')', ratName)), return, end
-rat = evalin('base', ratName);
-
-maskField = sprintf('ratemask_%s', dayStr);
-if ~isfield(rat,'ratemask') || ~isfield(rat.ratemask, maskField), return, end
-
-mv = rat.ratemask.(maskField);
-mv = mv(:);
-
-if numel(mv) ~= nCells
+function mask = getDayRatemask_local(ratName, dayTok, nCells)
+% Return ratemask vector for this rat/day if present; otherwise all-true.
+mask = true(nCells,1);
+try
+    rat = evalin('base', ratName);
+catch
     return
 end
 
-keepIdx = find(mv == 1);
+if ~isfield(rat,'ratemask') || ~isstruct(rat.ratemask), return, end
+
+D = strrep(strrep(char(dayTok),'-','_'),'/','_');
+
+% try exact
+fld = ['ratemask_' D];
+if isfield(rat.ratemask, fld)
+    m = rat.ratemask.(fld);
+    if numel(m) >= nCells, mask = logical(m(1:nCells)); else, mask(1:numel(m)) = logical(m(:)); end
+    return
 end
 
-
-function tf = isempty0(varargin)
-% Robust wrapper around builtin isempty to avoid path shadowing.
-% Accepts any #args so it never throws "Too many input arguments".
-if nargin < 1
-    tf = true;
-else
-    tf = builtin('isempty', varargin{1});
+% try padded/unpadded variants if token looks like yyyy_m_d
+tok = regexp(D,'^(\d{4})_(\d{1,2})_(\d{1,2})$','tokens','once');
+if ~isempty(tok)
+    yy = tok{1}; mm = str2double(tok{2}); dd = str2double(tok{3});
+    cands = {sprintf('%s_%02d_%02d',yy,mm,dd), sprintf('%s_%d_%d',yy,mm,dd)};
+    for k = 1:numel(cands)
+        fldk = ['ratemask_' cands{k}];
+        if isfield(rat.ratemask, fldk)
+            m = rat.ratemask.(fldk);
+            if numel(m) >= nCells, mask = logical(m(1:nCells)); else, mask(1:numel(m)) = logical(m(:)); end
+            return
+        end
+    end
 end
 end

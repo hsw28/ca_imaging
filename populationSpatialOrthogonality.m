@@ -149,6 +149,7 @@ tiledlayout(figAll,2,3,'TileSpacing','compact','Padding','compact');
 
 % (1,1) GRAND pooled heatmap
 nexttile(1);
+clims = [-.7, 1];
 imagesc(Cgrand, clims); axis square; colormap(gca, parula); colorbar;
 xticks(1:K); yticks(1:K); xlabel('Bin'); ylabel('Bin');
 if ~isempty(grandStats)
@@ -416,6 +417,7 @@ for j = 1:3
     if j <= numel(dayIdx)
         d = dayIdx(j);
         C = R.perDay(d).cosSimK;
+        clims = [-.8,1];
         imagesc(C, clims); axis square; colormap(gca, parula); colorbar;
         xticks(1:K); yticks(1:K); xlabel('Bin'); ylabel('Bin');
         mOff = mean(C(offMask),'omitnan');

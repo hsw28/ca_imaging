@@ -213,7 +213,8 @@ for j = 1:3
     if j <= numel(dayIdx)
         d = dayIdx(j);
         C = R.perDay(d).simMat;
-        clim = strcmp(simStr,'cosine')*[0 1] + ~strcmp(simStr,'cosine')*[-1 1];
+        %clim = strcmp(simStr,'cosine')*[0 1] + ~strcmp(simStr,'cosine')*[-1 1];
+        clim = [-.7, 1];
         imagesc(C, clim); axis square; colormap(gca, parula); colorbar;
         xticks(1:nSplits); yticks(1:nSplits); xlabel('Split'); ylabel('Split');
         if strcmp(simStr,'cosine')

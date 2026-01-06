@@ -1,4 +1,4 @@
-function rolling_struct = MI_control_rollingPost(spike_structure, pos_structure, velthreshold, dim, CA_timestamps, CS_times_struct, nIter, winEdges, ControlMatch, NSpeedBins, SpaceBinSize)
+function rolling_struct = MI_control_rollingPost(spike_structure, pos_structure, velthreshold, dim, CA_timestamps, CS_times_struct, nIter, winEdges, ControlMatch, NSpeedBins, SpaceBinSize, RM_structure)
 % MI_control_rollingPost  (CS-aligned rolling removal/control; negatives allowed)
 %
 % Test  : remove spikes ONLY in the CURRENT CS-aligned window from the movement MI pool.
@@ -37,12 +37,15 @@ fields_spikes = fieldnames(spike_structure);
 fields_pos    = fieldnames(pos_structure);
 fields_cats   = fieldnames(CA_timestamps);
 fields_CS     = fieldnames(CS_times_struct);
+fields_RM     = fieldnames(RM_structure);
 
 % last 3 days
 fields_spikes = fields_spikes(max(1,end-2):end);
 fields_pos    = fields_pos(   max(1,end-2):end);
 fields_cats   = fields_cats(  max(1,end-2):end);
 fields_CS     = fields_CS(    max(1,end-2):end);
+fields_RM     = fields_RM(    max(1,end-2):end);
+
 
 rolling_struct = struct();
 
@@ -52,10 +55,12 @@ for iDay = 1:numel(fields_spikes)
     fieldName_pos = fields_pos{iDay};
     fieldName_ts  = fields_cats{iDay}; %#ok<NASGU>
     fieldName_CS  = fields_CS{iDay};
+    fieldName_RM = fields_RM{iDay};
 
-    peaks_time = spike_structure.(fieldName_sp);   % Ncells x NspikeTimes
+    peaks_time = spike_structure.(fieldName_sp);  % Ncells x NspikeTimes
     pos        = pos_structure.(fieldName_pos);    % [t x y]
     cs_times   = CS_times_struct.(fieldName_CS);   % vector of CS onset times (sec)
+    RM = RM_structure.(fieldName_RM);
 
     spikes_date = extract_date_suffix(fieldName_sp);
 
@@ -101,8 +106,10 @@ for iDay = 1:numel(fields_spikes)
     Iter_OK        = nan(nWins, nCells);   % # successful control iterations used (for MI_rand)
 
     % ---------- MI_base over movement ----------
+
     for k = 1:nCells
         spk = peaks_time(k,:); spk = spk(~isnan(spk) & spk > 0);
+        if RM(k) == 0, continue; end
         if isempty(spk), continue; end
         spike_vel = interp1(vel_time, vel_mag, spk, 'linear', NaN);
         move_spikes = spk(spike_vel >= velthreshold);

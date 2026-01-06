@@ -23,14 +23,14 @@ for r = 1:length(ratNames)
      miVec = rat.MI_noCSUS15.(['MI_' theseDays{d}]);
   %   miVec = rat.MI_noCSUS30.(['MI_' theseDays{d}]);
   %  miVec = rat.MI_CSUS15.(['MI_' theseDays{d}]);
-  %miVec = rat.MI_wCSUS.(['MI_' theseDays{d}]);
-  %   miVec = rat.bitsperCSUS.(['MI_' theseDays{d}]);
+    %miVec = rat.MI_wCSUS.(['MI_' theseDays{d}]);
+    % miVec = rat.bitsperCSUS.(['MI_' theseDays{d}]);
     %          miVec = miVec(1,:); %%% ONLY FOR BITS PER -- THIS IS BITS PER SPIKE
   %           miVec = miVec(2,:); %%% ONLY FOR BITS PER -- THIS IS BITS PER SEC
 
-      %miVec = rat.bitsper.(['MI_' theseDays{d}]);
+    %  miVec = rat.bitsper.(['MI_' theseDays{d}]);
       %      miVec = miVec(1,:); %%% ONLY FOR BITS PER -- THIS IS BITS PER SPIKE
-      %      miVec = miVec(2,:); %%% ONLY FOR BITS PER -- THIS IS BITS PER SEC
+        %    miVec = miVec(2,:); %%% ONLY FOR BITS PER -- THIS IS BITS PER SEC
 
     %  nanny = isnan(miVec2);
     %  miVec(nanny) = NaN;
@@ -101,7 +101,7 @@ for r = 1:length(ratNames)
 
         %  miVec = rat.bitsper.(['MI_' theseDays{d}]);
         %        miVec = miVec(1,:); %%% ONLY FOR BITS PER -- THIS IS BITS PER SPIKE
-          %     miVec = miVec(2,:); %%% ONLY FOR BITS PER -- THIS IS BITS PER SEC
+        %       miVec = miVec(2,:); %%% ONLY FOR BITS PER -- THIS IS BITS PER SEC
 
         miVec(rate==0) = NaN;
 
