@@ -1,50 +1,44 @@
 function R = run_task_to_space_interference(ratNames, varargin)
-% RUN_TASK_TO_SPACE_INTERFERENCE  (C) Space stability with vs without task
-% Time-binned version so you can compare against the space→task analysis.
+% RUN_TASK_TO_SPACE_INTERFERENCE  Space stability with vs without task
 %
-%   CTRL↔TASK similarity is computed per (temporal bin, spatial bin), then
-%   averaged on the Fisher-z scale within each day. WITHOUT-task is the
-%   CTRL split-half reliability in the same spatial bins.
+% TEMPLATE version:
+%   - Build a CTRL spatial template from HALF of non-task frames (CTRL_A).
+%   - Compare template to:
+%       (1) other half of non-task frames (CTRL_B)  -> WITHOUT task
+%       (2) TASK frames in TraceWin (time-binned)   -> WITH task
+%   - All averaging/testing done in Fisher-z (atanh).
 %
-% CONTROL spatial PVs are computed from NON-task frames, excluding
-%   [CS .. CS+TraceWin(2)+BufferPost] for every trial. Optional speed mask.
-%
-% Usage:
-%   R = run_task_to_space_interference({'rat0222','rat0307'}, 'DoPlots',false);
-%
-% Required fields per rat (in base workspace):
+% Required per rat (in base workspace):
 %   rat.Ca_peaks, rat.Ca_ts, rat.pos, rat.CS_times
 %
-% Key options (name/value pairs):
-%   'DaysMode'        : {'last3toAn'|'all'|'last3byca'}  (default 'last3toAn')
-%   'TraceWin'        : [t0 t1] seconds from CS          (default [0 2])
-%   'BufferPost'      : seconds excluded after TraceWin  (default 0)
-%   'CellNorm'        : {'demean'|'zscore'|'none'}       (default 'demean')
-%   'GridRC'          : [rows cols] for spatial grid     (default [3 2])
-%   'NumBins'         : integer, overrides GridRC        (default [])
+% Options (name/value):
+%   'DaysMode'        : {'last3toAn'|'all'|'last3byca'}  default 'last3toAn'
+%   'TraceWin'        : [t0 t1] seconds from CS          default [0 2]
+%   'BufferPost'      : seconds excluded after TraceWin  default 0
+%   'CellNorm'        : {'demean'|'zscore'|'none'}       default 'none'
+%   'GridRC'          : [rows cols] for spatial grid     default [2 2]
+%   'NumBins'         : integer, overrides GridRC        default []
+%   'MinCtrlFrames'   : min CTRL frames per spatial bin *per half* default 10
+%   'MinTraceFrames'  : min TASK frames per (timebin,spatialbin)    default 2
+%   'TimeBins'        : number of temporal bins in TraceWin          default 15
+%   'FramesPerBin'    : fixed frames per temporal bin override       default []
+%   'CtrlSplitMode'   : {'random'|'evenodd'}             default 'random'
+%   'CtrlSplitSeed'   : [] or scalar                     default []
+%   'VelThresh'       : cm/s speed threshold             default 4
+%   'UseSpeedMask'    : bool                             default true
 %
-%   Frame-aligned gates (sampling ~7.5 Hz):
-%   'MinCtrlFrames'   : min CTRL frames per spatial bin          (default 2)
-%   'MinTraceFrames'  : min TASK frames per (temporal, spatial)  (default 2)
-%   'TimeBins'        : number of temporal bins in TraceWin      (default 15)
-%   'FramesPerBin'    : override: fixed frames per temporal bin  (default [])
+% Permutations:
+%   'NPerm_C'         : group null perms                 default 500
+%   'NullMode_C'      : (reserved; currently uses flip within-day pairs)
+%   'DeltaPermType'   : {'derange'|'flip'|'both'}        default 'flip'
 %
-%   CTRL kinematics:
-%   'VelThresh'       : cm/s threshold for speed mask    (default 4)
-%   'UseSpeedMask'    : bool                             (default true)
+% Single-cell (corr across spatial bins per cell):
+%   'DoSingleCell'    : bool                             default true
+%   'NPerm_SC'        : perms                            default 500
+%   'NullMode_SC'     : {'flip-cells'|'template-derange-bins'} default 'flip-cells'
 %
-%   Permutation (C):
-%   'NPerm_C'         : permutations for group null      (default 49)
-%   'NullMode_C'      : {'frame-redistribute'|'ctrl-derange-bins'} (default 'frame-redistribute')
-%
-% Output per animal:
+% Output:
 %   R(i).C.* and R(i).meta.*
-%
-% Notes:
-%   - Temporal binning is by frame index, not seconds. If FramesPerBin is
-%     empty, frames inside TraceWin are split as evenly as possible into
-%     TimeBins chunks per trial.
-%   - Day-level z is the mean of per-(b,k) Fisher z values.
 
 % ------------------------------- Options ---------------------------------
 p = inputParser;
@@ -58,21 +52,25 @@ addParameter(p,'VelThresh',4);
 addParameter(p,'UseSpeedMask',true);
 addParameter(p,'CellNorm','none');  % 'zscore'|'demean'|'none'
 
-% frame-based gates
-addParameter(p,'MinCtrlFrames',2);
+addParameter(p,'MinCtrlFrames',10);
 addParameter(p,'MinTraceFrames',2);
 addParameter(p,'TimeBins',15);
 addParameter(p,'FramesPerBin',[]);
 
-% (C) perms
+addParameter(p,'CtrlSplitMode','random', @(s) any(strcmpi(s,{'random','evenodd'})));
+addParameter(p,'CtrlSplitSeed',[], @(x) isempty(x) || (isnumeric(x)&&isscalar(x)));
+
 addParameter(p,'NPerm_C',500);
-addParameter(p,'NullMode_C','frame-redistribute');
+addParameter(p,'NullMode_C','frame-redistribute'); %#ok<NASGU>
 addParameter(p,'DeltaPermType','flip', @(s) any(strcmpi(s,{'derange','flip','both'})));
+
+addParameter(p,'DoSingleCell',true, @(x) islogical(x)&&isscalar(x));
+addParameter(p,'NPerm_SC',500);
+addParameter(p,'NullMode_SC','flip-cells', @(s) any(strcmpi(s,{'flip-cells','template-derange-bins'})));
 
 addParameter(p,'DoPlots',true);
 parse(p,varargin{:});
 opt = p.Results;
-
 
 ratNames = cellstr(ratNames);
 R = struct([]);
@@ -86,8 +84,8 @@ for ii = 1:numel(ratNames)
     end
     rat = evalin('base', ratVar);
 
-    % ----- Select days (by Ca_* fieldnames via autoDateList) -----
-    dateList = autoDateList(rat); % external helper
+    % ----- Select days -----
+    dateList = autoDateList_fallback(rat);
     switch lower(opt.DaysMode)
         case {'all','last3byca'}
             daysByCa = dateList;
@@ -102,10 +100,10 @@ for ii = 1:numel(ratNames)
                 if ~isempty(idx) && idx >= 3
                     daysToUse = dateList(idx-2:idx);
                 else
-                    daysToUse = dateList(max(1,end-2):end);
+                    daysToUse = dateList(max(1,numel(dateList)-2):end);
                 end
             else
-                daysToUse = dateList(max(1,end-2):end);
+                daysToUse = dateList(max(1,numel(dateList)-2):end);
             end
         otherwise
             daysToUse = dateList;
@@ -113,14 +111,14 @@ for ii = 1:numel(ratNames)
     fprintf('[%s] daysToUse: %s\n', ratVar, strjoin(daysToUse, ', '));
 
     % ----- Pull & standardize per-day containers -----
-    spikes_raw = filterFieldsByDay(rat.Ca_peaks, daysToUse); % external
-    ts_raw     = filterFieldsByDay(rat.Ca_ts,    daysToUse);
-    pos_raw    = filterFieldsByDay(rat.pos,      daysToUse);
-    cs_raw     = filterFieldsByDay(rat.CS_times, daysToUse);
+    spikes_raw = filterFieldsByDay_fallback(rat.Ca_peaks, daysToUse);
+    ts_raw     = filterFieldsByDay_fallback(rat.Ca_ts,    daysToUse);
+    pos_raw    = filterFieldsByDay_fallback(rat.pos,      daysToUse);
+    cs_raw     = filterFieldsByDay_fallback(rat.CS_times, daysToUse);
     [spikes, ts, pos, cs] = standardize_day_format(spikes_raw, ts_raw, pos_raw, cs_raw, daysToUse);
 
-    % ----- CONTROL spatial PVs (exclude Task+[0 BufferPost]) -----
-    ctrl = compute_control_spatialPV(spikes, ts, pos, cs, ...
+    % ----- CONTROL spatial PV template from CTRL_A; WITHOUT = CTRL_B vs template -----
+    ctrl = compute_control_spatialPV_template(spikes, ts, pos, cs, ...
         'TraceWin',        opt.TraceWin, ...
         'BufferPost',      opt.BufferPost, ...
         'GridRC',          opt.GridRC, ...
@@ -129,9 +127,11 @@ for ii = 1:numel(ratNames)
         'VelThresh',       opt.VelThresh, ...
         'UseSpeedMask',    opt.UseSpeedMask, ...
         'CellNorm',        opt.CellNorm, ...
+        'CtrlSplitMode',   opt.CtrlSplitMode, ...
+        'CtrlSplitSeed',   opt.CtrlSplitSeed, ...
         'Label',           ratVar);
 
-    % ----- Space stability WITH vs WITHOUT task (time-binned) -----
+    % ----- WITH task: TASK vs template -----
     C = compute_space_with_vs_without_task(spikes, ts, pos, cs, ctrl, ...
         'TraceWin',        opt.TraceWin, ...
         'VelThresh',       opt.VelThresh, ...
@@ -142,9 +142,12 @@ for ii = 1:numel(ratNames)
         'FramesPerBin',    opt.FramesPerBin, ...
         'NPerm',           opt.NPerm_C, ...
         'NullMode',        opt.NullMode_C, ...
-        'Label',           ratVar);
+        'NPerm_SC',        opt.NPerm_SC, ...
+        'NullMode_SC',     opt.NullMode_SC, ...
+        'Label',           ratVar, ...
+        'DeltaPermType',   opt.DeltaPermType);
 
-    % Per-day paired z stats
+    % Per-day paired z stats (quick)
     C = compute_space_with_without_binwise_stats(C, 'NPerm', 49);
     R(ii).C = C;
 
@@ -157,32 +160,69 @@ for ii = 1:numel(ratNames)
 end
 
 % ================================ PLOTS ==================================
-summarize_taskSpacePV_clean(R);
-plot_taskToSpace_deltaPermHist_perRat(R, 'PermType', opt.DeltaPermType);
+if opt.DoPlots
+    summarize_taskSpacePV_clean(R);
+    plot_taskToSpace_deltaPermHist_perRat(R, 'PermType', opt.DeltaPermType);
+
+    if opt.DoSingleCell
+        summarize_taskSpacePV_singleCell_clean(R);
+        plot_taskToSpace_SC_deltaPermHist_perRat(R);
+    end
+end
+
+for i = 1:numel(R)
+    fprintf('\n=== %s ===\n', R(i).animal);
+
+    hasSC = isfield(R(i),'C') && isfield(R(i).C,'SC') && ~isempty(R(i).C.SC);
+    fprintf('has C.SC: %d\n', hasSC);
+
+    if hasSC && isfield(R(i).C.SC,'byDay') ...
+            && isfield(R(i).C.SC.byDay,'withTask') && isfield(R(i).C.SC.byDay.withTask,'zmean')
+        disp('withTask zmean:'); disp(R(i).C.SC.byDay.withTask.zmean(:)');
+    else
+        disp('withTask zmean: MISSING');
+    end
+
+    if hasSC && isfield(R(i).C.SC,'byDay') ...
+            && isfield(R(i).C.SC.byDay,'withoutTask') && isfield(R(i).C.SC.byDay.withoutTask,'zmean')
+        disp('withoutTask zmean:'); disp(R(i).C.SC.byDay.withoutTask.zmean(:)');
+    else
+        disp('withoutTask zmean: MISSING');
+    end
+
+    if hasSC && isfield(R(i).C.SC,'delta') && isfield(R(i).C.SC.delta,'perm_z') && ~isempty(R(i).C.SC.delta.perm_z)
+        fprintf('SC.delta.perm_z length: %d\n', numel(R(i).C.SC.delta.perm_z));
+    else
+        disp('SC.delta.perm_z: MISSING/EMPTY');
+    end
+end
+
 end
 
 % =========================================================================
 % ========================== HELPER FUNCTIONS =============================
 % =========================================================================
 
-% ---------- CTRL spatial PVs (non-task frames) ----------
-function CTRL = compute_control_spatialPV(spikes, ts, pos, cs, varargin)
+% ---------- CTRL spatial PV TEMPLATE from half of non-task frames ----------
+function CTRL = compute_control_spatialPV_template(spikes, ts, pos, cs, varargin)
 p = inputParser;
 addParameter(p,'TraceWin',[0 2]);
 addParameter(p,'BufferPost',0);
 addParameter(p,'GridRC',[3 2]);
 addParameter(p,'NumBins',[]);
-addParameter(p,'MinCtrlFrames',2);
+addParameter(p,'MinCtrlFrames',10);
 addParameter(p,'VelThresh',4);
 addParameter(p,'UseSpeedMask',false);
 addParameter(p,'Label','');
 addParameter(p,'CellNorm','demean');
+addParameter(p,'CtrlSplitMode','random');
+addParameter(p,'CtrlSplitSeed',[]);
 parse(p,varargin{:});
 o = p.Results; L = char(o.Label);
 
 D = numel(ts);
 
-% ---- Build grid edges (per-day or pooled) ----
+% ---- Build grid edges ----
 if ~isempty(o.NumBins)
     rc_eff = best_factors(o.NumBins);
 else
@@ -192,18 +232,22 @@ K = rc_eff(1)*rc_eff(2);
 
 edgesByDay = cell(1,D);
 for d = 1:D
-    [edgesByDay{d}] = build_grid_edges_single_day(pos{d}, rc_eff);
+    edgesByDay{d} = build_grid_edges_single_day(pos{d}, rc_eff);
 end
 
-% ---- CONTROL PVs per day ----
-PV_by  = cell(1,D);
-rel_by = cell(1,D);
+PV_template_by = cell(1,D);    % template from CTRL_A
+PV_ctrlB_by    = cell(1,D);    % map from CTRL_B
+rel_by         = cell(1,D);    % corr(template_k, ctrlB_k) per bin
+
+if ~isempty(o.CtrlSplitSeed)
+    rng(o.CtrlSplitSeed);
+end
 
 for d = 1:D
     t = ts{d}(:);
     [x, y] = interp_pos(pos{d}, t);
 
-    % mask out Task + BufferPost
+    % mask out Task + BufferPost => CONTROL frames
     is_taskbuf = false(size(t));
     csd = cs{d};
     if ~isempty(csd)
@@ -213,70 +257,91 @@ for d = 1:D
     end
     use = ~is_taskbuf;
 
-    % speed mask (optional)
     if o.UseSpeedMask
         v = speed_cm_per_s(pos{d});
         v_i = interp1(pos{d}.t(:), v(:), t, 'linear','extrap');
         use = use & (v_i >= o.VelThresh);
     end
 
-    % spikes to [cells × frames] matrix aligned to t
     S = spikes_to_matrix(spikes{d}, t);
     S = normalize_cells(S, o.CellNorm);
 
-    % keep only control frames
     S   = S(:, use);
     x_u = x(use);
     y_u = y(use);
 
-    % bin assignments (spatial)
     [~, b] = pos2bin(x_u, y_u, edgesByDay{d});
 
-    % PV per bin (mean over frames)
     Nc_d = size(S,1);
-    PV   = nan(Nc_d, K);
+    PVtempl = nan(Nc_d, K);
+    PVb     = nan(Nc_d, K);
+    rel     = nan(K,1);
+
     for k = 1:K
         idx = find(b == k);
-        if numel(idx) >= o.MinCtrlFrames
-            PV(:,k) = mean(S(:,idx), 2, 'omitnan');  % frame-aligned mean
+        if numel(idx) < 2*o.MinCtrlFrames
+            continue;
         end
+
+        [idxA, idxB] = split_indices(idx, o.CtrlSplitMode);
+
+        if numel(idxA) < o.MinCtrlFrames || numel(idxB) < o.MinCtrlFrames
+            continue;
+        end
+
+        vA = mean(S(:, idxA), 2, 'omitnan');
+        vB = mean(S(:, idxB), 2, 'omitnan');
+
+        PVtempl(:,k) = vA;
+        PVb(:,k)     = vB;
+        rel(k)       = safe_corr(vA, vB);
     end
 
-    % split-half reliability within CTRL (even/odd frames inside each bin)
-    rel = nan(K,1);
-    for k = 1:K
-        idx = find(b == k);
-        if numel(idx) < max(4, 2*o.MinCtrlFrames), continue; end
-        idx_even = idx(2:2:end);
-        idx_odd  = idx(1:2:end);
-        v1 = mean(S(:,idx_even), 2, 'omitnan');
-        v2 = mean(S(:,idx_odd ), 2, 'omitnan');
-        rel(k) = safe_corr(v1, v2);
-    end
+    PV_template_by{d} = PVtempl;
+    PV_ctrlB_by{d}    = PVb;
+    rel_by{d}         = rel;
 
-    PV_by{d}  = PV;
-    rel_by{d} = rel;
-
-    kept = all(isfinite(PV),1);
-    fprintf('[%s][CTRL d=%d] kept bins %d/%d | split-half median r=%.2f\n', L, d, nnz(kept), K, median(rel,'omitnan'));
+    kept = all(isfinite(PVtempl),1) & all(isfinite(PVb),1);
+    fprintf('[%s][CTRL-TEMPLATE d=%d] kept bins %d/%d | template↔ctrlB median r=%.2f\n', ...
+        L, d, nnz(kept), K, median(rel,'omitnan'));
 end
 
-% ---- Pack CTRL ----
-CTRL.PV    = PV_by;                 % {day} : [Nc × K]
-CTRL.grid.edges   = edgesByDay;     % {day} edges
-CTRL.grid.GridRC  = rc_eff;
-CTRL.grid.K       = K;
+CTRL.PV_template = PV_template_by;
+CTRL.PV_ctrlB    = PV_ctrlB_by;
 
-CTRL.reliability_byDay = rel_by;    % {day}[K×1]
-CTRL.reliability.r = vertcat(rel_by{:});
-CTRL.reliability.z = atanh(max(min(CTRL.reliability.r,0.99999),-0.99999));
+CTRL.grid.edges  = edgesByDay;
+CTRL.grid.GridRC = rc_eff;
+CTRL.grid.K      = K;
 
-CTRL.params.MinCtrlFrames = o.MinCtrlFrames;
-CTRL.params.NumBins       = o.NumBins;
-CTRL.params.GridRC_eff    = rc_eff;
+CTRL.reliability_byDay = rel_by;
+CTRL.reliability.r     = vertcat(rel_by{:});
+CTRL.reliability.z     = atanh(max(min(CTRL.reliability.r,0.99999),-0.99999));
+
+CTRL.params.MinCtrlFrames   = o.MinCtrlFrames;
+CTRL.params.NumBins         = o.NumBins;
+CTRL.params.GridRC_eff      = rc_eff;
+CTRL.params.CtrlSplitMode   = o.CtrlSplitMode;
+CTRL.params.CtrlSplitSeed   = o.CtrlSplitSeed;
+
+CTRL.maps.template_byDay = PV_template_by;
+CTRL.maps.ctrlB_byDay    = PV_ctrlB_by;
 end
 
-% ---------- WITH vs WITHOUT task (C) : TIME-BINNED ----------
+function [idxA, idxB] = split_indices(idx, mode)
+idx = idx(:);
+switch lower(mode)
+    case 'evenodd'
+        idxA = idx(1:2:end);
+        idxB = idx(2:2:end);
+    otherwise
+        rp = idx(randperm(numel(idx)));
+        nA = floor(numel(rp)/2);
+        idxA = rp(1:nA);
+        idxB = rp(nA+1:end);
+end
+end
+
+% ---------- WITH vs WITHOUT task (C) ----------
 function C = compute_space_with_vs_without_task(spikes, ts, pos, cs, CTRL, varargin)
 p = inputParser;
 addParameter(p,'TraceWin',[0 2]);
@@ -287,17 +352,23 @@ addParameter(p,'MinTraceFrames',2);
 addParameter(p,'TimeBins',15);
 addParameter(p,'FramesPerBin',[]);
 addParameter(p,'NPerm',49);
-addParameter(p,'NullMode','frame-redistribute');
+addParameter(p,'NullMode','frame-redistribute'); %#ok<NASGU>
 addParameter(p,'Label','');
+addParameter(p,'NPerm_SC',500);
+addParameter(p,'NullMode_SC','flip-cells', @(s) any(strcmpi(s,{'flip-cells','template-derange-bins'})));
+addParameter(p,'DeltaPermType','flip', @(s) any(strcmpi(s,{'derange','flip','both'})));
 parse(p,varargin{:});
 o = p.Results; L = char(o.Label);
 
-D = numel(ts); K = CTRL.grid.K;
+D = numel(ts);
+K = CTRL.grid.K;
 
-r_bin_byDay   = cell(1,D);         % mean r over time-bins per spatial bin (for display)
-z_day         = nan(D,1);          % day-level mean of all (b,k) Fisher z
-n_valid_day   = zeros(D,1);
-perZ_list_byDay = cell(1,D);       % store list of per-(b,k) z's for sanity checks
+r_bin_byDay     = cell(1,D);
+z_day           = nan(D,1);
+n_valid_day     = zeros(D,1);
+perZ_list_byDay = cell(1,D);
+
+C = struct();
 
 for d = 1:D
     t = ts{d}(:);
@@ -305,7 +376,6 @@ for d = 1:D
     S = spikes_to_matrix(spikes{d}, t);
     S = normalize_cells(S, o.CellNorm);
 
-    % speed mask
     if o.UseSpeedMask
         v = speed_cm_per_s(pos{d});
         v = interp1(pos{d}.t(:), v(:), t, 'linear','extrap');
@@ -314,16 +384,13 @@ for d = 1:D
         speed_ok = true(size(t));
     end
 
-    edges_d = CTRL.grid.edges{d};
-    PV_ctrl = CTRL.PV{d};
-    if isempty(PV_ctrl), continue; end
-    Nc = size(PV_ctrl,1);
+    edges_d  = CTRL.grid.edges{d};
+    PV_templ = CTRL.PV_template{d};
+    if isempty(PV_templ), continue; end
 
-    % ---- Build per-(trial, temporal-bin) frame indices within TraceWin ----
     csd = cs{d}(:);
     B = o.TimeBins;
-    listZ = [];                    % all per-(b,k) Fisher z for this day
-    r_bin_accum = nan(K, B);       % r for each spatial bin and time bin
+    r_bin_accum = nan(K, B);
 
     for tr = 1:numel(csd)
         t0 = csd(tr) + o.TraceWin(1);
@@ -331,7 +398,6 @@ for d = 1:D
         idx_all = find(t >= t0 & t < t1);
         if isempty(idx_all), continue; end
 
-        % frame-aligned temporal splits
         if ~isempty(o.FramesPerBin)
             step = max(1, round(o.FramesPerBin));
             edges_idx = 1:step:(numel(idx_all)+1);
@@ -342,7 +408,7 @@ for d = 1:D
             edges_idx = round(linspace(1, numel(idx_all)+1, B+1));
             edges_idx(1) = 1; edges_idx(end) = numel(idx_all)+1;
         end
-        nTB = numel(edges_idx)-1;   % actual number of temporal bins this trial
+        nTB = numel(edges_idx)-1;
 
         for bti = 1:nTB
             if edges_idx(bti) >= edges_idx(bti+1), continue; end
@@ -350,22 +416,19 @@ for d = 1:D
             if o.UseSpeedMask, seg = seg(speed_ok(seg)); end
             if numel(seg) < o.MinTraceFrames, continue; end
 
-            % spatial bin per frame
             [~, b_space] = pos2bin(x(seg), y(seg), edges_d);
 
-            % per-bin TASK PV for this temporal chunk
             for k = 1:K
-                kk = (b_space == k);
-                if nnz(kk) >= o.MinTraceFrames && all(isfinite(PV_ctrl(:,k)))
-                    pv_task = mean(S(:, seg(kk)), 2, 'omitnan');
-                    r = safe_corr(PV_ctrl(:,k), pv_task);
-                    r_bin_accum(k, bti) = nanmean([r_bin_accum(k, bti), r]); % accumulate across trials if same (b,k)
+                hit = (b_space == k);
+                if nnz(hit) >= o.MinTraceFrames && all(isfinite(PV_templ(:,k)))
+                    pv_task = mean(S(:, seg(hit)), 2, 'omitnan');
+                    r = safe_corr(PV_templ(:,k), pv_task);
+                    r_bin_accum(k, bti) = nanmean([r_bin_accum(k, bti), r]);
                 end
             end
         end
     end
 
-    % per-day aggregation on Fisher-z over all valid (b,k)
     r_valid = r_bin_accum(isfinite(r_bin_accum));
     if isempty(r_valid)
         r_bin_byDay{d} = nan(K,1);
@@ -378,10 +441,9 @@ for d = 1:D
     perZ_list_byDay{d} = z_list;
     z_day(d) = mean(z_list, 'omitnan');
 
-    % also keep a simple spatial-bin mean r (over time bins) for display
     r_spatial = nan(K,1);
     for k = 1:K
-        rv = r_bin_accum(k, :);
+        rv = r_bin_accum(k,:);
         rv = rv(isfinite(rv));
         if ~isempty(rv)
             r_spatial(k) = tanh(mean(atanh(max(min(rv,0.99999),-0.99999))));
@@ -389,239 +451,388 @@ for d = 1:D
     end
     r_bin_byDay{d} = r_spatial;
     n_valid_day(d) = numel(z_list);
-end
 
-C.bin.byDay.r        = r_bin_byDay;          % mean r per spatial bin (over time)
-C.bin.byDay.z_mean   = z_day;                % day-level Fisher-z mean over (b,k)
-C.bin.byDay.n_valid  = n_valid_day;
-C.bin.byDay.z_list   = perZ_list_byDay;      % stash raw per-(b,k) z
-C.bin.group.z_mean   = mean(z_day(isfinite(z_day)),'omitnan');
-C.bin.group.r_mean   = tanh(C.bin.group.z_mean);
+    % ---------------- SINGLE-CELL ----------------
+    if isfield(CTRL,'maps') && numel(CTRL.maps.template_byDay) >= d && ~isempty(CTRL.maps.template_byDay{d}) && ...
+       numel(CTRL.maps.ctrlB_byDay)    >= d && ~isempty(CTRL.maps.ctrlB_byDay{d})
 
-% WITHOUT task = CTRL split-half reliability (precomputed if available)
-with_byDay    = cell(1,D);
-without_byDay = cell(1,D);
-z_ctrl_day    = nan(D,1);
+        mapA = CTRL.maps.template_byDay{d};  % Nc×K
+        mapB = CTRL.maps.ctrlB_byDay{d};     % Nc×K
+        Nc = size(mapA,1);
 
-for d = 1:D
-    r_task_bins = C.bin.byDay.r{d};
-    if isempty(r_task_bins), continue; end
-
-    if isfield(CTRL,'reliability_byDay') && numel(CTRL.reliability_byDay) >= d ...
-            && ~isempty(CTRL.reliability_byDay{d})
-        r_ctrl = CTRL.reliability_byDay{d}(:);
-    else
-        r_ctrl = nan(CTRL.grid.K,1);
-    end
-
-    mask = isfinite(r_task_bins) & isfinite(r_ctrl);
-    if ~any(mask), continue; end
-    with_byDay{d}    = r_task_bins(mask);
-    without_byDay{d} = r_ctrl(mask);
-
-    z_ctrl_day(d) = mean(atanh(max(min(without_byDay{d},0.99999),-0.99999)), 'omitnan');
-end
-
-% day-level delta (WITH minus WITHOUT) in Fisher-z
-delta_day = z_day - z_ctrl_day;      % [D x 1], may have NaNs
-
-
-% --------- choose which delta is "active" ----------
-C.delta = [];
-
-% --- Make WITH/WITHOUT daywise r available to downstream stats/plots ---
-C.byDay.withTask.r    = with_byDay;
-C.byDay.withoutTask.r = without_byDay;
-
-% --- Build within-day (bin-level) flip permutation null ---
-C.delta_flip = build_flip_perm_withinDayPairs(C, o.NPerm);
-if isfield(C,'delta_flip') && isfield(C.delta_flip,'p_two')
-    fprintf('[%s] within-day-pair flip: obs Δz=%.3f (r≈%.3f), p_two=%.3g (NPerm=%d)\n', ...
-        L, C.delta_flip.obs_z, tanh(C.delta_flip.obs_z), C.delta_flip.p_two, numel(C.delta_flip.perm_z));
-end
-
-
-% --- choose which delta is "active" (DO THIS LAST) ---
-C.delta = [];
-which = 'flip';
-if isfield(o,'DeltaPermType') && ~isempty(o.DeltaPermType)
-    which = lower(char(o.DeltaPermType));
-end
-
-switch which
-    case 'flip'
-        if isfield(C,'delta_flip') && ~isempty(C.delta_flip) && ~isempty(C.delta_flip.perm_z)
-            C.delta = C.delta_flip;
+        % WITHOUT: per-cell corr across bins
+        z_sc_without = nan(Nc,1);
+        for c = 1:Nc
+            r = safe_corr(mapA(c,:).', mapB(c,:).', 3, 1e-12);
+            if isfinite(r), z_sc_without(c) = atanh(max(min(r,0.99999),-0.99999)); end
         end
-    case 'derange'
-        if isfield(C,'delta_derange') && ~isempty(C.delta_derange) && ~isempty(C.delta_derange.perm_z)
-            C.delta = C.delta_derange;
-        end
-    otherwise
-        if isfield(C,'delta_flip') && ~isempty(C.delta_flip) && ~isempty(C.delta_flip.perm_z)
-            C.delta = C.delta_flip;
-        end
-end
 
+        % --- WITH task (FIXED): pool across TRIALS within each timebin to fill bins ---
+        % Build pooled TASK maps per timebin: taskMap_tb(:,:,bti) is Nc×K
+        B  = o.TimeBins;
+        Nc = size(mapA,1);
 
-% --- PERMUTATION: spatial-bin derangement null for Δz (per day, then group) ---
-P = o.NPerm;
-perm_byDay = cell(D,1);
-if P > 0
-    for d = 1:D
-        if ~isfinite(z_day(d)) || ~isfinite(z_ctrl_day(d)), continue; end
+        % Pool frame indices by (timebin, spatialbin) across ALL trials
+        idxPool = cell(B, K);   % each entry holds frame indices into t/S
 
-        % Collect the r values per spatial bin across time-bins that built z_day(d).
-        % We saved per-day, per-spatial mean r in C.bin.byDay.r{d}; we also saved the raw
-        % per-(b,k) z in C.bin.byDay.z_list{d}, but for a clean spatial derangement we
-        % re-evaluate z_with from the r_bin_accum we just used.
-        % To do that, recreate a matrix of r over (k, time-bin) for this day:
-        % (We cached r_bin_accum as 'r_bin_byDay{d}' only after averaging over time-bins;
-        % so we’ll rebuild a minimal proxy from S and CTRL now.)
-
-        % Lightweight reconstitution: use stored CTRL PVs + day’s TraceWin frames and edges
-        % to compute per-(k,b) TASK PVs again (same as above but without speed/occupancy checks)
-        % Then derange CTRL’s columns and recompute z_with^perm.
-        edges_d = CTRL.grid.edges{d};
-        PV_ctrl = CTRL.PV{d};
-        if isempty(PV_ctrl), continue; end
-        Nc = size(PV_ctrl,1);
-
-        % Build a list of (k,b) task vectors actually used earlier:
         csd = cs{d}(:);
-        B = o.TimeBins;
-        % Collect per-(k,b) TASK PV means in a cell; skip ones that would have been invalid
-        TASK_kb = cell(CTRL.grid.K, B);
-        t = ts{d}(:);
-        [x, y] = interp_pos(pos{d}, t);
-        S = spikes_to_matrix(spikes{d}, t); %#ok<NBRAK>
-        S = normalize_cells(S, o.CellNorm);
-        if o.UseSpeedMask
-            v = speed_cm_per_s(pos{d});
-            v = interp1(pos{d}.t(:), v(:), t, 'linear','extrap');
-            speed_ok = (v >= o.VelThresh);
-        else
-            speed_ok = true(size(t));
-        end
-
         for tr = 1:numel(csd)
             t0 = csd(tr) + o.TraceWin(1);
             t1 = csd(tr) + o.TraceWin(2);
             idx_all = find(t >= t0 & t < t1);
             if isempty(idx_all), continue; end
-            edges_idx = round(linspace(1, numel(idx_all)+1, B+1));
-            edges_idx([1 end]) = [1, numel(idx_all)+1];
-            for bti = 1:(numel(edges_idx)-1)
+
+            % same temporal split logic
+            if ~isempty(o.FramesPerBin)
+                step = max(1, round(o.FramesPerBin));
+                edges_idx = 1:step:(numel(idx_all)+1);
+                if edges_idx(end) ~= numel(idx_all)+1
+                    edges_idx(end+1) = numel(idx_all)+1;
+                end
+            else
+                edges_idx = round(linspace(1, numel(idx_all)+1, B+1));
+                edges_idx(1) = 1; edges_idx(end) = numel(idx_all)+1;
+            end
+            nTB = numel(edges_idx)-1;
+
+            for bti = 1:nTB
                 seg = idx_all(edges_idx(bti):edges_idx(bti+1)-1);
-                if o.UseSpeedMask, seg = seg(speed_ok(seg)); end
-                if numel(seg) < o.MinTraceFrames, continue; end
+                if isempty(seg), continue; end
+
+                if o.UseSpeedMask
+                    seg = seg(speed_ok(seg));
+                end
+                if numel(seg) < o.MinTraceFrames
+                    continue
+                end
+
                 [~, b_space] = pos2bin(x(seg), y(seg), edges_d);
-                for k = 1:CTRL.grid.K
+
+                % add frames into pools by spatial bin
+                for k = 1:K
                     hit = (b_space == k);
-                    if nnz(hit) >= o.MinTraceFrames && all(isfinite(PV_ctrl(:,k)))
-                        vec = mean(S(:, seg(hit)), 2, 'omitnan');
-                        % concatenate across trials (we'll average later in r / z)
-                        if isempty(TASK_kb{k,bti})
-                            TASK_kb{k,bti} = vec;
-                        else
-                            % average PVs across trials for same (k,b)
-                            TASK_kb{k,bti} = nanmean([TASK_kb{k,bti}, vec], 2);
+                    if nnz(hit) >= o.MinTraceFrames && all(isfinite(mapA(:,k)))
+                        idxPool{bti,k} = [idxPool{bti,k}; seg(hit)]; %#ok<AGROW>
+                    end
+                end
+            end
+        end
+
+        % Convert pooled indices -> pooled task maps
+        taskMap_tb = nan(Nc, K, B);  % Nc×K×B
+        for bti = 1:B
+            for k = 1:K
+                idxk = idxPool{bti,k};
+                if numel(idxk) >= o.MinTraceFrames
+                    taskMap_tb(:,k,bti) = mean(S(:, idxk), 2, 'omitnan');
+                end
+            end
+        end
+
+        % Per-cell corr across spatial bins per timebin vs template
+        z_sc_with_tb = nan(Nc, B);
+        for bti = 1:B
+            for c = 1:Nc
+                r = safe_corr(mapA(c,:).', taskMap_tb(c,:,bti).', 2, 1e-12); % minN=2 (not 3)
+                if isfinite(r)
+                    z_sc_with_tb(c,bti) = atanh(max(min(r,0.99999),-0.99999));
+                end
+            end
+        end
+
+
+        % collapse across timebins in Fisher-z per cell
+        z_sc_with = mean(z_sc_with_tb, 2, 'omitnan');
+        r_sc_with = tanh(z_sc_with);
+
+        if ~isfield(C,'SC'), C.SC = struct(); end
+        if ~isfield(C.SC,'byDay'), C.SC.byDay = struct(); end
+        if ~isfield(C.SC.byDay,'withTask'), C.SC.byDay.withTask = struct(); end
+        if ~isfield(C.SC.byDay,'withoutTask'), C.SC.byDay.withoutTask = struct(); end
+
+        C.SC.byDay.withTask.z{d}     = z_sc_with;
+        C.SC.byDay.withoutTask.z{d}  = z_sc_without;
+
+        C.SC.byDay.withTask.zmean(d,1)    = mean(z_sc_with, 'omitnan');
+        C.SC.byDay.withoutTask.zmean(d,1) = mean(z_sc_without, 'omitnan');
+
+        % Optional: template-derange-bins null at SC level (pooled-task map)
+        if ~isempty(o.NPerm_SC) && o.NPerm_SC >= 10
+            validK = find(all(isfinite(mapA),1));
+            if numel(validK) >= 2
+                [taskMap_pooled, okTask] = build_taskMap_pooled_day(t, x, y, S, csd, edges_d, speed_ok, o);
+                if okTask
+                    delta_obs = mean(z_sc_with, 'omitnan') - mean(z_sc_without, 'omitnan');
+                    perm_delta = nan(o.NPerm_SC,1);
+                    for pidx = 1:o.NPerm_SC
+                        kp = derange_indices(validK);
+                        z_with_perm = nan(Nc,1);
+                        for c = 1:Nc
+                            r = safe_corr(mapA(c, kp).', taskMap_pooled(c, validK).', 3, 1e-12);
+                            if isfinite(r), z_with_perm(c) = atanh(max(min(r,0.99999),-0.99999)); end
                         end
+                        perm_delta(pidx) = mean(z_with_perm, 'omitnan') - mean(z_sc_without, 'omitnan');
                     end
+                    pr = mean(perm_delta >= delta_obs);
+                    pl = mean(perm_delta <= delta_obs);
+                    pt = 2*min(pr, pl);
+
+                    C.SC.delta_derange.byDay{d}   = perm_delta;
+                    C.SC.delta_derange.obs_z(d,1) = delta_obs;
+                    C.SC.delta_derange.p_right(d,1) = pr;
+                    C.SC.delta_derange.p_left(d,1)  = pl;
+                    C.SC.delta_derange.p_two(d,1)   = pt;
                 end
             end
         end
-
-        % observed z_with_day(d) was already computed; now build perm nulls by deranging CTRL bins
-        validK = find(all(isfinite(PV_ctrl),1));
-        if numel(validK) < 2, continue; end
-
-        perm_d = nan(P,1);
-        for pidx = 1:P
-            % derangement of validK
-            map = validK(randperm(numel(validK)));
-            if any(map==validK), % enforce derangement
-                for rep = 1:5
-                    map = validK(randperm(numel(validK)));
-                    if ~any(map==validK), break; end
-                end
-                if any(map==validK)  % last resort rotate
-                    map = validK([2:end,1]);
-                end
-            end
-            % recompute r over all available (k,b) using CTRL(:, map(k)) vs TASK_kb{k,b}
-            r_list = [];
-            for bti = 1:B
-                for ii = 1:numel(validK)
-                    k = validK(ii); kp = map(ii);
-                    tv = TASK_kb{k,bti};
-                    if ~isempty(tv)
-                        r_list(end+1,1) = safe_corr(PV_ctrl(:,kp), tv); %#ok<AGROW>
-                    end
-                end
-            end
-            if isempty(r_list), continue; end
-            zw_perm = atanh(max(min(r_list,0.99999),-0.99999));
-            z_with_perm = mean(zw_perm,'omitnan');
-            perm_d(pidx) = z_with_perm - z_ctrl_day(d);
-        end
-        perm_byDay{d} = perm_d;
     end
-
-    % --- Δ-based permutation test (bin-derangement) --------------------------
-    % observed animal-level statistic = mean Δz across this animal's valid days
-    delta_obs = mean(delta_day(isfinite(delta_day)), 'omitnan');
-
-    % build a permutation distribution of the same statistic from perm_byDay
-    % (each entry perm_byDay{d} is a [P x 1] vector of Δz^perm for day d)
-    % choose the common number of perms Pcommon across days
-    valid = ~cellfun('isempty', perm_byDay);
-    if any(valid)
-        Pcommon = min(cellfun(@(v) sum(isfinite(v)), perm_byDay(valid)));
-    else
-        Pcommon = 0;
-    end
-
-    if Pcommon >= 5
-        delta_perm_anim = nan(Pcommon,1);
-        for p = 1:Pcommon
-            dvals = nan(sum(valid),1);
-            idx = 1;
-            for d = 1:D
-                if ~valid(d), continue; end
-                if numel(perm_byDay{d}) >= p && isfinite(perm_byDay{d}(p))
-                    dvals(idx) = perm_byDay{d}(p); idx = idx + 1;
-                end
-            end
-            delta_perm_anim(p) = mean(dvals(isfinite(dvals)), 'omitnan');  % same stat as delta_obs
-        end
-
-        pr = mean(delta_perm_anim >= delta_obs);
-        pl = mean(delta_perm_anim <= delta_obs);
-        pt = 2*min(pr, pl);
-    else
-        delta_perm_anim = [];
-        pr = NaN; pl = NaN; pt = NaN;
-    end
-
-  %  fprintf('p value against derange shuff')
-  %  pt
-
-    % store Δ-based null + p-values
-    C.delta_derange = struct();
-    C.delta_derange.obs_z     = delta_obs;
-    C.delta_derange.obs_r     = tanh(delta_obs);
-    C.delta_derange.perm_z    = delta_perm_anim;
-    C.delta_derange.p_right   = pr;
-    C.delta_derange.p_left    = pl;
-    C.delta_derange.p_two     = pt;
 end
 
-% --- Make WITH/WITHOUT daywise r available to downstream stats/plots ---
-C.byDay.withTask.r    = with_byDay;      % cell{day} of r per spatial bin
-C.byDay.withoutTask.r = without_byDay;   % cell{day} of r per spatial bin (CTRL split-half)
-% within-day (bin-level) flip permutation null
+% After all days: build SC flip-cells null (paired within cell)
+if isfield(C,'SC') && ~isempty(o.NPerm_SC) && o.NPerm_SC >= 10
+    C.SC.delta_flipCells = build_flip_perm_singleCell_flipCells(C, o.NPerm_SC);
+    fprintf('[%s][SC flip-cells] obs Δz=%.3f (r≈%.3f), p_two=%.3g (NPerm=%d)\n', ...
+        L, C.SC.delta_flipCells.obs_z, tanh(C.SC.delta_flipCells.obs_z), ...
+        C.SC.delta_flipCells.p_two, numel(C.SC.delta_flipCells.perm_z));
+end
+
+% Pick active SC delta
+if isfield(C,'SC')
+    C.SC.delta = [];
+    switch lower(char(o.NullMode_SC))
+        case 'flip-cells'
+            if isfield(C.SC,'delta_flipCells') && ~isempty(C.SC.delta_flipCells) && ...
+               isfield(C.SC.delta_flipCells,'perm_z') && ~isempty(C.SC.delta_flipCells.perm_z)
+                C.SC.delta = C.SC.delta_flipCells;
+            end
+        case 'template-derange-bins'
+            % Optional pooling of per-day derange; if absent, fall back
+            if isfield(C.SC,'delta_derange') && ~isempty(C.SC.delta_derange)
+                % If you later add pooling here, set C.SC.delta_derange.perm_z etc.
+            end
+    end
+    if isempty(C.SC.delta) && isfield(C.SC,'delta_flipCells')
+        C.SC.delta = C.SC.delta_flipCells;
+    end
+end
+
+% Bin-level summaries
+C.bin.byDay.r        = r_bin_byDay;
+C.bin.byDay.z_mean   = z_day;
+C.bin.byDay.n_valid  = n_valid_day;
+C.bin.byDay.z_list   = perZ_list_byDay;
+C.bin.group.z_mean   = mean(z_day(isfinite(z_day)),'omitnan');
+C.bin.group.r_mean   = tanh(C.bin.group.z_mean);
+
+% WITHOUT = template vs CTRL_B
+with_byDay    = cell(1,D);
+without_byDay = cell(1,D);
+z_without_day = nan(D,1);
+
+for d = 1:D
+    r_task_bins = C.bin.byDay.r{d};
+    if isempty(r_task_bins), continue; end
+
+    if isfield(CTRL,'reliability_byDay') && numel(CTRL.reliability_byDay) >= d && ~isempty(CTRL.reliability_byDay{d})
+        r_without = CTRL.reliability_byDay{d}(:);
+    else
+        r_without = nan(K,1);
+    end
+
+    mask = isfinite(r_task_bins) & isfinite(r_without);
+    if ~any(mask), continue; end
+
+    with_byDay{d}    = r_task_bins(mask);
+    without_byDay{d} = r_without(mask);
+
+    z_without_day(d) = mean(atanh(max(min(without_byDay{d},0.99999),-0.99999)), 'omitnan');
+end
+
+C.byDay.withTask.r    = with_byDay;
+C.byDay.withoutTask.r = without_byDay;
+
+delta_day = z_day - z_without_day; %#ok<NASGU>
+
+% Flip null (within-day paired pairs)
 C.delta_flip = build_flip_perm_withinDayPairs(C, o.NPerm);
+if isfield(C,'delta_flip') && isfield(C.delta_flip,'p_two')
+    fprintf('[%s] flip null: obs Δz=%.3f (r≈%.3f), p_two=%.3g (NPerm=%d)\n', ...
+        L, C.delta_flip.obs_z, tanh(C.delta_flip.obs_z), C.delta_flip.p_two, numel(C.delta_flip.perm_z));
+end
+
+% Derange null (template bins)
+C.delta_derange = build_derange_perm_templateBins(C, spikes, ts, pos, cs, CTRL, z_without_day, o);
+
+% Pick active delta
+which = lower(char(o.DeltaPermType));
+if strcmp(which,'both')
+    which = 'flip';
+end
+switch which
+    case 'flip'
+        C.delta = C.delta_flip;
+    case 'derange'
+        if ~isempty(C.delta_derange) && isfield(C.delta_derange,'perm_z') && ~isempty(C.delta_derange.perm_z)
+            C.delta = C.delta_derange;
+        else
+            C.delta = C.delta_flip;
+        end
+    otherwise
+        C.delta = C.delta_flip;
+end
+end
+
+% ---------- Derange perm (template bins vs TASK bins) ----------
+function dlt = build_derange_perm_templateBins(~, spikes, ts, pos, cs, CTRL, z_without_day, o)
+dlt = struct('obs_z',NaN,'obs_r',NaN,'perm_z',[],'p_right',NaN,'p_left',NaN,'p_two',NaN);
+P = o.NPerm;
+if isempty(P) || P < 5
+    return
+end
+
+D = numel(ts);
+K = CTRL.grid.K;
+perm_byDay = cell(D,1);
+z_with_day = nan(D,1);
+
+for d = 1:D
+    if ~isfinite(z_without_day(d)), continue; end
+
+    PVtempl = CTRL.PV_template{d};
+    if isempty(PVtempl), continue; end
+    edges_d = CTRL.grid.edges{d};
+
+    t = ts{d}(:);
+    [x, y] = interp_pos(pos{d}, t);
+    S = spikes_to_matrix(spikes{d}, t);
+    S = normalize_cells(S, o.CellNorm);
+
+    if o.UseSpeedMask
+        v = speed_cm_per_s(pos{d});
+        v = interp1(pos{d}.t(:), v(:), t, 'linear','extrap');
+        speed_ok = (v >= o.VelThresh);
+    else
+        speed_ok = true(size(t));
+    end
+
+    csd = cs{d}(:);
+    B = o.TimeBins;
+
+    TASK_kb = cell(K,B);
+
+    for tr = 1:numel(csd)
+        t0 = csd(tr) + o.TraceWin(1);
+        t1 = csd(tr) + o.TraceWin(2);
+        idx_all = find(t >= t0 & t < t1);
+        if isempty(idx_all), continue; end
+
+        if ~isempty(o.FramesPerBin)
+            step = max(1, round(o.FramesPerBin));
+            edges_idx = 1:step:(numel(idx_all)+1);
+            if edges_idx(end) ~= numel(idx_all)+1
+                edges_idx(end+1) = numel(idx_all)+1;
+            end
+        else
+            edges_idx = round(linspace(1, numel(idx_all)+1, B+1));
+            edges_idx(1) = 1; edges_idx(end) = numel(idx_all)+1;
+        end
+
+        for bti = 1:(numel(edges_idx)-1)
+            seg = idx_all(edges_idx(bti):edges_idx(bti+1)-1);
+            if o.UseSpeedMask, seg = seg(speed_ok(seg)); end
+            if numel(seg) < o.MinTraceFrames, continue; end
+
+            [~, b_space] = pos2bin(x(seg), y(seg), edges_d);
+
+            for k = 1:K
+                hit = (b_space == k);
+                if nnz(hit) >= o.MinTraceFrames && all(isfinite(PVtempl(:,k)))
+                    vec = mean(S(:, seg(hit)), 2, 'omitnan');
+                    if isempty(TASK_kb{k,bti})
+                        TASK_kb{k,bti} = vec;
+                    else
+                        TASK_kb{k,bti} = nanmean([TASK_kb{k,bti}, vec], 2);
+                    end
+                end
+            end
+        end
+    end
+
+    validK = find(all(isfinite(PVtempl),1));
+    if numel(validK) < 2, continue; end
+
+    % Observed z_with_day from TASK_kb
+    r_list_obs = [];
+    for bti = 1:B
+        for ii = 1:numel(validK)
+            k = validK(ii);
+            tv = TASK_kb{k,bti};
+            if ~isempty(tv)
+                r_list_obs(end+1,1) = safe_corr(PVtempl(:,k), tv); %#ok<AGROW>
+            end
+        end
+    end
+    if isempty(r_list_obs), continue; end
+    z_with_day(d) = mean(atanh(max(min(r_list_obs,0.99999),-0.99999)), 'omitnan');
+
+    perm_d = nan(P,1);
+    for pidx = 1:P
+        map = derange_indices(validK); % deranged mapping of valid bins
+        r_list = [];
+        for bti = 1:B
+            for ii = 1:numel(validK)
+                k  = validK(ii);
+                kp = map(ii);
+                tv = TASK_kb{k,bti};
+                if ~isempty(tv)
+                    r_list(end+1,1) = safe_corr(PVtempl(:,kp), tv); %#ok<AGROW>
+                end
+            end
+        end
+        if isempty(r_list), continue; end
+        z_with_perm = mean(atanh(max(min(r_list,0.99999),-0.99999)), 'omitnan');
+        perm_d(pidx) = z_with_perm - z_without_day(d);
+    end
+    perm_byDay{d} = perm_d;
+end
+
+mask = isfinite(z_with_day) & isfinite(z_without_day);
+if nnz(mask) < 1
+    return
+end
+delta_obs = mean(z_with_day(mask) - z_without_day(mask), 'omitnan');
+
+valid = ~cellfun('isempty', perm_byDay);
+if ~any(valid)
+    return
+end
+Pcommon = min(cellfun(@(v) nnz(isfinite(v)), perm_byDay(valid)));
+if Pcommon < 5
+    return
+end
+
+delta_perm_anim = nan(Pcommon,1);
+for pp = 1:Pcommon
+    dvals = [];
+    for d = 1:D
+        if ~valid(d), continue; end
+        if numel(perm_byDay{d}) >= pp && isfinite(perm_byDay{d}(pp))
+            dvals(end+1,1) = perm_byDay{d}(pp); %#ok<AGROW>
+        end
+    end
+    delta_perm_anim(pp) = mean(dvals,'omitnan');
+end
+
+pr = mean(delta_perm_anim >= delta_obs);
+pl = mean(delta_perm_anim <= delta_obs);
+pt = 2*min(pr, pl);
+
+dlt.obs_z   = delta_obs;
+dlt.obs_r   = tanh(delta_obs);
+dlt.perm_z  = delta_perm_anim;
+dlt.p_right = pr;
+dlt.p_left  = pl;
+dlt.p_two   = pt;
 end
 
 % ---------- (C) per-day paired z + pooled + sign-flip ----------
@@ -642,8 +853,8 @@ for d = 1:D
     zu = atanh(max(min(ru(m), 0.99999), -0.99999));
     delta = zw - zu;
     if numel(delta) >= 2
-        [~, p, ~, st] = ttest(zw, zu); dz = mean(delta)/std(delta);
-        dayStats(d) = struct('nPairs',numel(delta),'t',st.tstat,'df',st.df,'p',p,'dz',dz);
+        [~, pval, ~, st] = ttest(zw, zu); dz = mean(delta)/std(delta);
+        dayStats(d) = struct('nPairs',numel(delta),'t',st.tstat,'df',st.df,'p',pval,'dz',dz);
     else
         dayStats(d).nPairs = numel(delta);
     end
@@ -657,7 +868,7 @@ if nnz(mask) >= 2
 else
     p_all = NaN; st_all = struct('tstat',NaN,'df',NaN); dz_all = NaN;
 end
-% cluster-aware permutation: sign-flip on per-day mean Δz
+
 day_mu = nan(D,1);
 for d = 1:D
     rw = C.byDay.withTask.r{d};  ru = C.byDay.withoutTask.r{d};
@@ -668,15 +879,18 @@ for d = 1:D
     zu = atanh(max(min(ru(m), 0.99999), -0.99999));
     day_mu(d) = mean(zw - zu, 'omitnan');
 end
-day_mu = day_mu(isfinite(day_mu)); obs_cluster_mean = mean(day_mu,'omitnan');
-NPerm = opt.NPerm; perm_stat = nan(NPerm,1);
+day_mu = day_mu(isfinite(day_mu));
+obs_cluster_mean = mean(day_mu,'omitnan');
+
+NPerm = opt.NPerm;
+perm_stat = nan(NPerm,1);
 for b = 1:NPerm
-    s = (rand(size(day_mu))>0.5)*2 - 1; perm_stat(b) = mean(s .* day_mu);
+    s = (rand(size(day_mu))>0.5)*2 - 1;
+    perm_stat(b) = mean(s .* day_mu);
 end
 p_right = (sum(perm_stat >= obs_cluster_mean) + 1) / (nnz(isfinite(perm_stat)) + 1);
 p_left  = (sum(perm_stat <= obs_cluster_mean) + 1) / (nnz(isfinite(perm_stat)) + 1);
 p_two   = 2*min(p_right, p_left);
-
 
 if ~isfield(C,'distStats'), C.distStats = struct(); end
 C.distStats.perDay  = dayStats;
@@ -686,6 +900,202 @@ C.distStats.cluster_perm = struct('NPerm',NPerm,'obs_meanDelta_z',obs_cluster_me
 end
 
 % ========================== UTILITIES ==========================
+function [taskMap, ok] = build_taskMap_pooled_day(t, x, y, S, csd, edges_d, speed_ok, o)
+% Build pooled task map across ALL trace frames (ignores time bins).
+% Output: taskMap [Nc×K] mean activity in each spatial bin within TraceWin.
+K  = (numel(edges_d.x)-1) * (numel(edges_d.y)-1);
+Nc = size(S,1);
+taskMap = nan(Nc, K);
+ok = false;
+if isempty(csd), return; end
+
+sumV = zeros(Nc, K);
+cnt  = zeros(1, K);
+
+for tr = 1:numel(csd)
+    t0 = csd(tr) + o.TraceWin(1);
+    t1 = csd(tr) + o.TraceWin(2);
+    seg = find(t >= t0 & t < t1);
+    if isempty(seg), continue; end
+    if o.UseSpeedMask, seg = seg(speed_ok(seg)); end
+    if numel(seg) < o.MinTraceFrames, continue; end
+
+    [~, b_space] = pos2bin(x(seg), y(seg), edges_d);
+
+    for k = 1:K
+        hit = (b_space == k);
+        if nnz(hit) >= o.MinTraceFrames
+            v = mean(S(:, seg(hit)), 2, 'omitnan');
+            if all(isfinite(v))
+                sumV(:,k) = sumV(:,k) + v;
+                cnt(k)    = cnt(k) + 1;
+            end
+        end
+    end
+end
+
+for k = 1:K
+    if cnt(k) > 0
+        taskMap(:,k) = sumV(:,k) ./ cnt(k);
+    end
+end
+ok = any(all(isfinite(taskMap),1));
+end
+
+function kp = derange_indices(validK)
+% Return a derangement of validK (no fixed points), length = numel(validK).
+validK = validK(:)';
+n = numel(validK);
+if n < 2
+    kp = validK;
+    return
+end
+for rep = 1:50
+    perm = validK(randperm(n));
+    if all(perm ~= validK)
+        kp = perm;
+        return
+    end
+end
+% Fallback: cyclic shift
+kp = validK([2:end,1]);
+end
+
+function OUT = build_flip_perm_withinDayPairs(C, NPerm)
+OUT = struct('obs_z',NaN,'obs_r',NaN,'perm_z',[],'p_right',NaN,'p_left',NaN,'p_two',NaN, ...
+             'nPairsByDay',[],'nDays',0);
+
+if ~isfield(C,'byDay') || ~isfield(C.byDay,'withTask') || ~isfield(C.byDay,'withoutTask')
+    return
+end
+if ~isfield(C.byDay.withTask,'r') || ~isfield(C.byDay.withoutTask,'r')
+    return
+end
+
+rw = C.byDay.withTask.r;
+ru = C.byDay.withoutTask.r;
+
+D = min(numel(rw), numel(ru));
+day_delta_mu  = nan(D,1);
+day_delta_vec = cell(D,1);
+nPairs        = zeros(D,1);
+
+for d = 1:D
+    if isempty(rw{d}) || isempty(ru{d}), continue; end
+    a = rw{d}(:); b = ru{d}(:);
+    m = isfinite(a) & isfinite(b);
+    if nnz(m) < 2, continue; end
+
+    zw = atanh(max(min(a(m),0.999999),-0.999999));
+    zu = atanh(max(min(b(m),0.999999),-0.999999));
+    dv = zw - zu;
+
+    day_delta_vec{d} = dv;
+    day_delta_mu(d)  = mean(dv,'omitnan');
+    nPairs(d)        = numel(dv);
+end
+
+validDays = find(isfinite(day_delta_mu) & ~cellfun(@isempty, day_delta_vec));
+OUT.nDays = numel(validDays);
+OUT.nPairsByDay = nPairs;
+
+if OUT.nDays < 1
+    return
+end
+
+obs = mean(day_delta_mu(validDays), 'omitnan');
+
+if nargin < 2 || isempty(NPerm) || NPerm < 5
+    OUT.obs_z = obs;
+    OUT.obs_r = tanh(obs);
+    return
+end
+
+perm = nan(NPerm,1);
+for pidx = 1:NPerm
+    day_mu_perm = nan(OUT.nDays,1);
+    for j = 1:OUT.nDays
+        d = validDays(j);
+        dv = day_delta_vec{d};
+        s = (rand(size(dv)) > 0.5)*2 - 1;
+        day_mu_perm(j) = mean(s .* dv, 'omitnan');
+    end
+    perm(pidx) = mean(day_mu_perm, 'omitnan');
+end
+
+pr = mean(perm >= obs);
+pl = mean(perm <= obs);
+pt = 2*min(pr, pl);
+
+OUT.obs_z   = obs;
+OUT.obs_r   = tanh(obs);
+OUT.perm_z  = perm;
+OUT.p_right = pr;
+OUT.p_left  = pl;
+OUT.p_two   = pt;
+end
+
+function OUT = build_flip_perm_singleCell_flipCells(C, NPerm)
+OUT = struct('obs_z',NaN,'obs_r',NaN,'perm_z',[],'p_right',NaN,'p_left',NaN,'p_two',NaN, ...
+             'nCellsByDay',[],'nDays',0);
+
+if nargin < 2 || isempty(NPerm), NPerm = 500; end
+if ~isfield(C,'SC') || ~isfield(C.SC,'byDay') || ...
+   ~isfield(C.SC.byDay,'withTask') || ~isfield(C.SC.byDay,'withoutTask') || ...
+   ~isfield(C.SC.byDay.withTask,'z') || ~isfield(C.SC.byDay.withoutTask,'z')
+    return
+end
+
+zw = C.SC.byDay.withTask.z;
+zu = C.SC.byDay.withoutTask.z;
+
+D = min(numel(zw), numel(zu));
+day_mu   = nan(D,1);
+day_dv   = cell(D,1);
+nCells   = zeros(D,1);
+
+for d = 1:D
+    if isempty(zw{d}) || isempty(zu{d}), continue; end
+    a = zw{d}(:); b = zu{d}(:);
+    m = isfinite(a) & isfinite(b);
+    if nnz(m) < 2, continue; end
+
+    dv = a(m) - b(m);
+    day_dv{d} = dv;
+    day_mu(d) = mean(dv,'omitnan');
+    nCells(d) = numel(dv);
+end
+
+validDays = find(isfinite(day_mu) & ~cellfun(@isempty, day_dv));
+OUT.nDays = numel(validDays);
+OUT.nCellsByDay = nCells;
+
+if OUT.nDays < 1
+    return
+end
+
+obs = mean(day_mu(validDays), 'omitnan');
+
+perm = nan(NPerm,1);
+for pidx = 1:NPerm
+    mu_perm = nan(OUT.nDays,1);
+    for j = 1:OUT.nDays
+        d  = validDays(j);
+        dv = day_dv{d};
+        s  = (rand(size(dv)) > 0.5)*2 - 1;
+        mu_perm(j) = mean(s .* dv, 'omitnan');
+    end
+    perm(pidx) = mean(mu_perm, 'omitnan');
+end
+
+OUT.obs_z   = obs;
+OUT.obs_r   = tanh(obs);
+OUT.perm_z  = perm;
+OUT.p_right = mean(perm >= obs);
+OUT.p_left  = mean(perm <= obs);
+OUT.p_two   = 2*min(OUT.p_right, OUT.p_left);
+end
+
 function [edges] = build_grid_edges_single_day(posd, GridRC)
 allx = posd.x(:); ally = posd.y(:);
 allx = allx(isfinite(allx));  ally = ally(isfinite(ally));
@@ -861,7 +1271,7 @@ end
 n=min([numel(t),numel(x),numel(y)]); t=double(t(1:n)); x=double(x(1:n)); y=double(y(1:n));
 end
 
-function cs_vec = coerce_cs_day(csd, tday)
+function cs_vec = coerce_cs_day(csd, ~)
 if iscell(csd), if isempty(csd), cs_vec=[]; return; else, csd=csd{1}; end, end
 if isnumeric(csd) && isvector(csd), cs=double(csd(:)); if ~isempty(cs)&&max(cs,[],'omitnan')>1e4, cs=cs/1000; end, cs_vec=cs; return, end
 if istable(csd)
@@ -874,7 +1284,6 @@ end
 if isnumeric(csd) && ismatrix(csd) && ~isscalar(csd)
     M=double(csd); cs = M(:, min(2,size(M,2))); if max(cs,[],'omitnan')>1e4, cs=cs/1000; end, cs_vec=cs(:); return
 end
-if isstruct(csd), cs_vec=[]; return, end
 cs_vec=[];
 end
 
@@ -917,7 +1326,6 @@ else, st=[]; end
 st=double(st(:)); st=st(isfinite(st) & st>0);
 end
 
-% ---------- Corr + normalization ----------
 function varargout = safe_corr(a,b,varargin)
 a = a(:);
 b = b(:);
@@ -954,23 +1362,44 @@ switch lower(mode)
 end
 end
 
-% ---------- Small helpers used above ----------
+% ======================= FALLBACK DAY HELPERS =======================
+function dateList = autoDateList_fallback(rat)
+% Prefer your existing helper if present on path.
+if exist('autoDateList','file') == 2
+    try
+        dateList = autoDateList(rat);
+        return
+    catch
+    end
+end
+% Fallback: infer from Ca_peaks fields or Ca_ts fields
+dateList = {};
+if isfield(rat,'Ca_peaks') && isstruct(rat.Ca_peaks)
+    dateList = fieldnames(rat.Ca_peaks);
+elseif isfield(rat,'Ca_ts') && isstruct(rat.Ca_ts)
+    dateList = fieldnames(rat.Ca_ts);
+end
+dateList = dateList(:);
+end
+
+function S = filterFieldsByDay_fallback(Sin, daysToUse)
+% Prefer your existing helper if present.
+if exist('filterFieldsByDay','file') == 2
+    try
+        S = filterFieldsByDay(Sin, daysToUse);
+        return
+    catch
+    end
+end
+% Fallback: pass through; standardize_day_format will pick matching fields.
+S = Sin;
+end
+
+% ===================== PLOTS / SUMMARIES (same as your version) =====================
+
 function summarize_taskSpacePV_clean(R)
-% SUMMARIZE_TASKSPACEPV_CLEAN
-% Group viz + stats for (C) WITH vs WITHOUT task.
-% - All averaging/testing done in Fisher-z (atanh), bars plotted in r.
-% - Each rat contributes one mean (across its valid days) -> group mean.
-%
-% Expected fields per animal (produced by your pipeline):
-%   R(i).C.bin.byDay.z_mean     : per-day WITH-task mean Fisher-z
-%   R(i).C.byDay.withoutTask.r  : cell{day} of r-values (CTRL split-half) per bin
-%
-% This function is self-contained and includes its helpers below.
-
 titleStr = 'C: WITH vs WITHOUT task';
-
-% ---------- harvest per-day z (WITH) and z (WITHOUT) ----------
-[Zw_all, Za_all, aid, did] = get_C_dayZ(R);  % column vectors; aligned by (animal, day)
+[Zw_all, Za_all, aid, did] = get_C_dayZ(R);
 
 if isempty(Zw_all) || isempty(Za_all)
     warning('No WITH/WITHOUT day-level data found to summarize.');
@@ -978,9 +1407,6 @@ if isempty(Zw_all) || isempty(Za_all)
 end
 
 animals = {R.animal}';
-
-% ---------- PRIMARY STATS: per-rat (subject-level) ----------
-% Build per-rat mean z (WITH/WITHOUT), then paired t across rats.
 nA = numel(animals);
 rat_mean_with_z    = nan(nA,1);
 rat_mean_without_z = nan(nA,1);
@@ -997,23 +1423,18 @@ keepA = isfinite(rat_mean_with_z) & isfinite(rat_mean_without_z);
 Zw_rats = rat_mean_with_z(keepA);
 Za_rats = rat_mean_without_z(keepA);
 
-% Paired t across rats (Fisher-z)
 [pA, tA, dfA, dzA] = paired_t_z(Zw_rats, Za_rats);
 
-% ---------- SECONDARY (OPTIONAL): pooled per-day paired t in z ----------
 keepD = isfinite(Zw_all) & isfinite(Za_all);
 Zw_days = Zw_all(keepD);
 Za_days = Za_all(keepD);
 [pD, tD, dfD, dzD] = paired_t_z(Zw_days, Za_days);
 
-% ---------- PLOT ----------
 figure('Color','w','Position',[160 160 900 540]); hold on
 
-% 1) Per-day light lines, grouped by rat
 cmap = lines(nA);
 make_light = @(c,frac) (1-frac)*c + frac*[1 1 1];
 
-% Convert the specific day's WITH/WITHOUT z back to r for display
 rw_day = tanh(Zw_all);
 ru_day = tanh(Za_all);
 
@@ -1033,10 +1454,8 @@ for i = 1:nA
     end
 end
 
-% 2) Per-rat dark means (in r, from tanh of per-rat mean z)
 rat_with_r    = tanh(rat_mean_with_z);
 rat_without_r = tanh(rat_mean_without_z);
-rat_with_r-rat_without_r
 
 for i = 1:nA
     if isfinite(rat_with_r(i)) && isfinite(rat_without_r(i))
@@ -1046,51 +1465,38 @@ for i = 1:nA
     end
 end
 
-% 3) Group bars (mean across rats in z, back-transformed)
 bar(1, tanh(mean(Zw_rats,'omitnan')), 0.6, 'FaceColor',[0.35 0.70 1.00], 'EdgeColor','k');
 bar(2, tanh(mean(Za_rats,'omitnan')), 0.6, 'FaceColor',[0.85 0.55 0.25], 'EdgeColor','k');
 
-% Cosmetics
 xlim([0.5 2.5]); xticks([1 2]);
-xticklabels({'with task','without task'});  % <- fixed label order
+xticklabels({'with task','without task'});
 ylabel('Mean PV correlation (r)');
 title(titleStr);
 yline(0,'k:'); grid on; box on
 
-% Stats annotation (primary: per-rat; secondary: per-day)
 yl = ylim; y = yl(2) + 0.06*range(yl);
 line([1 2], [y y], 'Color','k', 'LineWidth', 1.2);
 txt1 = sprintf('per-rat paired t (z): t(%d)=%.2f, p=%.3g, dz=%.2f, nRats=%d', dfA, tA, pA, dzA, numel(Zw_rats));
 text(1.5, y + 0.02*range(yl), txt1, 'HorizontalAlignment','center');
 ylim([yl(1) y + 0.10*range(yl)]);
 
-% Also print to console a concise summary, including the secondary per-day test
 fprintf('\n== %s ==\n', titleStr);
 fprintf('Primary (per-rat):  paired t in z: t(%d)=%.2f, p=%.3g, dz=%.2f, nRats=%d\n', dfA, tA, pA, dzA, numel(Zw_rats));
 fprintf('Secondary (per-day): paired t in z: t(%d)=%.2f, p=%.3g, dz=%.2f, nDays=%d\n', dfD, tD, pD, dzD, numel(Zw_days));
-
 end
 
-% ========================= HELPERS =========================
-
 function [Zw, Za, aid, did] = get_C_dayZ(R)
-% Return aligned per-day Fisher-z values:
-%   Zw : WITH-task (already z in R(i).C.bin.byDay.z_mean)
-%   Za : WITHOUT-task (convert day’s r cell to z by averaging within day in z)
 Zw=[]; Za=[]; aid=[]; did=[];
-
 for i = 1:numel(R)
     has_with = isfield(R(i),'C') && isfield(R(i).C,'bin') && isfield(R(i).C.bin,'byDay') ...
                && isfield(R(i).C.bin.byDay,'z_mean');
     has_without = isfield(R(i),'C') && isfield(R(i).C,'byDay') ...
                   && isfield(R(i).C.byDay,'withoutTask') && isfield(R(i).C.byDay.withoutTask,'r');
-
     if ~has_with || ~has_without, continue; end
 
-    z_with = R(i).C.bin.byDay.z_mean(:);        % z per day (WITH)
-    ur     = R(i).C.byDay.withoutTask.r;        % cell{day} vectors of r (WITHOUT)
+    z_with = R(i).C.bin.byDay.z_mean(:);
+    ur     = R(i).C.byDay.withoutTask.r;
 
-    % Convert WITHOUT r-vectors to per-day Fisher-z means
     z_without = nan(numel(ur),1);
     for d = 1:numel(ur)
         if ~isempty(ur{d})
@@ -1102,20 +1508,16 @@ for i = 1:numel(R)
         end
     end
 
-    % Align days that have both WITH and WITHOUT
     m = isfinite(z_with) & isfinite(z_without);
     Zw  = [Zw;  z_with(m)];
     Za  = [Za;  z_without(m)];
     aid = [aid; i*ones(nnz(m),1)];
-    % for completeness (not used here), the within-animal day indices:
     did_local = (1:numel(z_with)).';
     did = [did; did_local(m)];
 end
 end
 
 function [p, t, df, dz] = paired_t_z(z1, z2)
-% Paired t-test in z space + Cohen's dz for paired design.
-% Returns two-sided p (MATLAB ttest default), t statistic, df, and dz.
 if numel(z1) ~= numel(z2)
     error('paired_t_z: inputs must be same length.');
 end
@@ -1126,25 +1528,15 @@ if numel(z1) < 2
     p = NaN; t = NaN; df = 0; dz = NaN; return
 end
 
-[~, p, ~, st] = ttest(z1, z2);   % two-sided
+[~, p, ~, st] = ttest(z1, z2);
 t  = st.tstat;
 df = st.df;
 
 d  = z1 - z2;
-dz = mean(d,'omitnan') / std(d, 0, 'omitnan');  % Cohen's dz (paired)
+dz = mean(d,'omitnan') / std(d, 0, 'omitnan');
 end
 
-
 function plot_taskToSpace_deltaPermHist_perRat(R, varargin)
-% plot_taskToSpace_deltaPermHist_perRat
-% One panel per rat: histogram of permuted Δz with vertical line at observed Δz.
-%
-% PermType:
-%   'derange' (ctrl-bin derangement null)
-%   'flip'    (day-level WITH/WITHOUT label-swap via sign flips)
-%
-% NOTE: This version has NO nested functions (more robust in big files).
-
 p = inputParser;
 addParameter(p,'NBins',30, @(x) isnumeric(x)&&isscalar(x)&&x>=5);
 addParameter(p,'ShowTwoSided',true, @(x) islogical(x)&&isscalar(x));
@@ -1155,25 +1547,18 @@ ShowTwoSided = p.Results.ShowTwoSided;
 PermType = lower(char(p.Results.PermType));
 
 nRats = numel(R);
-
 figure('Color','w','Position',[200 200 1100 700]);
 
 for ii = 1:nRats
-    % rat name
     if isfield(R(ii),'animal') && ~isempty(R(ii).animal)
         ratName = R(ii).animal;
     else
         ratName = sprintf('rat%02d', ii);
     end
-
-    if ~isfield(R(ii),'C') || isempty(R(ii).C)
-        continue
-    end
+    if ~isfield(R(ii),'C') || isempty(R(ii).C), continue; end
 
     dlt = get_delta_struct(R(ii).C, PermType);
-    if isempty(dlt) || ~isfield(dlt,'obs_z') || ~isfield(dlt,'perm_z')
-        continue
-    end
+    if isempty(dlt) || ~isfield(dlt,'obs_z') || ~isfield(dlt,'perm_z'), continue; end
 
     obs  = dlt.obs_z;
     perm = dlt.perm_z;
@@ -1183,7 +1568,6 @@ for ii = 1:nRats
     if isempty(perm), continue; end
 
     subplot(3,2,ii); hold on;
-
     histogram(perm, NBins, 'Normalization','pdf', 'EdgeColor','none');
     yl = ylim;
     plot([obs obs], yl, 'k-', 'LineWidth', 2);
@@ -1193,7 +1577,6 @@ for ii = 1:nRats
     title(sprintf('%s: %s null', ratName, PermType));
     grid on; box on
 
-    % p-values
     pR = NaN; pL = NaN; pT = NaN;
     if isfield(dlt,'p_right'), pR = dlt.p_right; end
     if isfield(dlt,'p_left'),  pL = dlt.p_left;  end
@@ -1222,103 +1605,244 @@ end
 end
 
 function dlt = get_delta_struct(C, permType)
-% Helper: choose delta struct based on permType
 dlt = [];
-
 switch lower(permType)
   case 'flip'
       if isfield(C,'delta_flip') && ~isempty(C.delta_flip)
           dlt = C.delta_flip;
       end
-    case 'derange'
-        if isfield(C,'delta_derange') && ~isempty(C.delta_derange)
-            dlt = C.delta_derange;
-        elseif isfield(C,'delta') && ~isempty(C.delta)
-            dlt = C.delta; % fallback
-        end
+  case 'derange'
+      if isfield(C,'delta_derange') && ~isempty(C.delta_derange)
+          dlt = C.delta_derange;
+      elseif isfield(C,'delta') && ~isempty(C.delta)
+          dlt = C.delta;
+      end
 end
 end
 
-function OUT = build_flip_perm_withinDayPairs(C, NPerm)
-% Flip labels within each day across paired bins (cluster-aware by day).
-% Uses C.byDay.withTask.r{d} and C.byDay.withoutTask.r{d}.
-% Returns animal-level Δz null for mean(Δz_day) across days.
+function summarize_taskSpacePV_singleCell_clean(R)
+titleStr = 'Single-cell: WITH vs WITHOUT task (corr across spatial bins per cell)';
 
-OUT = struct('obs_z',NaN,'obs_r',NaN,'perm_z',[],'p_right',NaN,'p_left',NaN,'p_two',NaN, ...
-             'nPairsByDay',[],'nDays',0);
+[Zw_all, Za_all, aid, did] = get_SC_dayZ(R);
 
-if ~isfield(C,'byDay') || ~isfield(C.byDay,'withTask') || ~isfield(C.byDay,'withoutTask')
-    return
-end
-if ~isfield(C.byDay.withTask,'r') || ~isfield(C.byDay.withoutTask,'r')
+if isempty(Zw_all) || isempty(Za_all)
+    warning('No single-cell WITH/WITHOUT day-level data found.');
     return
 end
 
-rw = C.byDay.withTask.r;
-ru = C.byDay.withoutTask.r;
+animals = {R.animal}';
+nA = numel(animals);
 
-D = min(numel(rw), numel(ru));
-day_delta_mu = nan(D,1);          % observed mean Δz per day
-day_delta_vec = cell(D,1);        % per-bin Δz vector per day
-nPairs = zeros(D,1);
+rat_mean_with_z    = nan(nA,1);
+rat_mean_without_z = nan(nA,1);
 
-for d = 1:D
-    if isempty(rw{d}) || isempty(ru{d}), continue; end
-    a = rw{d}(:); b = ru{d}(:);
-    m = isfinite(a) & isfinite(b);
-    if nnz(m) < 2, continue; end
-
-    zw = atanh(max(min(a(m),0.999999),-0.999999));
-    zu = atanh(max(min(b(m),0.999999),-0.999999));
-    dv = zw - zu;                         % per-bin Δz within day
-
-    day_delta_vec{d} = dv;
-    day_delta_mu(d)  = mean(dv,'omitnan'); % day mean Δz
-    nPairs(d)        = numel(dv);
+for i = 1:nA
+    m = (aid == i);
+    if any(m)
+        rat_mean_with_z(i)    = mean(Zw_all(m), 'omitnan');
+        rat_mean_without_z(i) = mean(Za_all(m), 'omitnan');
+    end
 end
 
-validDays = find(isfinite(day_delta_mu) & ~cellfun(@isempty, day_delta_vec));
-OUT.nDays = numel(validDays);
-OUT.nPairsByDay = nPairs;
+keepA = isfinite(rat_mean_with_z) & isfinite(rat_mean_without_z);
+Zw_rats = rat_mean_with_z(keepA);
+Za_rats = rat_mean_without_z(keepA);
 
-if OUT.nDays < 1
+[pA, tA, dfA, dzA] = paired_t_z(Zw_rats, Za_rats);
+
+keepD = isfinite(Zw_all) & isfinite(Za_all);
+Zw_days = Zw_all(keepD);
+Za_days = Za_all(keepD);
+
+[pD, tD, dfD, dzD] = paired_t_z(Zw_days, Za_days); %#ok<ASGLU>
+
+perm = build_flip_perm_singleCell_byDay(Zw_all, Za_all, aid, did, 500);
+
+figure('Color','w','Position',[160 160 920 560]); hold on
+
+cmap = lines(nA);
+make_light = @(c,frac) (1-frac)*c + frac*[1 1 1];
+
+rw_day = tanh(Zw_all);
+ru_day = tanh(Za_all);
+
+for i = 1:nA
+    c_base  = cmap(i,:);
+    c_light = make_light(c_base, 0.60);
+
+    m = (aid == i) & isfinite(rw_day) & isfinite(ru_day);
+    idx = find(m);
+    for j = 1:numel(idx)
+        plot([1 2], [rw_day(idx(j)) ru_day(idx(j))], '-', 'Color', c_light, 'LineWidth', 1.0);
+        plot(1, rw_day(idx(j)), 'o', 'MarkerFaceColor', c_light, 'MarkerEdgeColor', c_light, 'MarkerSize', 4);
+        plot(2, ru_day(idx(j)), 'o', 'MarkerFaceColor', c_light, 'MarkerEdgeColor', c_light, 'MarkerSize', 4);
+    end
+end
+
+rat_with_r    = tanh(rat_mean_with_z);
+rat_without_r = tanh(rat_mean_without_z);
+
+for i = 1:nA
+    if isfinite(rat_with_r(i)) && isfinite(rat_without_r(i))
+        plot([1 2], [rat_with_r(i) rat_without_r(i)], '-', 'Color', cmap(i,:), 'LineWidth', 2.5);
+        plot(1, rat_with_r(i),    'o', 'MarkerFaceColor', cmap(i,:), 'MarkerEdgeColor','k', 'LineWidth',0.5, 'MarkerSize', 6);
+        plot(2, rat_without_r(i), 'o', 'MarkerFaceColor', cmap(i,:), 'MarkerEdgeColor','k', 'LineWidth',0.5, 'MarkerSize', 6);
+    end
+end
+
+bar(1, tanh(mean(Zw_rats,'omitnan')), 0.6, 'FaceColor',[0.35 0.70 1.00], 'EdgeColor','k');
+bar(2, tanh(mean(Za_rats,'omitnan')), 0.6, 'FaceColor',[0.85 0.55 0.25], 'EdgeColor','k');
+
+xlim([0.5 2.5]); xticks([1 2]);
+xticklabels({'with task','without task'});
+ylabel('Mean per-cell spatial-map correlation (r)');
+title(titleStr);
+yline(0,'k:'); grid on; box on
+
+yl = ylim; y = yl(2) + 0.06*range(yl);
+line([1 2], [y y], 'Color','k', 'LineWidth', 1.2);
+
+txtA = sprintf('per-rat paired t (z): t(%d)=%.2f, p=%.3g, dz=%.2f, nRats=%d', dfA, tA, pA, dzA, numel(Zw_rats));
+txtP = sprintf('day-flip perm (z): obs \\Delta z=%.3f (r\\approx%.3f), p_{two}=%.3g', perm.obs_z, tanh(perm.obs_z), perm.p_two);
+
+text(1.5, y + 0.02*range(yl), txtA, 'HorizontalAlignment','center');
+text(1.5, y - 0.02*range(yl), txtP, 'HorizontalAlignment','center');
+
+ylim([yl(1) y + 0.12*range(yl)]);
+
+fprintf('\n== %s ==\n', titleStr);
+fprintf('Primary (per-rat): paired t in z: t(%d)=%.2f, p=%.3g, dz=%.2f, nRats=%d\n', dfA, tA, pA, dzA, numel(Zw_rats));
+fprintf('Secondary (per-day): paired t in z: t(%d)=%.2f, p=%.3g, dz=%.2f, nDays=%d\n', dfD, tD, pD, dzD, numel(Zw_days));
+fprintf('Perm (day-flip within rat): obs Δz=%.3f (r≈%.3f), p_two=%.3g (NPerm=%d)\n', perm.obs_z, tanh(perm.obs_z), perm.p_two, numel(perm.perm_z));
+end
+
+function [Zw, Za, aid, did] = get_SC_dayZ(R)
+Zw=[]; Za=[]; aid=[]; did=[];
+for i = 1:numel(R)
+    ok = isfield(R(i),'C') && isfield(R(i).C,'SC') && isfield(R(i).C.SC,'byDay') && ...
+         isfield(R(i).C.SC.byDay,'withTask') && isfield(R(i).C.SC.byDay.withTask,'zmean') && ...
+         isfield(R(i).C.SC.byDay,'withoutTask') && isfield(R(i).C.SC.byDay.withoutTask,'zmean');
+    if ~ok, continue; end
+
+    z_with    = R(i).C.SC.byDay.withTask.zmean(:);
+    z_without = R(i).C.SC.byDay.withoutTask.zmean(:);
+
+    nD = min(numel(z_with), numel(z_without));
+    z_with    = z_with(1:nD);
+    z_without = z_without(1:nD);
+
+    m = isfinite(z_with) & isfinite(z_without);
+    Zw  = [Zw; z_with(m)]; %#ok<AGROW>
+    Za  = [Za; z_without(m)]; %#ok<AGROW>
+    aid = [aid; i*ones(nnz(m),1)]; %#ok<AGROW>
+    dd = (1:nD).';
+    did = [did; dd(m)]; %#ok<AGROW>
+end
+end
+
+function OUT = build_flip_perm_singleCell_byDay(Zw_all, Za_all, aid, ~, NPerm)
+OUT = struct('obs_z',NaN,'perm_z',[],'p_right',NaN,'p_left',NaN,'p_two',NaN);
+if nargin < 5 || isempty(NPerm), NPerm = 500; end
+
+nA = max(aid);
+rat_mu = nan(nA,1);
+rat_days = cell(nA,1);
+
+for i = 1:nA
+    m = (aid == i) & isfinite(Zw_all) & isfinite(Za_all);
+    if ~any(m), continue; end
+    dz = Zw_all(m) - Za_all(m);
+    rat_mu(i) = mean(dz,'omitnan');
+    rat_days{i} = dz(:);
+end
+
+keepA = isfinite(rat_mu);
+if nnz(keepA) < 1
     return
 end
 
-% observed animal-level statistic = mean(day means)
-obs = mean(day_delta_mu(validDays), 'omitnan');
-
-if nargin < 2 || isempty(NPerm) || NPerm < 5
-    OUT.obs_z = obs;
-    OUT.obs_r = tanh(obs);
-    return
-end
+obs = mean(rat_mu(keepA), 'omitnan');
+OUT.obs_z = obs;
 
 perm = nan(NPerm,1);
-
 for p = 1:NPerm
-    day_mu_perm = nan(OUT.nDays,1);
-
-    for j = 1:OUT.nDays
-        d = validDays(j);
-        dv = day_delta_vec{d};
-
-        % flip sign per paired bin (equivalent to swapping WITH/WITHOUT label per pair)
-        s = (rand(size(dv)) > 0.5)*2 - 1;     % +/-1 per pair
-        day_mu_perm(j) = mean(s .* dv, 'omitnan');
+    mu_perm = nan(nnz(keepA),1);
+    jj = 1;
+    for i = 1:nA
+        if ~keepA(i), continue; end
+        dz = rat_days{i};
+        s  = (rand(size(dz)) > 0.5)*2 - 1;
+        mu_perm(jj) = mean(s .* dz, 'omitnan');
+        jj = jj + 1;
     end
-
-    perm(p) = mean(day_mu_perm, 'omitnan');   % animal stat
+    perm(p) = mean(mu_perm, 'omitnan');
 end
 
-pr = mean(perm >= obs);
-pl = mean(perm <= obs);
-pt = 2*min(pr, pl);
-
-OUT.obs_z   = obs;
-OUT.obs_r   = tanh(obs);
 OUT.perm_z  = perm;
-OUT.p_right = pr;
-OUT.p_left  = pl;
-OUT.p_two   = pt;
+OUT.p_right = mean(perm >= obs);
+OUT.p_left  = mean(perm <= obs);
+OUT.p_two   = 2*min(OUT.p_right, OUT.p_left);
+end
+
+function plot_taskToSpace_SC_deltaPermHist_perRat(R, varargin)
+p = inputParser;
+addParameter(p,'NBins',30, @(x) isnumeric(x)&&isscalar(x)&&x>=5);
+addParameter(p,'ShowTwoSided',true, @(x) islogical(x)&&isscalar(x));
+parse(p,varargin{:});
+NBins = p.Results.NBins;
+ShowTwoSided = p.Results.ShowTwoSided;
+
+nRats = numel(R);
+figure('Color','w','Position',[220 220 1100 700]);
+
+for ii = 1:nRats
+    if ~isfield(R(ii),'C') || isempty(R(ii).C) || ~isfield(R(ii).C,'SC') || isempty(R(ii).C.SC)
+        continue;
+    end
+    if ~isfield(R(ii).C.SC,'delta') || isempty(R(ii).C.SC.delta)
+        continue;
+    end
+
+    dlt = R(ii).C.SC.delta;
+    if ~isfield(dlt,'obs_z') || ~isfield(dlt,'perm_z') || isempty(dlt.perm_z)
+        continue;
+    end
+
+    obs  = dlt.obs_z;
+    perm = dlt.perm_z;
+    perm = perm(isfinite(perm));
+
+    if ~isfinite(obs) || isempty(perm), continue; end
+
+    subplot(3,2,ii); hold on;
+    histogram(perm, NBins, 'Normalization','pdf', 'EdgeColor','none');
+    yl = ylim;
+    plot([obs obs], yl, 'k-', 'LineWidth', 2);
+
+    ratName = '';
+    if isfield(R(ii),'animal'), ratName = R(ii).animal; else, ratName = sprintf('rat%02d', ii); end
+
+    xlabel('\Delta z (single-cell) = WITH - WITHOUT');
+    ylabel('Null density');
+    title(sprintf('%s: SC null', ratName));
+    grid on; box on
+
+    pR = NaN; pL = NaN; pT = NaN;
+    if isfield(dlt,'p_right'), pR = dlt.p_right; end
+    if isfield(dlt,'p_left'),  pL = dlt.p_left;  end
+    if isfield(dlt,'p_two'),   pT = dlt.p_two;   end
+
+    txt = sprintf('obs \\Delta z = %.3f (r\\approx%.3f)\n', obs, tanh(obs));
+    if ShowTwoSided
+        if isfinite(pT), txt = [txt, sprintf('p_{two} = %.3g', pT)];
+        else, txt = [txt, sprintf('p_{two} \\approx %.3g', 2*min(mean(perm>=obs), mean(perm<=obs)))];
+        end
+    else
+        if isfinite(pR), txt = [txt, sprintf('p_{right} = %.3g', pR)];
+        else, txt = [txt, sprintf('p_{right} \\approx %.3g', mean(perm>=obs))];
+        end
+    end
+    text(obs, yl(2), ['  ', txt], 'VerticalAlignment','top', 'HorizontalAlignment','left');
+    ylim(yl);
+end
 end
