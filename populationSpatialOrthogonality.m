@@ -9,7 +9,7 @@ addParameter(p,'NBins',15, @(x) isnumeric(x)&&isscalar(x)&&x>=2);
 addParameter(p,'GridRC',[],@(v) (isempty(v) || (isnumeric(v) && numel(v)==2 && all(v>=1))));
 addParameter(p,'BinMode','equal_occ',@(s) any(strcmpi(s,{'equal_occ','equal_size'})));
 addParameter(p,'MinSpeed',4,@(x) isnumeric(x)&&isscalar(x)&&x>=0);
-addParameter(p,'Mode','demean',@(s) any(strcmpi(s,{'raw','demean','zscore'})));
+addParameter(p,'Mode','demean',@(s) any(strcmpi(s,{'raw','demean','zscore','meanrate'})));
 addParameter(p,'Similarity','corr',@(s) any(strcmpi(s,{'cosine','corr','pearson'})));
 addParameter(p,'Adjacency','rook',@(s) any(strcmpi(s,{'moore','rook'})));
 addParameter(p,'Days',[],@(d) ischar(d) || isstring(d) || iscellstr(d) || isempty(d));
@@ -255,7 +255,7 @@ addParameter(p,'NBins',16, @(x) isnumeric(x)&&isscalar(x)&&x>=2);
 addParameter(p,'GridRC',[],@(v) (isempty(v) || (isnumeric(v)&&numel(v)==2&&all(v>=1))));
 addParameter(p,'BinMode','equal_occ',@(s) any(strcmpi(s,{'equal_occ','equal_size'})));
 addParameter(p,'MinSpeed',4,@(x) isnumeric(x)&&isscalar(x)&&x>=0);
-addParameter(p,'Mode','raw',@(s) any(strcmpi(s,{'raw','demean','zscore'})));
+addParameter(p,'Mode','raw',@(s) any(strcmpi(s,{'raw','demean','zscore','meanrate'})));
 addParameter(p,'Similarity','cosine',@(s) any(strcmpi(s,{'cosine','corr','pearson'})));
 addParameter(p,'Adjacency','moore',@(s) any(strcmpi(s,{'moore','rook'})));
 addParameter(p,'Days',[],@(d) ischar(d) || isstring(d) || iscellstr(d) || isempty(d));
@@ -609,7 +609,7 @@ addParameter(p,'NBins',6,@(x) isnumeric(x)&&isscalar(x)&&x>=2);
 addParameter(p,'GridRC',[],@(v) (isempty(v) || (isnumeric(v)&&numel(v)==2&&all(v>=1))));
 addParameter(p,'BinMode','equal_size',@(s) any(strcmpi(s,{'equal_occ','equal_size'})));
 addParameter(p,'LockAxis','x',@(s) any(strcmpi(s,{'x','y'}))); % only used in 1D mode
-addParameter(p,'Mode','raw',@(s) any(strcmpi(s,{'raw','demean','zscore'})));
+addParameter(p,'Mode','raw',@(s) any(strcmpi(s,{'raw','demean','zscore','meanrate'})));
 addParameter(p,'Similarity','cosine',@(s) any(strcmpi(s,{'cosine','corr','pearson'})));
 addParameter(p,'Days',[],@(d) ischar(d) || isstring(d) || iscellstr(d) || isempty(d));
 addParameter(p,'MICutoff',[],@(x) isempty(x) || (isscalar(x)&&isfinite(x)));
@@ -891,6 +891,10 @@ for gi = 1:numel(goodIdxList)
     rateForSim = normalizeRatesPerCell(rateKxN_raw, modeStr);
     [dotK, S, angK] = computeSimilarityMatrix(rateForSim, simStr);
 
+    if false  % toggle
+    debug_full_upturn(S, rateForSim, binMeta, GridRC);
+    end
+
     perDay(gi).rateKxN_raw = rateKxN_raw;
     perDay(gi).cosSimK     = S;
     perDay(gi).angleK      = angK;
@@ -953,6 +957,9 @@ switch lower(modeStr)
         sd = std(R, 0, 1, 'omitnan');
         sd(~isfinite(sd) | sd==0) = 1;
         X  = (R - mu) ./ sd;
+    case 'meanrate'
+        mu = mean(R, 1, 'omitnan');
+        X  = R ./ mu;
     otherwise
         error('Unknown Mode: %s', modeStr);
 end
@@ -1056,7 +1063,6 @@ end
 
 function Sstats = computeSpatialGridStats(S, binMeta, varargin)
 
-
 p = inputParser;
 addParameter(p,'Adjacency','moore',@(s) any(strcmpi(s,{'moore','rook'})));
 addParameter(p,'MantelPerms',10000,@(x) isnumeric(x)&&isscalar(x)&&x>=0);
@@ -1066,98 +1072,115 @@ adjStr = lower(p.Results.Adjacency);
 nPerm  = p.Results.MantelPerms;
 
 K = size(S,1);
-S = (S + S')./2; S(1:K+1:end) = NaN;
+
+% Symmetrize; blank diagonal for UT summaries
+S = (S + S')./2;
+S(1:K+1:end) = NaN;
 
 UT = triu(true(K),1);
 [idxI, idxJ] = find(UT);
 sUT = S(UT);
 
-% distances + adjacency
-if isfield(binMeta,'mode') && strcmpi(binMeta.mode,'grid') && ...
-   isfield(binMeta,'centers2D') && size(binMeta.centers2D,2)==2
-    Rg = binMeta.gridRC(1); Cg = binMeta.gridRC(2);
+% ------------------- build distances + step metric -------------------
+isGrid = isfield(binMeta,'mode') && strcmpi(binMeta.mode,'grid') && ...
+         isfield(binMeta,'centers2D') && size(binMeta.centers2D,2)==2 && ...
+         isfield(binMeta,'gridRC') && numel(binMeta.gridRC)==2;
+
+if isGrid
+    Rg = binMeta.gridRC(1);
+    Cg = binMeta.gridRC(2);
+
+    % grid row/col indices per bin (index order must match centers2D order)
     [rows, cols] = ind2sub([Rg Cg], (1:K)');
+
+    % step distances in grid steps
+    dCheb = max(abs(rows(idxI)-rows(idxJ)), abs(cols(idxI)-cols(idxJ)));
+    dMan  = abs(rows(idxI)-rows(idxJ)) + abs(cols(idxI)-cols(idxJ));
+
+    % adjacency mask in UT-vector space
+    switch adjStr
+        case 'moore'
+            stepD = dCheb;
+            adjMaskVec = (dCheb == 1);
+        case 'rook'
+            stepD = dMan;
+            adjMaskVec = (dMan == 1);
+    end
+
+    % Euclidean distances between physical bin centers (Option A distance curve)
     XY = binMeta.centers2D;
     DX = XY(idxI,1) - XY(idxJ,1);
     DY = XY(idxI,2) - XY(idxJ,2);
     De = sqrt(DX.^2 + DY.^2);
 
-    Dcheb = max(abs(rows(idxI)-rows(idxJ)), abs(cols(idxI)-cols(idxJ)));
-    Dman  = abs(rows(idxI)-rows(idxJ)) + abs(cols(idxI)-cols(idxJ));
-    switch adjStr
-        case 'moore', adjMaskVec = (Dcheb == 1);
-        case 'rook',  adjMaskVec = (Dman  == 1);
-    end
+    % full Euclidean distance matrix (Mantel)
+    Dfull = nan(K);
+    Dfull(UT) = De;
+    Dfull = (Dfull + Dfull')./2;
+    Dfull(1:K+1:end) = 0;
 
-    % --- GRID branch ---
-    kmax = max(Dcheb(:));
-    lag_k1 = nan(1,kmax);
-    for k = 1:kmax
-        lag_k1(k) = mean(sUT(Dcheb==k), 'omitnan');
-    end
-    lag_mean = [1, lag_k1];       % <-- prepend zero-lag = 1
-
-    % --- 1-D fallback branch ---
-    kmax = max(Didx(:));
-    lag_k1 = nan(1,kmax);
-    for k = 1:kmax
-        lag_k1(k) = mean(sUT(Didx==k), 'omitnan');
-    end
-    lag_mean = [1, lag_k1];       % <-- prepend zero-lag = 1
-
-    for k = 1:kmax, lag_mean(k) = mean(sUT(Dcheb==k), 'omitnan'); end
-
-    Dfull = nan(K); Dfull(UT) = De; Dfull = (Dfull + Dfull')./2; Dfull(1:K+1:end) = 0;
 else
-    % 1D fallback
-    if isfield(binMeta,'centers1D') && ~isempty(binMeta.centers1D)
-        centers = binMeta.centers1D(:);
-    else
-        centers = (1:K).';
-    end
-    De   = abs(centers(idxI) - centers(idxJ));
-    Didx = abs(idxI - idxJ);
-    adjMaskVec = (Didx == 1);
-    kmax = max(Didx(:));
-    lag_mean = nan(1,kmax);
-    for k = 1:kmax, lag_mean(k) = mean(sUT(Didx==k), 'omitnan'); end
+    % 1D fallback (pc1 or unknown): step distance = index distance
+    stepD = abs(idxI - idxJ);
+    adjMaskVec = (stepD == 1);
 
-    Dfull = nan(K); Dfull(UT) = De; Dfull = (Dfull + Dfull')./2; Dfull(1:K+1:end) = 0;
+    % physical-ish distance uses centers1D if available
+    if isfield(binMeta,'centers1D') && ~isempty(binMeta.centers1D)
+        c = binMeta.centers1D(:);
+        De = abs(c(idxI) - c(idxJ));
+    else
+        De = stepD; % last resort
+    end
+
+    Dfull = nan(K);
+    Dfull(UT) = De;
+    Dfull = (Dfull + Dfull')./2;
+    Dfull(1:K+1:end) = 0;
 end
 
-% summary
+% ------------------- lag curve (Option A: step distance) -------------------
+kmax = max(stepD);
+lag_mean = nan(1, kmax+1);
+lag_mean(1) = 1;  % define lag 0 as 1 by convention
+for k = 1:kmax
+    mk = (stepD == k);
+    if any(mk)
+        lag_mean(k+1) = mean(sUT(mk), 'omitnan');
+    end
+end
+
+% ------------------- summary adj vs nonadj -------------------
 mean_off    = mean(sUT, 'omitnan');
+
 sAdj        = sUT(adjMaskVec);
 sNonAdj     = sUT(~adjMaskVec);
+
 mean_adj    = mean(sAdj,    'omitnan');
 mean_nonadj = mean(sNonAdj, 'omitnan');
 adj_diff    = mean_adj - mean_nonadj;
 
-% --- Mantel (robust) ---
-% If distances are degenerate, return r=0, p=1 (instead of NaN)
+% ------------------- Mantel (Option A: Euclidean) -------------------
 dOK = De(isfinite(De));
 if numel(dOK) < 3 || numel(unique(dOK)) < 2
     mantel_r = 0;
     mantel_p = 1;
 else
     [mantel_r, mantel_p] = mantelTest_fromDistanceMatrix(S, Dfull, nPerm);
-    % Last-resort guard: if anything still NaN, emit null-like values
     if ~isfinite(mantel_r)
-        UT = triu(true(K),1);
-        s = S(UT); d = Dfull(UT);
+        % fallback effect-size only if perms/inputs degenerate
+        UT2 = triu(true(K),1);
+        s = S(UT2); d = Dfull(UT2);
         ok = isfinite(s) & isfinite(d);
         if nnz(ok) >= 3 && std(s(ok))>0 && std(d(ok))>0
             mantel_r = corr(s(ok), -d(ok), 'type','Pearson');
-            mantel_p = NaN;  % no perms → no p-value
+            mantel_p = NaN;
         else
             mantel_r = 0; mantel_p = 1;
         end
     end
 end
 
-
-
-% linear slope/R2
+% ------------------- linear slope/R2 (Euclidean) -------------------
 ok = isfinite(sUT) & isfinite(De(:));
 if nnz(ok) >= 3 && std(De(ok))>0 && std(sUT(ok))>0
     X = [ones(nnz(ok),1) De(ok)];
@@ -1171,62 +1194,66 @@ else
     slope = NaN; r2 = NaN;
 end
 
-% distance bins (guard degenerate case)
+% ------------------- distance bins (Euclidean) -------------------
 if all(~isfinite(De))
-    edges = [0 1]; centers = 0.5; dist_mean = NaN;
+    edges = [0 1];
+    centers = 0.5;
+    dist_mean = NaN;
 else
     nb = min(10, max(4, round(sqrt(nnz(isfinite(De))))));
     dOK = De(isfinite(De));
     if isempty(dOK)
-        edges = [0 1]; centers = 0.5; dist_mean = NaN;
+        edges = [0 1];
+        centers = 0.5;
+        dist_mean = NaN;
     else
         edges = unique([min(dOK), quantile(dOK, linspace(0,1,nb)), max(dOK)]);
-        edges(1) = edges(1)-eps;
+        edges(1) = edges(1) - eps;
         if numel(edges) < nb+1
             edges = linspace(min(dOK), max(dOK), nb+1);
-            edges(1) = edges(1)-eps;
+            edges(1) = edges(1) - eps;
         end
         centers = (edges(1:end-1)+edges(2:end))/2;
         dist_mean = nan(1,numel(centers));
         for k = 1:numel(centers)
-            dist_mean(k) = mean(sUT(De>=edges(k) & De<edges(k+1)), 'omitnan');
+            mk = (De >= edges(k) & De < edges(k+1));
+            dist_mean(k) = mean(sUT(mk), 'omitnan');
         end
     end
 end
 
-% -------- prepend zero-distance point (lag 0) --------
+% prepend 0-distance point (kept consistent with your plotting expectations)
 centers   = centers(:);
 dist_mean = dist_mean(:);
 centers   = [0; centers];
 dist_mean = [1; dist_mean];
-% -----------------------------------------------------
 
-% then later keep your existing assignments:
-Sstats.dist_edges   = edges;
-Sstats.dist_centers = centers;
-
-
+% ------------------- outputs -------------------
 Sstats = struct();
 Sstats.mean_off       = mean_off;
 Sstats.mean_adj       = mean_adj;
 Sstats.mean_nonadj    = mean_nonadj;
 Sstats.adj_diff       = adj_diff;
-Sstats.adj_perm_p     = NaN;          % (unchanged here)
-Sstats.n_adj_pairs    = numel(sAdj);
-Sstats.n_nonadj_pairs = numel(sNonAdj);
+
+Sstats.adj_perm_p     = NaN;
+Sstats.n_adj_pairs    = nnz(isfinite(sAdj));
+Sstats.n_nonadj_pairs = nnz(isfinite(sNonAdj));
+
 Sstats.lag_mean       = lag_mean;
+
 Sstats.mantel_r       = mantel_r;
 Sstats.mantel_p       = mantel_p;
+
 Sstats.slope          = slope;
 Sstats.r2             = r2;
+
 Sstats.adjType        = adjStr;
-Sstats.diff_perm      = [];           % (unchanged here)
+
+Sstats.diff_perm      = [];
 Sstats.dist_edges     = edges;
 Sstats.dist_centers   = centers;
 Sstats.dist_mean      = dist_mean;
 end
-
-
 
 function [p_perm, diff_perm] = adjacencyPermutationP_vec(S, adjMaskVec, nPerm)
 % Permute bin labels; recompute (mean_adj - mean_nonadj) in UT vector space.
@@ -1649,4 +1676,126 @@ elseif p<1e-2, stars='**';
 elseif p<0.05, stars='*';
 else,          stars='n.s.';
 end
+end
+
+function OUT = debug_full_upturn(S, X, binMeta, GridRC)
+% S: KxK similarity (full, not split)
+% X: KxN matrix used for similarity (after Mode normalization)
+% Reports: per-distance-bin nPairs, mean/sem, median shared cells;
+% and farthest-bin pair list + leave-one-out leverage.
+
+K  = size(S,1);
+UT = triu(true(K),1);
+
+% --- distances for UT pairs (same geometry as your stats) ---
+[I,J] = find(UT);
+if isfield(binMeta,'mode') && strcmpi(binMeta.mode,'grid') && ...
+   isfield(binMeta,'centers2D') && size(binMeta.centers2D,2)==2
+    XY = binMeta.centers2D;
+    dvec = sqrt(sum((XY(I,:) - XY(J,:)).^2,2));
+else
+    if isfield(binMeta,'centers1D') && ~isempty(binMeta.centers1D)
+        c = binMeta.centers1D(:);
+    else
+        c = (1:K)';
+    end
+    dvec = abs(c(I)-c(J));
+end
+
+svec = S(UT);
+
+% --- shared finite cell counts per pair ---
+Aok = isfinite(X);
+nShared = double(Aok) * double(Aok)';     % KxK
+nvec = nShared(UT);
+
+% --- distance binning (quantile bins like you use elsewhere) ---
+ok = isfinite(dvec) & isfinite(svec);
+dOK = dvec(ok); sOK = svec(ok); nOK = nvec(ok);
+if isempty(dOK)
+    fprintf('[debug_full_upturn] no finite UT pairs.\n');
+    OUT = [];
+    return
+end
+
+nBins = 8;  % match your plot feel
+edges = unique(quantile(dOK, linspace(0,1,nBins+1)));
+edges(1) = edges(1) - eps;
+if numel(edges) < nBins+1
+    edges = linspace(min(dOK), max(dOK), nBins+1);
+    edges(1) = edges(1) - eps;
+end
+centers = (edges(1:end-1)+edges(2:end))/2;
+
+% --- per-bin summaries ---
+% --- per-bin summaries ---
+T = table('Size',[nBins 6], ...
+    'VariableTypes',{'double','double','double','double','double','double'}, ...
+    'VariableNames',{'distCenter','nPairs','meanR','semR','medianShared','minShared'});
+
+for k = 1:nBins
+    mk = (dOK >= edges(k)) & (dOK < edges(k+1));
+
+    vv = sOK(mk);
+    vv = vv(isfinite(vv));     % already drops NaN/Inf
+
+    nn = nOK(mk);
+    nn = nn(isfinite(nn));     % already drops NaN/Inf
+
+    T.distCenter(k) = centers(k);
+    T.nPairs(k)     = nnz(mk);
+
+    if isempty(vv)
+        T.meanR(k) = NaN;
+        T.semR(k)  = NaN;
+    else
+        T.meanR(k) = mean(vv);
+        if numel(vv) == 1
+            T.semR(k) = NaN;
+        else
+            T.semR(k) = std(vv,0) / sqrt(numel(vv));
+        end
+    end
+
+    if isempty(nn)
+        T.medianShared(k) = NaN;
+        T.minShared(k)    = NaN;
+    else
+        T.medianShared(k) = median(nn);
+        T.minShared(k)    = min(nn);
+    end
+end
+
+fprintf('\n[full] Pair counts + shared-cell counts per distance bin:\n');
+disp(T);
+
+% --- farthest-distance bin details ---
+[~,kFar] = max(T.distCenter);
+mkFar = ok & (dvec>=edges(kFar) & dvec<edges(kFar+1));
+
+Ifar = I(mkFar); Jfar = J(mkFar);
+dFar = dvec(mkFar);
+sFar = svec(mkFar);
+nFar = nvec(mkFar);
+
+fprintf('[full] Farthest bin: dist≈%.2f, nPairs=%d, mean=%.3f, medianShared=%.1f (minShared=%d)\n', ...
+    T.distCenter(kFar), nnz(mkFar), mean(sFar,'omitnan'), median(nFar,'omitnan'), min(nFar));
+
+% leave-one-pair-out mean range
+mu0 = mean(sFar,'omitnan');
+loo = nan(numel(sFar),1);
+for q = 1:numel(sFar)
+    vv = sFar; vv(q) = [];
+    loo(q) = mean(vv,'omitnan');
+end
+fprintf('[full] Farthest bin leave-one-pair mean range: [%.3f, %.3f]\n', min(loo), max(loo));
+
+% print sorted pair list
+[~,ord] = sort(sFar,'descend','MissingPlacement','last');
+nShow = min(20,numel(ord));
+P = table(Ifar(ord(1:nShow)), Jfar(ord(1:nShow)), dFar(ord(1:nShow)), sFar(ord(1:nShow)), nFar(ord(1:nShow)), ...
+    'VariableNames',{'binA','binB','dist','sim','nShared'});
+disp(P);
+
+OUT = struct('table',T,'edges',edges,'centers',centers,'pairs',P);
 end

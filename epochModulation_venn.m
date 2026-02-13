@@ -136,9 +136,45 @@ for r = 1:nR
                     dirsgn(c,e) = int8(sign(double(obsK) - lambda));
                 end
             end
+
+            % After filling pvals (nCells x nEp)
+            alpha = opt.Alpha;
+            sigs = false(size(pvals));  % corrected significance calls
+
+            for c = 1:nCells
+                pv = pvals(c,:);
+                ok = isfinite(pv);
+                if nnz(ok) < 1, continue; end
+
+                % Holm-Bonferroni across the epochs for this cell
+                [pSort, ord] = sort(pv(ok), 'ascend');
+                m = numel(pSort);
+
+                pass = false(1,m);
+                for k = 1:m
+                    if pSort(k) <= alpha / (m - k + 1)
+                        pass(k) = true;
+                    else
+                        break; % Holm: once you fail, all larger p fail
+                    end
+                end
+
+                % Map back to epoch indices
+                idxOk = find(ok);
+                sigIdxLocal = ord(pass);
+                sigEpochs = idxOk(sigIdxLocal);
+                sigs(c, sigEpochs) = true;
+            end
         end
 
-        sigs = pvals <= opt.Alpha;
+        %sigs = pvals <= opt.Alpha;
+        % Fraction of kept cells significant in ANY epoch
+        anyEpoch = any(sigs(keep,:), 2);
+        fracAny  = mean(anyEpoch);
+
+        if opt.Verbose
+            fprintf('  Any-epoch modulated (this session): %.2f%%\n', 100*fracAny);
+        end
 
         ALL_sets   = [ALL_sets;   sigs(keep,:)];          %#ok<AGROW>
         ALL_dir    = [ALL_dir;    dirsgn(keep,:)];        %#ok<AGROW>
@@ -183,6 +219,11 @@ for r = 1:nR
         assignin('base', ratNames{r}, rat);
     end
 end
+
+anyEpoch_all = any(ALL_sets, 2);
+fracAny_all  = mean(anyEpoch_all);
+
+fprintf('\nOverall any-epoch fraction: %.2f%%\n', 100*fracAny_all);
 
 if isempty(ALL_sets)
     warning('No cells kept for epochModulation_venn.');
@@ -317,12 +358,15 @@ switch lower(opt.PlotMode)
                         sprintf('%.1f%%',100*F.ABC) };
             else
                 F = ratEqualExclusiveFrac4(setsK, ALL_rat, opt.PercentBase);
+                F
                 lbl = { sprintf('%.1f%%',100*F.A_only), sprintf('%.1f%%',100*F.B_only), ...
                         sprintf('%.1f%%',100*F.C_only), sprintf('%.1f%%',100*F.D_only), ...
                         sprintf('%.1f%%',100*F.AB),     sprintf('%.1f%%',100*F.AC),     sprintf('%.1f%%',100*F.AD), ...
                         sprintf('%.1f%%',100*F.BC),     sprintf('%.1f%%',100*F.BD),     sprintf('%.1f%%',100*F.CD), ...
                         sprintf('%.1f%%',100*F.ABC),    sprintf('%.1f%%',100*F.ABD),    sprintf('%.1f%%',100*F.ACD), ...
                         sprintf('%.1f%%',100*F.BCD),    sprintf('%.1f%%',100*F.ABCD) };
+
+
             end
         else
             switch lower(opt.PercentBase)
@@ -756,6 +800,7 @@ F.ACD    = mean(vals(:,13),'omitnan');
 F.BCD    = mean(vals(:,14),'omitnan');
 F.ABCD   = mean(vals(:,15),'omitnan');
 end
+
 
 % ==========================================================
 % Proportional circle diagrams (rat-equalized geometry optional)

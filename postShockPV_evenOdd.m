@@ -16,7 +16,7 @@ function Rall = postShockPV_evenOdd(ratNames, varargin)
 %   - Returns Rall with per-rat results and pooled-across-rats fields.
 %
 % New option:
-%   'Preprocess' : 'none' | 'demean' | 'zscore' (default 'none')
+%   'Preprocess' : 'none' | 'demean' | 'zscore' | 'meanrate' (default 'none')
 %                  Per-cell normalization applied to across all bins×trials
 %                  X (cells × bins × trials) before forming PVs.
 
@@ -36,6 +36,7 @@ addParameter(p,'UseSpeedMask',false,@islogical);
 addParameter(p,'SpeedThresh',4,@isscalar);
 addParameter(p,'SpeedMaskFrac',0.5,@(x)isscalar(x)&&x>=0&&x<=1);
 addParameter(p,'Preprocess','demean',@(s) ischar(s)||isstring(s));
+
 parse(p,varargin{:});
 opts = p.Results;
 
@@ -330,6 +331,10 @@ for d = 1:numel(dayNames)
             sd = std(X, 0, [2 3], 'omitnan');
             sd(sd==0 | isnan(sd)) = eps;
             X  = (X - mu) ./ sd;
+        case "meanrate"
+          mu = mean(X, [2 3], 'omitnan');          % cells×1×1
+          X  = X - mu;
+
         otherwise
             error('Preprocess must be ''none'', ''demean'', or ''zscore''.');
     end

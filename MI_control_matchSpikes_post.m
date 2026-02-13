@@ -1,5 +1,6 @@
 function mutualinfo_struct = MI_control_matchSpikes_post(spike_structure, pos_structure, velthreshold, dim, CA_timestamps, CSUS_id_struct, ca_MI, nIter)
-% MI_control_matchSpikes
+% DEP (I think)
+%MI_control_matchSpikes
 % Computes shuffled mutual information (MI) as a control  excluding task periods and
 % removing matched number of cells to task.
 % Returns a struct with per-cell control stats.

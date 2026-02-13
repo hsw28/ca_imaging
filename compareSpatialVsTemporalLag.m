@@ -11,7 +11,7 @@ function OUT = compareSpatialVsTemporalLag(ratNames, varargin)
 
 % ---------- parse args ----------
 p = inputParser;  p.KeepUnmatched = true;
-addParameter(p,'Mode','raw',@(s) any(strcmpi(s,{'raw','demean','zscore'})));
+addParameter(p,'Mode','raw',@(s) any(strcmpi(s,{'raw','demean','zscore','meanrate'})));
 addParameter(p,'Similarity','corr',@(s) any(strcmpi(s,{'corr','pearson','cosine','spearman'})));
 addParameter(p,'NBins',[5,8,12,15],@(x) isnumeric(x) && all(x>=2));               % vector OK
 addParameter(p,'GridRC',[],@(v) isempty(v) || (isnumeric(v)&&numel(v)==2&&all(v>=1)));
@@ -27,6 +27,8 @@ addParameter(p,'Spatial',struct(),@(s) isstruct(s));
 addParameter(p,'Temporal',struct(),@(s) isstruct(s));
 addParameter(p,'ShowShuffled',true,@(x) islogical(x) || isnumeric(x));
 addParameter(p,'NShuff',500,@(x) isnumeric(x) && x>=10);
+addParameter(p,'SpatialX','distance',@(s) any(strcmpi(s,{'step','distance'})));
+addParameter(p,'NormalizeX',true,@(x) islogical(x) || isnumeric(x));
 parse(p,varargin{:});
 C = p.Results;
 
@@ -49,14 +51,15 @@ if numel(binsList) > 1
         % Optional: show one shuffle/null reference from the first run (scaled x)
         if C.ShowShuffled && ii==1
             if ~isempty(OUTi.curves.temporal_shuff.x)
-                xt = OUTi.curves.temporal_shuff.x ./ binsList(ii);
+              xt = OUTi.curves.temporal_shuff.x;
+
                 muT = OUTi.curves.temporal_shuff.mu; seT = OUTi.curves.temporal_shuff.se;
                 fill(ax, [xt; flipud(xt)], [muT-seT; flipud(muT+seT)], [0 0 0], ...
                     'FaceAlpha',0.05, 'EdgeColor','none');
                 plot(ax, xt, muT, '-', 'LineWidth',1.0,'Color',[0.4 0.4 0.4]);
             end
             if ~isempty(OUTi.curves.spatial_shuff.x)
-                xs = OUTi.curves.spatial_shuff.x ./ binsList(ii);
+                xs = OUTi.curves.spatial_shuff.x;
                 muS = OUTi.curves.spatial_shuff.mu; seS = OUTi.curves.spatial_shuff.se;
                 fill(ax, [xs; flipud(xs)], [muS-seS; flipud(muS+seS)], [0 0 0], ...
                     'FaceAlpha',0.05, 'EdgeColor','none');
@@ -71,8 +74,8 @@ if numel(binsList) > 1
         legendStr{end+1} = sprintf('Temporal (%d bins)', binsList(ii));
         legendStr{end+1} = sprintf('Spatial  (%d bins)', binsList(ii));
 
-        allY = [allY; OUTi.curves.temporal.y(:); OUTi.curves.spatial.y(:)];
-        allX = [allX; OUTi.curves.temporal.x(:)./binsList(ii); OUTi.curves.spatial.x(:)./binsList(ii)];
+
+        allX = [allX; OUTi.curves.temporal.x(:); OUTi.curves.spatial.x(:)];
 
         OUT.multi{ii} = OUTi;
         print_shape_stats(binsList(ii), OUTi);
@@ -121,7 +124,11 @@ end
 p1 = plot(xT, yT, '-', 'LineWidth', 2.4);              % temporal
 p2 = plot(xS, yS, '-', 'LineWidth', 2.4);              % spatial
 
-xlabel('Lag (bins)');
+if strcmpi(pick(C,'SpatialX','distance'),'distance') && pick(C,'NormalizeX',true)
+    xlabel('Separation (fraction of max distance / max lag)');
+else
+    xlabel('Lag (bins)');
+end
 if any(strcmpi(C.Similarity,{'corr','pearson'})) || strcmpi(mapTemporalSimilarity(pick(C.Temporal,'Similarity',C.Similarity)),'pearson')
     ylabel('Mean Pearson similarity');
 else
@@ -171,21 +178,59 @@ Rsp = populationSpatialOrthogonality(ratNames, ...
     'MICutoff',sp.MICutoff,'MIExcludeCutoff',sp.MIExcludeCutoff, ...
     'PerRatFigures',sp.PerRatFigures,'SaveFig',false);
 
-% extract spatial lag (vector by integer lag)
-sLag = [];
+% --- choose spatial x-axis: step-lag vs Euclidean distance ---
+useDist = strcmpi(pick(C,'SpatialX','distance'),'distance');
+
+% ---------- build SPATIAL curve (xS, sLag) ----------
+sY = []; xS = [];
 if isfield(Rsp,'pooledAcrossRats') && isfield(Rsp.pooledAcrossRats,'spatialStats') ...
-        && isfield(Rsp.pooledAcrossRats.spatialStats,'lag_mean')
-    sLag = Rsp.pooledAcrossRats.spatialStats.lag_mean(:);
+        && ~isempty(Rsp.pooledAcrossRats.spatialStats)
+
+    st = Rsp.pooledAcrossRats.spatialStats;
+
+    if useDist && isfield(st,'dist_centers') && isfield(st,'dist_mean') ...
+            && ~isempty(st.dist_centers) && ~isempty(st.dist_mean)
+        xS = st.dist_centers(:);
+        sY = st.dist_mean(:);
+        if isempty(xS) || xS(1) ~= 0
+            xS = [0; xS];
+            sY = [1; sY];
+        elseif ~isfinite(sY(1))
+            sY(1) = 1;
+        end
+    elseif isfield(st,'lag_mean') && ~isempty(st.lag_mean)
+        sY = st.lag_mean(:);
+        xS = (0:numel(sY)-1).';
+    end
 end
-if isempty(sLag) && isfield(Rsp,'pooledAcrossRats') && isfield(Rsp.pooledAcrossRats,'cosSimK')
-    Cpool = Rsp.pooledAcrossRats.cosSimK;
-    sLag  = lagMean_from_matrix(Cpool);
+
+% fallback if stats weren't present
+if isempty(sY)
+    Cpool_for_curve = getPooledSpatialMatrix(Rsp, any(strcmpi(sp.Similarity,{'corr','pearson'})));
+    if ~isempty(Cpool_for_curve)
+        if useDist && isfield(Rsp,'pooledAcrossRats') && isfield(Rsp.pooledAcrossRats,'binMeta') && ~isempty(Rsp.pooledAcrossRats.binMeta)
+            st2 = computeSpatialGridStats(Cpool_for_curve, Rsp.pooledAcrossRats.binMeta, ...
+                'Adjacency', sp.Adjacency, 'MantelPerms', 0, ...
+                'IsCorr', any(strcmpi(sp.Similarity,{'corr','pearson'})));
+            if isfield(st2,'dist_centers') && ~isempty(st2.dist_centers)
+                xS = st2.dist_centers(:);
+                sY = st2.dist_mean(:);
+                if xS(1) ~= 0, xS = [0; xS]; sY = [1; sY]; end
+            end
+        end
+        if isempty(sY)
+            sY = lagMean_from_matrix(Cpool_for_curve);
+            sY = [1; sY(:)];
+            xS = (0:numel(sY)-1).';
+        end
+    end
 end
-% ensure lag-0 anchor
-if isempty(sLag) || ~isfinite(sLag(1)) || sLag(1) < 0.999
-    sLag = [1; sLag(:)];
+
+% optional x normalization (makes overlay across NBins sane)
+if pick(C,'NormalizeX',true)
+    if ~isempty(xS) && max(xS) > 0, xS = xS ./ max(xS); end
 end
-xS = (0:numel(sLag)-1).';
+sLag = sY;
 
 % ---------- run TEMPORAL ----------
 Gtp = populationOrthogonality_group(ratNames, ...
@@ -196,36 +241,89 @@ Gtp = populationOrthogonality_group(ratNames, ...
     'GroupSaveFig',false);
 
 % temporal lag (group mean ± SEM)
-Cg = [];   % keep for nulls if available
+yT = []; yTse = [];
 if isfield(Gtp,'lagMat') && ~isempty(Gtp.lagMat)
     tLag = Gtp.lagMat;                   % nRats × NSplits
     yT   = mean(tLag,1,'omitnan').';
     yTse = std(tLag,0,1,'omitnan').' ./ sqrt(max(1,sum(isfinite(tLag),1)).');
-    if isfield(Gtp,'simMean'), Cg = Gtp.simMean; end
 elseif isfield(Gtp,'simMean') && ~isempty(Gtp.simMean)
-    Cg   = Gtp.simMean;
-    yT   = lagMean_from_matrix(Cg);
+    yT   = lagMean_from_matrix(Gtp.simMean);
     yTse = nan(size(yT));
 else
-    % fallback: cannot build temporal null; still produce yT from lags if possible
-    yT   = nan(sp.NBins,1);  yTse = nan(sp.NBins,1);
+    yT   = nan(sp.NBins,1);
+    yTse = nan(sp.NBins,1);
 end
-xT = (0:numel(yT)-1).';
 
-% --- shuffled/null lag curves (after Gtp/Rsp exist) ---
+xT = (0:numel(yT)-1).';
+if pick(C,'NormalizeX',true) && max(xT)>0
+    xT = xT ./ max(xT);
+end
+
+% --- shuffled/null lag curves (temporal + spatial) ---
+nSh = pick(C,'NShuff',500);
+
+% temporal null
 temNull = struct('x',[],'mu',[],'se',[]);
-spaNull = struct('x',[],'mu',[],'se',[]);
-if ~isempty(Cg)
-    [muT,seT] = lag_null_from_matrix(Cg, pick(C,'NShuff',500));
+Ctemp = getPooledTemporalMatrix(Gtp);
+if ~isempty(Ctemp)
+    [muT,seT] = lag_null_from_matrix(Ctemp, nSh);
     temNull.x  = (0:numel(muT)-1).';
     temNull.mu = muT;
     temNull.se = seT;
+    if pick(C,'NormalizeX',true) && max(temNull.x)>0
+        temNull.x = temNull.x ./ max(temNull.x);
+    end
 end
-if isfield(Rsp,'pooledAcrossRats') && isfield(Rsp.pooledAcrossRats,'cosSimK') && ~isempty(Rsp.pooledAcrossRats.cosSimK)
-    [muS,seS] = lag_null_from_matrix(Rsp.pooledAcrossRats.cosSimK, pick(C,'NShuff',500));
-    spaNull.x  = (0:numel(muS)-1).';
-    spaNull.mu = muS;
-    spaNull.se = seS;
+
+% spatial null
+spaNull = struct('x',[],'mu',[],'se',[]);
+Csp = getPooledSpatialMatrix(Rsp, any(strcmpi(sp.Similarity,{'corr','pearson'})));
+if ~isempty(Csp)
+    didDistanceNull = false;
+
+    if strcmpi(pick(C,'SpatialX','distance'),'distance') && ...
+       isfield(Rsp,'pooledAcrossRats') && isfield(Rsp.pooledAcrossRats,'binMeta') && ~isempty(Rsp.pooledAcrossRats.binMeta)
+
+        bm = Rsp.pooledAcrossRats.binMeta;
+
+        % edges: prefer what spatialStats computed; otherwise recompute
+        edges = [];
+        if isfield(Rsp.pooledAcrossRats,'spatialStats') && ~isempty(Rsp.pooledAcrossRats.spatialStats) && ...
+           isfield(Rsp.pooledAcrossRats.spatialStats,'dist_edges') && ~isempty(Rsp.pooledAcrossRats.spatialStats.dist_edges)
+            edges = Rsp.pooledAcrossRats.spatialStats.dist_edges;
+        end
+        if isempty(edges)
+            stTmp = computeSpatialGridStats(Csp, bm, ...
+                'Adjacency', sp.Adjacency, 'MantelPerms', 0, ...
+                'IsCorr', any(strcmpi(sp.Similarity,{'corr','pearson'})));
+            if isfield(stTmp,'dist_edges'), edges = stTmp.dist_edges; end
+        end
+
+        if ~isempty(edges) && numel(edges) >= 2
+            [xSnull, muS, seS] = distance_null_from_matrix(Csp, bm, edges, nSh);
+
+            if pick(C,'NormalizeX',true) && max(xSnull)>0
+                xSnull = xSnull ./ max(xSnull);
+            end
+
+            spaNull.x  = xSnull(:);
+            spaNull.mu = muS(:);
+            spaNull.se = seS(:);
+            didDistanceNull = true;
+        end
+    end
+
+    % fallback: step-lag null
+    if ~didDistanceNull || isempty(spaNull.x)
+        [muS,seS] = lag_null_from_matrix(Csp, nSh);
+        spaNull.x  = (0:numel(muS)-1).';
+        spaNull.mu = muS;
+        spaNull.se = seS;
+
+        if pick(C,'NormalizeX',true) && max(spaNull.x)>0
+            spaNull.x = spaNull.x ./ max(spaNull.x);
+        end
+    end
 end
 
 % ---- SHAPE STATS on pooled curves ----
@@ -239,9 +337,9 @@ end
 if isfield(Rsp,'perRat')
     PR = Rsp.perRat;
     for k = 1:numel(PR)
-        if isfield(PR(k),'spatialStats') && isfield(PR(k).spatialStats,'lag_mean')
+        if isfield(PR(k),'spatialStats') && isfield(PR(k).spatialStats,'lag_mean') && ~isempty(PR(k).spatialStats.lag_mean)
             sPerRat{k,1} = PR(k).spatialStats.lag_mean(:);
-        elseif isfield(PR(k),'cosSimK')
+        elseif isfield(PR(k),'cosSimK') && ~isempty(PR(k).cosSimK)
             sPerRat{k,1} = lagMean_from_matrix(PR(k).cosSimK);
         end
     end
@@ -346,4 +444,121 @@ for ii = 1:nShuff
 end
 mu = mean(allLags,2,'omitnan');
 se = std(allLags,0,2,'omitnan') ./ sqrt(nShuff);
+end
+
+function [x, mu, se] = distance_null_from_matrix(C, binMeta, edges, nShuff)
+% Null for similarity-vs-distance curve:
+% permute bin labels in C (Cp=C(p,p)) while keeping geometry fixed,
+% then average Cp(UT) within each Euclidean-distance bin.
+
+K  = size(C,1);
+UT = triu(true(K),1);
+[I,J] = find(UT);
+
+% distances for UT pairs from fixed geometry
+if isfield(binMeta,'mode') && strcmpi(binMeta.mode,'grid') && ...
+   isfield(binMeta,'centers2D') && size(binMeta.centers2D,2)==2
+    XY = binMeta.centers2D;
+    dvec = sqrt(sum((XY(I,:) - XY(J,:)).^2, 2));
+else
+    if isfield(binMeta,'centers1D') && ~isempty(binMeta.centers1D)
+        c = binMeta.centers1D(:);
+    else
+        c = (1:K)';
+    end
+    dvec = abs(c(I) - c(J));
+end
+
+% distance-bin masks in UT-vector space
+nBins = numel(edges) - 1;
+masks = cell(1,nBins);
+for b = 1:nBins
+    masks{b} = (dvec >= edges(b) & dvec < edges(b+1));
+end
+
+centers = (edges(1:end-1) + edges(2:end)) / 2;
+centers = centers(:);
+
+allVals = nan(nBins, nShuff);
+for s = 1:nShuff
+    p  = randperm(K);
+    Cp = C(p,p);
+    v  = Cp(UT);
+    for b = 1:nBins
+        mk = masks{b};
+        if any(mk)
+            allVals(b,s) = mean(v(mk), 'omitnan');
+        end
+    end
+end
+
+mu = mean(allVals, 2, 'omitnan');
+se = std(allVals, 0, 2, 'omitnan') ./ sqrt(nShuff);
+
+% prepend distance=0 anchor (match your observed curve convention)
+x  = [0; centers];
+mu = [1; mu];
+se = [0; se];
+end
+
+function C = getPooledTemporalMatrix(Gtp)
+C = [];
+if isfield(Gtp,'simMean') && ~isempty(Gtp.simMean), C = Gtp.simMean; return; end
+if isfield(Gtp,'simMat')  && ~isempty(Gtp.simMat),  C = Gtp.simMat;  return; end
+if isfield(Gtp,'C')       && ~isempty(Gtp.C),       C = Gtp.C;       return; end
+end
+
+function Cpool = getPooledSpatialMatrix(Rsp, isCorr)
+Cpool = [];
+
+% pooledAcrossRats candidates
+if isfield(Rsp,'pooledAcrossRats') && ~isempty(Rsp.pooledAcrossRats)
+    P = Rsp.pooledAcrossRats;
+
+    cand = {'cosSimK','simMat','simMean','C','corrMat'};
+    for i = 1:numel(cand)
+        f = cand{i};
+        if isfield(P,f) && ~isempty(P.(f))
+            Cpool = P.(f);
+            return
+        end
+    end
+end
+
+% perRat fallback: pool matrices across rats
+if isfield(Rsp,'perRat') && ~isempty(Rsp.perRat)
+    PR = Rsp.perRat;
+    mats = {};
+    for k = 1:numel(PR)
+        if isfield(PR(k),'cosSimK') && ~isempty(PR(k).cosSimK)
+            mats{end+1} = PR(k).cosSimK; %#ok<AGROW>
+        elseif isfield(PR(k),'simMat') && ~isempty(PR(k).simMat)
+            mats{end+1} = PR(k).simMat; %#ok<AGROW>
+        end
+    end
+    if ~isempty(mats)
+        Cpool = pool_mats(mats, isCorr);
+    end
+end
+end
+
+
+function C = pool_mats(mats, isCorr)
+% mats: cell array of KxK matrices (same K)
+K = size(mats{1},1);
+stack = nan(K,K,numel(mats));
+for i = 1:numel(mats)
+    M = mats{i};
+    if ~isequal(size(M),[K K]), continue; end
+    stack(:,:,i) = M;
+end
+
+if isCorr
+    stack = max(min(stack, 0.999999), -0.999999);
+    Z = atanh(stack);
+    Zm = mean(Z, 3, 'omitnan');
+    C = tanh(Zm);
+else
+    C = mean(stack, 3, 'omitnan');
+end
 end

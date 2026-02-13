@@ -22,15 +22,15 @@ addParameter(p,'BlockLen',2,@(x) isnumeric(x)&&isscalar(x)&&x>0);   % s (only fo
 addParameter(p,'PhaseRepeats',1,@(x) isnumeric(x)&&isscalar(x)&&x>=1);
 addParameter(p,'Pairwise',true,@islogical);                        % corr Rows='pairwise' vs 'complete'
 addParameter(p,'NShuff',100,@(x) isnumeric(x)&&isscalar(x)&&x>=100);
-addParameter(p,'MinOccPerBin',2,@(x) isnumeric(x)&&isscalar(x)&&x>=0);
-addParameter(p,'MinCellsPerCorr',10,@(x) isnumeric(x)&&isscalar(x)&&x>=0);
-addParameter(p,'CellMinBinsFrac',0.30,@(x) isnumeric(x)&&isscalar(x)&&x>0&&x<=1); % per-cell stability
-addParameter(p,'MinCellsBinFrac',0.10,@(x) isnumeric(x)&&isscalar(x)&&x>=0&&x<=1);
+addParameter(p,'MinOccPerBin',.5,@(x) isnumeric(x)&&isscalar(x)&&x>=0);
+addParameter(p,'MinCellsPerCorr',1,@(x) isnumeric(x)&&isscalar(x)&&x>=0);
+addParameter(p,'CellMinBinsFrac',0.35,@(x) isnumeric(x)&&isscalar(x)&&x>0&&x<=1); % per-cell stability
+addParameter(p,'MinCellsBinFrac',1e-6,@(x) isnumeric(x)&&isscalar(x)&&x>=0&&x<=1);
 addParameter(p,'DoPlot',true,@islogical);
-addParameter(p,'Debug',false,@islogical);
+addParameter(p,'Debug',true,@islogical);
 addParameter(p,'SaveFig',false,@islogical);
 addParameter(p,'FigName','',@(s) ischar(s) || isstring(s));
-addParameter(p,'SubsampleN',0,@(x) isnumeric(x)&&isscalar(x)&&x>=0);  % 0 = off
+addParameter(p,'SubsampleN',30,@(x) isnumeric(x)&&isscalar(x)&&x>=0);  % 0 = off
 addParameter(p,'SplitMode','withinbin_random', ...   % 'withinbin_evenodd' | 'withinbin_random' | 'blocks'
     @(s) any(strcmpi(s,{'withinbin_evenodd','withinbin_random','blocks'})));
 addParameter(p,'NormAcrossCells',false,@islogical);   % extra row-wise (bin-wise) zscore
@@ -256,6 +256,7 @@ for d = 1:numel(perDayRun)
         rateA = normalizeRatesPerCell(rateA, lower(opt.Mode));
         rateB = normalizeRatesPerCell(rateB, lower(opt.Mode));
 
+
         % NEW: per-bin normalization across cells (row-wise)
         if opt.NormAcrossCells
             rateA = row_zscore(rateA);   % zscore each bin across cells
@@ -270,6 +271,7 @@ for d = 1:numel(perDayRun)
         end
 
         % --- Freeze one complete-case cell list for the whole matrix
+
         keepList = all(isfinite([rateA; rateB]), 1);
         nKeep    = nnz(keepList);
         if nKeep < max(3, opt.SubsampleN)
@@ -278,6 +280,7 @@ for d = 1:numel(perDayRun)
         end
         rateA = rateA(:, keepList);
         rateB = rateB(:, keepList);
+
 
         % (now Pairwise vs. Complete is irrelevant; every (i,j) sees the same cells)
 
@@ -661,31 +664,65 @@ end
 end
 
 function lag = spatialLagCurve(C, binMeta)
-K = size(C,1); UT = triu(true(K),1);
+K = size(C,1);
+UT = triu(true(K),1);
+
+% distances
 if strcmpi(binMeta.mode,'grid')
-    XY = binMeta.centers2D; D = squareform(pdist(XY));
+    XY = binMeta.centers2D;
+    D  = squareform(pdist(XY));
 else
     if isfield(binMeta,'centers1D'), c = binMeta.centers1D(:); else, c = (1:K)'; end
     D = squareform(pdist(c));
 end
-d = D(UT); s = C(UT);
+
+% extract upper-tri pairs + indices
+[I,J] = find(UT);
+d = D(UT);
+s = C(UT);
+
 ok = isfinite(d) & isfinite(s);
-d = d(ok); s = s(ok);
+I = I(ok); J = J(ok); d = d(ok); s = s(ok);
 
 % distance=0 (diagonal)
-lag.centers = 0;  lag.mean = mean(diag(C),'omitnan');
+lag.centers = 0;
+lag.mean    = mean(diag(C),'omitnan');
+lag.nPairs  = K;                           % diagonal count
+lag.sem     = std(diag(C), 'omitnan') / sqrt(max(1, nnz(isfinite(diag(C)))));
+lag.values  = cell(1,1);
+lag.pairs   = cell(1,1);
+lag.dists   = cell(1,1);
+lag.values{1} = diag(C);
+lag.pairs{1}  = [(1:K)' (1:K)'];
+lag.dists{1}  = zeros(K,1);
 
 % 8 quantile bins for the rest
 if ~isempty(d)
     edges = unique(quantile(d, linspace(0,1,9)));
-    edges(1) = edges(1)-eps;
+    edges(1) = edges(1) - eps;
+
     for k = 1:numel(edges)-1
-        mk = d>=edges(k) & d<edges(k+1);
+        mk = (d >= edges(k)) & (d < edges(k+1));
         lag.centers(end+1) = mean([edges(k) edges(k+1)]); %#ok<AGROW>
         lag.mean(end+1)    = mean(s(mk),'omitnan');       %#ok<AGROW>
+        lag.nPairs(end+1)  = nnz(mk);                     %#ok<AGROW>
+
+        if nnz(mk) >= 2
+            lag.sem(end+1) = std(s(mk),'omitnan') / sqrt(nnz(mk)); %#ok<AGROW>
+        else
+            lag.sem(end+1) = NaN; %#ok<AGROW>
+        end
+
+        lag.values{end+1} = s(mk);               %#ok<AGROW>
+        lag.pairs{end+1}  = [I(mk) J(mk)];       %#ok<AGROW>
+        lag.dists{end+1}  = d(mk);               %#ok<AGROW>
     end
 end
-lag.centers = lag.centers(:)'; lag.mean = lag.mean(:)';
+
+lag.centers = lag.centers(:)';
+lag.mean    = lag.mean(:)';
+lag.nPairs  = lag.nPairs(:)';
+lag.sem     = lag.sem(:)';
 end
 
 function m = fdr_mask_local(p, q)

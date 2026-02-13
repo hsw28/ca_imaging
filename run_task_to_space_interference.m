@@ -1,44 +1,10 @@
 function R = run_task_to_space_interference(ratNames, varargin)
 % RUN_TASK_TO_SPACE_INTERFERENCE  Space stability with vs without task
 %
-% TEMPLATE version:
-%   - Build a CTRL spatial template from HALF of non-task frames (CTRL_A).
-%   - Compare template to:
-%       (1) other half of non-task frames (CTRL_B)  -> WITHOUT task
-%       (2) TASK frames in TraceWin (time-binned)   -> WITH task
-%   - All averaging/testing done in Fisher-z (atanh).
-%
-% Required per rat (in base workspace):
-%   rat.Ca_peaks, rat.Ca_ts, rat.pos, rat.CS_times
-%
-% Options (name/value):
-%   'DaysMode'        : {'last3toAn'|'all'|'last3byca'}  default 'last3toAn'
-%   'TraceWin'        : [t0 t1] seconds from CS          default [0 2]
-%   'BufferPost'      : seconds excluded after TraceWin  default 0
-%   'CellNorm'        : {'demean'|'zscore'|'none'}       default 'none'
-%   'GridRC'          : [rows cols] for spatial grid     default [2 2]
-%   'NumBins'         : integer, overrides GridRC        default []
-%   'MinCtrlFrames'   : min CTRL frames per spatial bin *per half* default 10
-%   'MinTraceFrames'  : min TASK frames per (timebin,spatialbin)    default 2
-%   'TimeBins'        : number of temporal bins in TraceWin          default 15
-%   'FramesPerBin'    : fixed frames per temporal bin override       default []
-%   'CtrlSplitMode'   : {'random'|'evenodd'}             default 'random'
-%   'CtrlSplitSeed'   : [] or scalar                     default []
-%   'VelThresh'       : cm/s speed threshold             default 4
-%   'UseSpeedMask'    : bool                             default true
-%
-% Permutations:
-%   'NPerm_C'         : group null perms                 default 500
-%   'NullMode_C'      : (reserved; currently uses flip within-day pairs)
-%   'DeltaPermType'   : {'derange'|'flip'|'both'}        default 'flip'
-%
-% Single-cell (corr across spatial bins per cell):
-%   'DoSingleCell'    : bool                             default true
-%   'NPerm_SC'        : perms                            default 500
-%   'NullMode_SC'     : {'flip-cells'|'template-derange-bins'} default 'flip-cells'
-%
-% Output:
-%   R(i).C.* and R(i).meta.*
+% Changes (memory + printing):
+%   - Prints only a per-rat summary (no per-rep spam).
+%   - Does NOT store all resample structs by default (big memory cut).
+%   - Optional: StoreResampleDetails=true to keep full rep structs.
 
 % ------------------------------- Options ---------------------------------
 p = inputParser;
@@ -50,7 +16,7 @@ addParameter(p,'NumBins',[]);
 
 addParameter(p,'VelThresh',4);
 addParameter(p,'UseSpeedMask',true);
-addParameter(p,'CellNorm','none');  % 'zscore'|'demean'|'none'
+addParameter(p,'CellNorm','demean');  % 'zscore'|'demean'|'none'|'meanrate'
 
 addParameter(p,'MinCtrlFrames',10);
 addParameter(p,'MinTraceFrames',2);
@@ -59,6 +25,15 @@ addParameter(p,'FramesPerBin',[]);
 
 addParameter(p,'CtrlSplitMode','random', @(s) any(strcmpi(s,{'random','evenodd'})));
 addParameter(p,'CtrlSplitSeed',[], @(x) isempty(x) || (isnumeric(x)&&isscalar(x)));
+
+% template resampling controls
+addParameter(p,'TemplateResampleN',50, @(x) isnumeric(x)&&isscalar(x)&&x>=1);
+addParameter(p,'TemplateResampleSeed',[], @(x) isempty(x) || (isnumeric(x)&&isscalar(x)));
+
+% NEW: storage/verbosity controls
+addParameter(p,'StoreResampleDetails',false, @(x) islogical(x)&&isscalar(x)); % big memory toggle
+addParameter(p,'Verbose',true, @(x) islogical(x)&&isscalar(x));              % per-rat header only
+addParameter(p,'VerboseDay',false, @(x) islogical(x)&&isscalar(x));          % optional per-day CTRL kept bins
 
 addParameter(p,'NPerm_C',500);
 addParameter(p,'NullMode_C','frame-redistribute'); %#ok<NASGU>
@@ -108,7 +83,10 @@ for ii = 1:numel(ratNames)
         otherwise
             daysToUse = dateList;
     end
-    fprintf('[%s] daysToUse: %s\n', ratVar, strjoin(daysToUse, ', '));
+
+    if opt.Verbose
+        fprintf('\n[%s] daysToUse: %s\n', ratVar, strjoin(daysToUse, ', '));
+    end
 
     % ----- Pull & standardize per-day containers -----
     spikes_raw = filterFieldsByDay_fallback(rat.Ca_peaks, daysToUse);
@@ -117,46 +95,288 @@ for ii = 1:numel(ratNames)
     cs_raw     = filterFieldsByDay_fallback(rat.CS_times, daysToUse);
     [spikes, ts, pos, cs] = standardize_day_format(spikes_raw, ts_raw, pos_raw, cs_raw, daysToUse);
 
-    % ----- CONTROL spatial PV template from CTRL_A; WITHOUT = CTRL_B vs template -----
-    ctrl = compute_control_spatialPV_template(spikes, ts, pos, cs, ...
-        'TraceWin',        opt.TraceWin, ...
-        'BufferPost',      opt.BufferPost, ...
-        'GridRC',          opt.GridRC, ...
-        'NumBins',         opt.NumBins, ...
-        'MinCtrlFrames',   opt.MinCtrlFrames, ...
-        'VelThresh',       opt.VelThresh, ...
-        'UseSpeedMask',    opt.UseSpeedMask, ...
-        'CellNorm',        opt.CellNorm, ...
-        'CtrlSplitMode',   opt.CtrlSplitMode, ...
-        'CtrlSplitSeed',   opt.CtrlSplitSeed, ...
-        'Label',           ratVar);
+    % ----- Apply ratemask per day (keepCells where ratemask==1) -----
+      for d = 1:numel(daysToUse)
+          dlabel = daysToUse{d};
+          keepCells = [];
 
-    % ----- WITH task: TASK vs template -----
-    C = compute_space_with_vs_without_task(spikes, ts, pos, cs, ctrl, ...
-        'TraceWin',        opt.TraceWin, ...
-        'VelThresh',       opt.VelThresh, ...
-        'UseSpeedMask',    opt.UseSpeedMask, ...
-        'CellNorm',        opt.CellNorm, ...
-        'MinTraceFrames',  opt.MinTraceFrames, ...
-        'TimeBins',        opt.TimeBins, ...
-        'FramesPerBin',    opt.FramesPerBin, ...
-        'NPerm',           opt.NPerm_C, ...
-        'NullMode',        opt.NullMode_C, ...
-        'NPerm_SC',        opt.NPerm_SC, ...
-        'NullMode_SC',     opt.NullMode_SC, ...
-        'Label',           ratVar, ...
-        'DeltaPermType',   opt.DeltaPermType);
+          if isfield(rat,'ratemask')
+              f = sprintf('ratemask_%s', dlabel);
+              if isfield(rat.ratemask, f)
+                  rm = rat.ratemask.(f);
+                  keepCells = (rm == 1);
+              end
+          end
 
-    % Per-day paired z stats (quick)
-    C = compute_space_with_without_binwise_stats(C, 'NPerm', 49);
-    R(ii).C = C;
+          if ~isempty(keepCells)
+              % spikes{d} is expected to be cell array (1 per neuron) or numeric (neurons×something)
+              if iscell(spikes{d})
+                  if numel(keepCells) == numel(spikes{d})
+                      spikes{d} = spikes{d}(keepCells);
+                  else
+                      warning('[%s][%s] ratemask length (%d) != #cells (%d). Skipping ratemask filter for this day.', ...
+                          ratVar, dlabel, numel(keepCells), numel(spikes{d}));
+                  end
 
-    % ----- Pack meta -----
+              elseif isnumeric(spikes{d})
+                  if numel(keepCells) == size(spikes{d},1)
+                      spikes{d} = spikes{d}(keepCells, :);
+                  else
+                      warning('[%s][%s] ratemask length (%d) != #rows (%d). Skipping ratemask filter for this day.', ...
+                          ratVar, dlabel, numel(keepCells), size(spikes{d},1));
+                  end
+
+              else
+                  warning('[%s][%s] spikes day type not supported for ratemask filtering: %s', ...
+                      ratVar, dlabel, class(spikes{d}));
+              end
+          end
+      end
+
+    % =================== TEMPLATE RESAMPLING LOOP ===================
+    nRep = max(1, round(opt.TemplateResampleN));
+
+    % base seed logic:
+    baseSeed = [];
+    if ~isempty(opt.TemplateResampleSeed)
+        baseSeed = opt.TemplateResampleSeed;
+    elseif ~isempty(opt.CtrlSplitSeed)
+        baseSeed = opt.CtrlSplitSeed;
+    end
+
+    % We keep only rep1 as the returned canonical struct, plus aggregated summaries.
+    C0 = [];
+    ctrl0 = [];
+
+    % Streaming aggregation (avoid huge rep storage)
+    D = numel(ts);
+    sum_z_with    = zeros(D,1);
+    sum_z_without = zeros(D,1);
+    sum_delta     = zeros(D,1);
+    cnt_day       = zeros(D,1);
+
+    % Optional: estimate resample spread (Welford) for delta per day
+    mu_delta = zeros(D,1);
+    M2_delta = zeros(D,1);
+    cnt_w    = zeros(D,1);
+
+    % Pooled permutation null across reps (for your hist plots / pooled p)
+    perm_all = [];
+
+    % If requested, store full reps (can be huge)
+    if opt.StoreResampleDetails
+        repC    = cell(nRep,1);
+        repCTRL = cell(nRep,1);
+    end
+
+    for rr = 1:nRep
+        repSeed = [];
+        if ~isempty(baseSeed)
+            repSeed = baseSeed + rr - 1;
+        end
+
+        % ----- CONTROL template from CTRL_A -----
+        ctrl = compute_control_spatialPV_template(spikes, ts, pos, cs, ...
+            'TraceWin',        opt.TraceWin, ...
+            'BufferPost',      opt.BufferPost, ...
+            'GridRC',          opt.GridRC, ...
+            'NumBins',         opt.NumBins, ...
+            'MinCtrlFrames',   opt.MinCtrlFrames, ...
+            'VelThresh',       opt.VelThresh, ...
+            'UseSpeedMask',    opt.UseSpeedMask, ...
+            'CellNorm',        opt.CellNorm, ...
+            'CtrlSplitMode',   opt.CtrlSplitMode, ...
+            'CtrlSplitSeed',   repSeed, ...
+            'Label',           sprintf('%s', ratVar), ...
+            'VerboseDay',      opt.VerboseDay);
+
+        % ----- WITH vs WITHOUT -----
+        C = compute_space_with_vs_without_task(spikes, ts, pos, cs, ctrl, ...
+            'TraceWin',        opt.TraceWin, ...
+            'VelThresh',       opt.VelThresh, ...
+            'UseSpeedMask',    opt.UseSpeedMask, ...
+            'CellNorm',        opt.CellNorm, ...
+            'MinTraceFrames',  opt.MinTraceFrames, ...
+            'TimeBins',        opt.TimeBins, ...
+            'FramesPerBin',    opt.FramesPerBin, ...
+            'NPerm',           opt.NPerm_C, ...
+            'NullMode',        opt.NullMode_C, ...
+            'NPerm_SC',        opt.NPerm_SC, ...
+            'NullMode_SC',     opt.NullMode_SC, ...
+            'Label',           sprintf('%s', ratVar), ...
+            'DeltaPermType',   opt.DeltaPermType);
+
+        % Optional per-day paired z stats (kept for compatibility; small)
+        C = compute_space_with_without_binwise_stats(C, 'NPerm', 49);
+
+        % Save canonical rep1
+        if rr == 1
+            C0 = C;
+            ctrl0 = ctrl;
+        end
+
+        % Store full reps only if requested
+        if opt.StoreResampleDetails
+            repC{rr} = C;
+            repCTRL{rr} = ctrl;
+        end
+
+        % Aggregate day-level z (explicit fields)
+        zw = C.bin.byDay.z_with_day(:);
+        zu = C.bin.byDay.z_without_day(:);
+        dz = C.bin.byDay.delta_z_day(:);
+
+        for d = 1:D
+            if isfinite(zw(d))
+                sum_z_with(d) = sum_z_with(d) + zw(d);
+                cnt_day(d)    = cnt_day(d) + 1;
+            end
+            if isfinite(zu(d))
+                sum_z_without(d) = sum_z_without(d) + zu(d);
+            end
+            if isfinite(dz(d))
+                sum_delta(d) = sum_delta(d) + dz(d);
+
+                % Welford for delta SD across reps
+                cnt_w(d) = cnt_w(d) + 1;
+                delta_prev = mu_delta(d);
+                mu_delta(d) = delta_prev + (dz(d) - delta_prev) / cnt_w(d);
+                M2_delta(d) = M2_delta(d) + (dz(d) - delta_prev) * (dz(d) - mu_delta(d));
+            end
+        end
+
+        % Pool permutation null draws (chosen perm type)
+        permType = lower(char(opt.DeltaPermType));
+        if strcmp(permType,'both')
+            permType = 'flip';
+        end
+        dlt = [];
+        switch permType
+            case 'flip'
+                if isfield(C,'delta_flip') && isfield(C.delta_flip,'perm_z')
+                    dlt = C.delta_flip;
+                elseif isfield(C,'delta') && isfield(C.delta,'perm_z')
+                    dlt = C.delta;
+                end
+            case 'derange'
+                if isfield(C,'delta_derange') && isfield(C.delta_derange,'perm_z')
+                    dlt = C.delta_derange;
+                elseif isfield(C,'delta') && isfield(C.delta,'perm_z')
+                    dlt = C.delta;
+                end
+        end
+        if ~isempty(dlt) && isfield(dlt,'perm_z') && ~isempty(dlt.perm_z)
+            perm_all = [perm_all; dlt.perm_z(:)]; %#ok<AGROW>
+        end
+    end
+
+    % ----- Build aggregated output (overwrite key fields in canonical C0) -----
+    Cagg = C0;
+
+    % Resample-averaged day z values
+    z_with_day    = nan(D,1);
+    z_without_day = nan(D,1);
+    delta_z_day   = nan(D,1);
+
+    for d = 1:D
+        if cnt_day(d) > 0
+            z_with_day(d) = sum_z_with(d) / cnt_day(d);
+        end
+        if cnt_day(d) > 0
+            z_without_day(d) = sum_z_without(d) / cnt_day(d);
+        end
+        if cnt_day(d) > 0
+            delta_z_day(d) = sum_delta(d) / cnt_day(d);
+        end
+    end
+
+    Cagg.bin.byDay.z_with_day    = z_with_day;
+    Cagg.bin.byDay.z_without_day = z_without_day;
+    Cagg.bin.byDay.delta_z_day   = delta_z_day;
+    Cagg.bin.byDay.z_mean        = z_with_day; % legacy name used in plots
+
+    Cagg.bin.group.z_mean = mean(z_with_day(isfinite(z_with_day)), 'omitnan');
+    Cagg.bin.group.r_mean = tanh(Cagg.bin.group.z_mean);
+
+    % Pooled null p-values consistent with aggregated observed delta
+    perm_all = perm_all(isfinite(perm_all));
+    obs_delta = mean(delta_z_day(isfinite(delta_z_day)), 'omitnan');
+
+    if ~isempty(perm_all) && isfinite(obs_delta)
+        pr = mean(perm_all >= obs_delta);
+        pl = mean(perm_all <= obs_delta);
+        pt = 2*min(pr, pl);
+
+        Cagg.delta = struct();
+        Cagg.delta.obs_z   = obs_delta;
+        Cagg.delta.obs_r   = tanh(obs_delta);
+        Cagg.delta.perm_z  = perm_all;
+        Cagg.delta.p_right = pr;
+        Cagg.delta.p_left  = pl;
+        Cagg.delta.p_two   = pt;
+
+        permType = lower(char(opt.DeltaPermType));
+        if strcmp(permType,'both'), permType = 'flip'; end
+        Cagg.delta.note = sprintf('pooled null across TemplateResampleN=%d reps (%s)', nRep, permType);
+
+        % keep compatibility fields
+        if strcmp(permType,'flip')
+            Cagg.delta_flip = Cagg.delta;
+        elseif strcmp(permType,'derange')
+            Cagg.delta_derange = Cagg.delta;
+        end
+    end
+
+    % Minimal resample QC fields (small)
+    Cagg.resample = struct();
+    Cagg.resample.nRep  = nRep;
+    Cagg.resample.seed0 = baseSeed;
+    Cagg.resample.summary = struct();
+    Cagg.resample.summary.delta_z_day_mean = delta_z_day;
+
+    delta_sd = nan(D,1);
+    for d = 1:D
+        if cnt_w(d) >= 2
+            delta_sd(d) = sqrt(M2_delta(d) / (cnt_w(d)-1));
+        end
+    end
+    Cagg.resample.summary.delta_z_day_sd = delta_sd;
+
+    if opt.StoreResampleDetails
+        Cagg.resample.C    = repC;    %#ok<NASGU>
+        Cagg.resample.ctrl = repCTRL; %#ok<NASGU>
+    end
+    if isfield(Cagg,'delta')
+        Cagg.resample.delta_pooled = Cagg.delta;
+    end
+
+    % ----- Per-rat summary print (ONE BLOCK) -----
+    if opt.Verbose
+        dz = delta_z_day(isfinite(delta_z_day));
+        if isempty(dz), dzm = NaN; dzmed = NaN; dzsd = NaN;
+        else
+            dzm = mean(dz,'omitnan');
+            dzmed = median(dz,'omitnan');
+            dzsd = std(dz,0,'omitnan');
+        end
+
+        fprintf('[%s] TemplateResampleN=%d | Δz day-mean=%.4f (med=%.4f, SD=%.4f) | pooled null N=%d', ...
+            ratVar, nRep, dzm, dzmed, dzsd, numel(perm_all));
+
+        if isfield(Cagg,'delta') && isfield(Cagg.delta,'p_two')
+            fprintf(' | p_two=%.3g p_right=%.3g\n', Cagg.delta.p_two, Cagg.delta.p_right);
+        else
+            fprintf('\n');
+        end
+    end
+
+    % Save
+    R(ii).C = Cagg;
     R(ii).animal = ratVar;
     R(ii).meta.options = opt;
     R(ii).meta.days = daysToUse;
-    R(ii).meta.ctrl_reliability = ctrl.reliability;
-    R(ii).meta.grid = ctrl.grid;
+    R(ii).meta.ctrl_reliability = ctrl0.reliability;
+    R(ii).meta.grid = ctrl0.grid;
 end
 
 % ================================ PLOTS ==================================
@@ -167,33 +387,6 @@ if opt.DoPlots
     if opt.DoSingleCell
         summarize_taskSpacePV_singleCell_clean(R);
         plot_taskToSpace_SC_deltaPermHist_perRat(R);
-    end
-end
-
-for i = 1:numel(R)
-    fprintf('\n=== %s ===\n', R(i).animal);
-
-    hasSC = isfield(R(i),'C') && isfield(R(i).C,'SC') && ~isempty(R(i).C.SC);
-    fprintf('has C.SC: %d\n', hasSC);
-
-    if hasSC && isfield(R(i).C.SC,'byDay') ...
-            && isfield(R(i).C.SC.byDay,'withTask') && isfield(R(i).C.SC.byDay.withTask,'zmean')
-        disp('withTask zmean:'); disp(R(i).C.SC.byDay.withTask.zmean(:)');
-    else
-        disp('withTask zmean: MISSING');
-    end
-
-    if hasSC && isfield(R(i).C.SC,'byDay') ...
-            && isfield(R(i).C.SC.byDay,'withoutTask') && isfield(R(i).C.SC.byDay.withoutTask,'zmean')
-        disp('withoutTask zmean:'); disp(R(i).C.SC.byDay.withoutTask.zmean(:)');
-    else
-        disp('withoutTask zmean: MISSING');
-    end
-
-    if hasSC && isfield(R(i).C.SC,'delta') && isfield(R(i).C.SC.delta,'perm_z') && ~isempty(R(i).C.SC.delta.perm_z)
-        fprintf('SC.delta.perm_z length: %d\n', numel(R(i).C.SC.delta.perm_z));
-    else
-        disp('SC.delta.perm_z: MISSING/EMPTY');
     end
 end
 
@@ -217,6 +410,7 @@ addParameter(p,'Label','');
 addParameter(p,'CellNorm','demean');
 addParameter(p,'CtrlSplitMode','random');
 addParameter(p,'CtrlSplitSeed',[]);
+addParameter(p,'VerboseDay',false, @(x) islogical(x)&&isscalar(x));
 parse(p,varargin{:});
 o = p.Results; L = char(o.Label);
 
@@ -243,6 +437,9 @@ if ~isempty(o.CtrlSplitSeed)
     rng(o.CtrlSplitSeed);
 end
 
+keptBins_perDay = nan(D,1);
+medRel_perDay   = nan(D,1);
+
 for d = 1:D
     t = ts{d}(:);
     [x, y] = interp_pos(pos{d}, t);
@@ -263,7 +460,7 @@ for d = 1:D
         use = use & (v_i >= o.VelThresh);
     end
 
-    S = spikes_to_matrix(spikes{d}, t);
+    S = spikes_to_matrix(spikes{d}, t);       % single
     S = normalize_cells(S, o.CellNorm);
 
     S   = S(:, use);
@@ -273,8 +470,8 @@ for d = 1:D
     [~, b] = pos2bin(x_u, y_u, edgesByDay{d});
 
     Nc_d = size(S,1);
-    PVtempl = nan(Nc_d, K);
-    PVb     = nan(Nc_d, K);
+    PVtempl = nan(Nc_d, K, 'single');
+    PVb     = nan(Nc_d, K, 'single');
     rel     = nan(K,1);
 
     for k = 1:K
@@ -292,9 +489,9 @@ for d = 1:D
         vA = mean(S(:, idxA), 2, 'omitnan');
         vB = mean(S(:, idxB), 2, 'omitnan');
 
-        PVtempl(:,k) = vA;
-        PVb(:,k)     = vB;
-        rel(k)       = safe_corr(vA, vB);
+        PVtempl(:,k) = single(vA);
+        PVb(:,k)     = single(vB);
+        rel(k)       = safe_corr(double(vA), double(vB));
     end
 
     PV_template_by{d} = PVtempl;
@@ -302,8 +499,12 @@ for d = 1:D
     rel_by{d}         = rel;
 
     kept = all(isfinite(PVtempl),1) & all(isfinite(PVb),1);
-    fprintf('[%s][CTRL-TEMPLATE d=%d] kept bins %d/%d | template↔ctrlB median r=%.2f\n', ...
-        L, d, nnz(kept), K, median(rel,'omitnan'));
+    keptBins_perDay(d) = nnz(kept);
+    medRel_perDay(d)   = median(rel,'omitnan');
+
+    if o.VerboseDay
+        fprintf('[%s][CTRL d=%d] kept bins %d/%d | median r=%.2f\n', L, d, keptBins_perDay(d), K, medRel_perDay(d));
+    end
 end
 
 CTRL.PV_template = PV_template_by;
@@ -323,8 +524,10 @@ CTRL.params.GridRC_eff      = rc_eff;
 CTRL.params.CtrlSplitMode   = o.CtrlSplitMode;
 CTRL.params.CtrlSplitSeed   = o.CtrlSplitSeed;
 
-CTRL.maps.template_byDay = PV_template_by;
-CTRL.maps.ctrlB_byDay    = PV_ctrlB_by;
+% (Removed CTRL.maps.* duplicates to save memory)
+
+CTRL.qc.keptBins_perDay = keptBins_perDay;
+CTRL.qc.medianRel_perDay = medRel_perDay;
 end
 
 function [idxA, idxB] = split_indices(idx, mode)
@@ -386,10 +589,13 @@ for d = 1:D
 
     edges_d  = CTRL.grid.edges{d};
     PV_templ = CTRL.PV_template{d};
+    PV_ctrlB = CTRL.PV_ctrlB{d};
     if isempty(PV_templ), continue; end
 
     csd = cs{d}(:);
     B = o.TimeBins;
+
+    % ===== BIN-LEVEL TASK similarity =====
     r_bin_accum = nan(K, B);
 
     for tr = 1:numel(csd)
@@ -398,6 +604,7 @@ for d = 1:D
         idx_all = find(t >= t0 & t < t1);
         if isempty(idx_all), continue; end
 
+        % time bin edges (frame indices)
         if ~isempty(o.FramesPerBin)
             step = max(1, round(o.FramesPerBin));
             edges_idx = 1:step:(numel(idx_all)+1);
@@ -422,7 +629,7 @@ for d = 1:D
                 hit = (b_space == k);
                 if nnz(hit) >= o.MinTraceFrames && all(isfinite(PV_templ(:,k)))
                     pv_task = mean(S(:, seg(hit)), 2, 'omitnan');
-                    r = safe_corr(PV_templ(:,k), pv_task);
+                    r = safe_corr(double(PV_templ(:,k)), double(pv_task));
                     r_bin_accum(k, bti) = nanmean([r_bin_accum(k, bti), r]);
                 end
             end
@@ -452,37 +659,33 @@ for d = 1:D
     r_bin_byDay{d} = r_spatial;
     n_valid_day(d) = numel(z_list);
 
-    % ---------------- SINGLE-CELL ----------------
-    if isfield(CTRL,'maps') && numel(CTRL.maps.template_byDay) >= d && ~isempty(CTRL.maps.template_byDay{d}) && ...
-       numel(CTRL.maps.ctrlB_byDay)    >= d && ~isempty(CTRL.maps.ctrlB_byDay{d})
-
-        mapA = CTRL.maps.template_byDay{d};  % Nc×K
-        mapB = CTRL.maps.ctrlB_byDay{d};     % Nc×K
+    % ================= SINGLE-CELL (MEMORY-LITE) =================
+    if ~isempty(PV_ctrlB) && size(PV_ctrlB,1) == size(PV_templ,1)
+        mapA = PV_templ;   % Nc×K
+        mapB = PV_ctrlB;   % Nc×K
         Nc = size(mapA,1);
 
         % WITHOUT: per-cell corr across bins
         z_sc_without = nan(Nc,1);
         for c = 1:Nc
-            r = safe_corr(mapA(c,:).', mapB(c,:).', 3, 1e-12);
+            r = safe_corr(double(mapA(c,:)).', double(mapB(c,:)).', 3, 1e-12);
             if isfinite(r), z_sc_without(c) = atanh(max(min(r,0.99999),-0.99999)); end
         end
 
-        % --- WITH task (FIXED): pool across TRIALS within each timebin to fill bins ---
-        % Build pooled TASK maps per timebin: taskMap_tb(:,:,bti) is Nc×K
-        B  = o.TimeBins;
-        Nc = size(mapA,1);
+        % WITH: accumulate (timebin,spacebin) sums/counts WITHOUT storing indices or Nc×K×B
+        sumTask = zeros(Nc, K, B, 'single');   % Nc×K×B (still big if Nc huge)
+        cntTask = zeros(1,  K, B, 'uint32');   % counts per k,b
 
-        % Pool frame indices by (timebin, spatialbin) across ALL trials
-        idxPool = cell(B, K);   % each entry holds frame indices into t/S
+        % If Nc is large and you want even less RAM:
+        % switch to per-timebin computation (Nc×K at a time) by moving sumTask inside bti loop.
+        % For now, Nc×K×B with K small is usually manageable; the big win is removing idxPool + taskMap_tb.
 
-        csd = cs{d}(:);
         for tr = 1:numel(csd)
             t0 = csd(tr) + o.TraceWin(1);
             t1 = csd(tr) + o.TraceWin(2);
             idx_all = find(t >= t0 & t < t1);
             if isempty(idx_all), continue; end
 
-            % same temporal split logic
             if ~isempty(o.FramesPerBin)
                 step = max(1, round(o.FramesPerBin));
                 edges_idx = 1:step:(numel(idx_all)+1);
@@ -498,52 +701,42 @@ for d = 1:D
             for bti = 1:nTB
                 seg = idx_all(edges_idx(bti):edges_idx(bti+1)-1);
                 if isempty(seg), continue; end
-
-                if o.UseSpeedMask
-                    seg = seg(speed_ok(seg));
-                end
-                if numel(seg) < o.MinTraceFrames
-                    continue
-                end
+                if o.UseSpeedMask, seg = seg(speed_ok(seg)); end
+                if numel(seg) < o.MinTraceFrames, continue; end
 
                 [~, b_space] = pos2bin(x(seg), y(seg), edges_d);
 
-                % add frames into pools by spatial bin
                 for k = 1:K
                     hit = (b_space == k);
                     if nnz(hit) >= o.MinTraceFrames && all(isfinite(mapA(:,k)))
-                        idxPool{bti,k} = [idxPool{bti,k}; seg(hit)]; %#ok<AGROW>
+                        v = mean(S(:, seg(hit)), 2, 'omitnan');        % Nc×1
+                        sumTask(:,k,bti) = sumTask(:,k,bti) + single(v);
+                        cntTask(1,k,bti) = cntTask(1,k,bti) + 1;
                     end
                 end
             end
         end
 
-        % Convert pooled indices -> pooled task maps
-        taskMap_tb = nan(Nc, K, B);  % Nc×K×B
+        % Compute per-cell corr across bins for each timebin, then average across timebins
+        z_sc_with_tb = nan(Nc, B);
+
         for bti = 1:B
+            taskMap_b = nan(Nc, K, 'single');
             for k = 1:K
-                idxk = idxPool{bti,k};
-                if numel(idxk) >= o.MinTraceFrames
-                    taskMap_tb(:,k,bti) = mean(S(:, idxk), 2, 'omitnan');
+                if cntTask(1,k,bti) > 0
+                    taskMap_b(:,k) = sumTask(:,k,bti) ./ single(cntTask(1,k,bti));
                 end
             end
-        end
 
-        % Per-cell corr across spatial bins per timebin vs template
-        z_sc_with_tb = nan(Nc, B);
-        for bti = 1:B
             for c = 1:Nc
-                r = safe_corr(mapA(c,:).', taskMap_tb(c,:,bti).', 2, 1e-12); % minN=2 (not 3)
+                r = safe_corr(double(mapA(c,:)).', double(taskMap_b(c,:)).', 2, 1e-12);
                 if isfinite(r)
                     z_sc_with_tb(c,bti) = atanh(max(min(r,0.99999),-0.99999));
                 end
             end
         end
 
-
-        % collapse across timebins in Fisher-z per cell
         z_sc_with = mean(z_sc_with_tb, 2, 'omitnan');
-        r_sc_with = tanh(z_sc_with);
 
         if ~isfield(C,'SC'), C.SC = struct(); end
         if ~isfield(C.SC,'byDay'), C.SC.byDay = struct(); end
@@ -556,8 +749,8 @@ for d = 1:D
         C.SC.byDay.withTask.zmean(d,1)    = mean(z_sc_with, 'omitnan');
         C.SC.byDay.withoutTask.zmean(d,1) = mean(z_sc_without, 'omitnan');
 
-        % Optional: template-derange-bins null at SC level (pooled-task map)
-        if ~isempty(o.NPerm_SC) && o.NPerm_SC >= 10
+        % Optional SC nulls unchanged (but avoid extra large buffers)
+        if ~isempty(o.NPerm_SC) && o.NPerm_SC >= 10 && strcmpi(o.NullMode_SC,'template-derange-bins')
             validK = find(all(isfinite(mapA),1));
             if numel(validK) >= 2
                 [taskMap_pooled, okTask] = build_taskMap_pooled_day(t, x, y, S, csd, edges_d, speed_ok, o);
@@ -568,7 +761,7 @@ for d = 1:D
                         kp = derange_indices(validK);
                         z_with_perm = nan(Nc,1);
                         for c = 1:Nc
-                            r = safe_corr(mapA(c, kp).', taskMap_pooled(c, validK).', 3, 1e-12);
+                            r = safe_corr(double(mapA(c,kp)).', double(taskMap_pooled(c, validK)).', 3, 1e-12);
                             if isfinite(r), z_with_perm(c) = atanh(max(min(r,0.99999),-0.99999)); end
                         end
                         perm_delta(pidx) = mean(z_with_perm, 'omitnan') - mean(z_sc_without, 'omitnan');
@@ -577,8 +770,8 @@ for d = 1:D
                     pl = mean(perm_delta <= delta_obs);
                     pt = 2*min(pr, pl);
 
-                    C.SC.delta_derange.byDay{d}   = perm_delta;
-                    C.SC.delta_derange.obs_z(d,1) = delta_obs;
+                    C.SC.delta_derange.byDay{d}     = perm_delta;
+                    C.SC.delta_derange.obs_z(d,1)   = delta_obs;
                     C.SC.delta_derange.p_right(d,1) = pr;
                     C.SC.delta_derange.p_left(d,1)  = pl;
                     C.SC.delta_derange.p_two(d,1)   = pt;
@@ -591,9 +784,6 @@ end
 % After all days: build SC flip-cells null (paired within cell)
 if isfield(C,'SC') && ~isempty(o.NPerm_SC) && o.NPerm_SC >= 10
     C.SC.delta_flipCells = build_flip_perm_singleCell_flipCells(C, o.NPerm_SC);
-    fprintf('[%s][SC flip-cells] obs Δz=%.3f (r≈%.3f), p_two=%.3g (NPerm=%d)\n', ...
-        L, C.SC.delta_flipCells.obs_z, tanh(C.SC.delta_flipCells.obs_z), ...
-        C.SC.delta_flipCells.p_two, numel(C.SC.delta_flipCells.perm_z));
 end
 
 % Pick active SC delta
@@ -601,14 +791,12 @@ if isfield(C,'SC')
     C.SC.delta = [];
     switch lower(char(o.NullMode_SC))
         case 'flip-cells'
-            if isfield(C.SC,'delta_flipCells') && ~isempty(C.SC.delta_flipCells) && ...
-               isfield(C.SC.delta_flipCells,'perm_z') && ~isempty(C.SC.delta_flipCells.perm_z)
+            if isfield(C.SC,'delta_flipCells') && isfield(C.SC.delta_flipCells,'perm_z') && ~isempty(C.SC.delta_flipCells.perm_z)
                 C.SC.delta = C.SC.delta_flipCells;
             end
         case 'template-derange-bins'
-            % Optional pooling of per-day derange; if absent, fall back
             if isfield(C.SC,'delta_derange') && ~isempty(C.SC.delta_derange)
-                % If you later add pooling here, set C.SC.delta_derange.perm_z etc.
+                % (per-day derange stored above)
             end
     end
     if isempty(C.SC.delta) && isfield(C.SC,'delta_flipCells')
@@ -618,13 +806,13 @@ end
 
 % Bin-level summaries
 C.bin.byDay.r        = r_bin_byDay;
-C.bin.byDay.z_mean   = z_day;
+C.bin.byDay.z_mean   = z_day;     % legacy field name (WITH)
 C.bin.byDay.n_valid  = n_valid_day;
 C.bin.byDay.z_list   = perZ_list_byDay;
 C.bin.group.z_mean   = mean(z_day(isfinite(z_day)),'omitnan');
 C.bin.group.r_mean   = tanh(C.bin.group.z_mean);
 
-% WITHOUT = template vs CTRL_B
+% WITHOUT day-level z (template vs CTRL_B)
 with_byDay    = cell(1,D);
 without_byDay = cell(1,D);
 z_without_day = nan(D,1);
@@ -651,23 +839,20 @@ end
 C.byDay.withTask.r    = with_byDay;
 C.byDay.withoutTask.r = without_byDay;
 
-delta_day = z_day - z_without_day; %#ok<NASGU>
+% Explicit day-level z fields
+C.bin.byDay.z_with_day    = z_day;
+C.bin.byDay.z_without_day = z_without_day;
+C.bin.byDay.delta_z_day   = z_day - z_without_day;
 
 % Flip null (within-day paired pairs)
 C.delta_flip = build_flip_perm_withinDayPairs(C, o.NPerm);
-if isfield(C,'delta_flip') && isfield(C.delta_flip,'p_two')
-    fprintf('[%s] flip null: obs Δz=%.3f (r≈%.3f), p_two=%.3g (NPerm=%d)\n', ...
-        L, C.delta_flip.obs_z, tanh(C.delta_flip.obs_z), C.delta_flip.p_two, numel(C.delta_flip.perm_z));
-end
 
 % Derange null (template bins)
 C.delta_derange = build_derange_perm_templateBins(C, spikes, ts, pos, cs, CTRL, z_without_day, o);
 
 % Pick active delta
 which = lower(char(o.DeltaPermType));
-if strcmp(which,'both')
-    which = 'flip';
-end
+if strcmp(which,'both'), which = 'flip'; end
 switch which
     case 'flip'
         C.delta = C.delta_flip;
@@ -680,6 +865,7 @@ switch which
     otherwise
         C.delta = C.delta_flip;
 end
+
 end
 
 % ---------- Derange perm (template bins vs TASK bins) ----------
@@ -1145,6 +1331,7 @@ function [spikes, ts, pos, cs] = standardize_day_format(spikes_raw, ts_raw, pos_
 spikes = to_daycells(spikes_raw, dayKeys);
 ts_in  = to_daycells(ts_raw,   dayKeys);
 pos_in = to_daycells(pos_raw,  dayKeys);
+
 cs_in  = to_daycells(cs_raw,   dayKeys);
 D = numel(dayKeys);
 ts  = cell(1,D); pos = cell(1,D); cs  = cell(1,D);
@@ -1269,6 +1456,15 @@ if isempty(t)
 else, t=t(:);
 end
 n=min([numel(t),numel(x),numel(y)]); t=double(t(1:n)); x=double(x(1:n)); y=double(y(1:n));
+
+
+%pos = smoothpos([t,x,y]);
+%t = pos(:,1);
+%x = pos(:,2);
+%y = pos(:,3);
+
+t = t(:); x=x(:); y=y(:);
+
 end
 
 function cs_vec = coerce_cs_day(csd, ~)
@@ -1354,11 +1550,16 @@ function S = normalize_cells(S, mode)
 switch lower(mode)
     case 'none'
     case 'demean'
-        mu = mean(S,2,'omitnan'); S = S - mu;
+        mu = mean(S,2,'omitnan');
+        S = S - mu;
     case 'zscore'
         mu = mean(S,2,'omitnan'); sd = std(S,0,2,'omitnan'); sd(sd==0|~isfinite(sd)) = 1; S = (S - mu) ./ sd;
+    case 'meanrate'
+        mu = mean(S,2,'omitnan');
+        S = S ./ mu;
+
     otherwise
-        error('CellNorm must be ''zscore'',''demean'',''none''.');
+        error('CellNorm must be ''zscore'',''demean'',''meanrate'',''none''.');
 end
 end
 
@@ -1488,32 +1689,31 @@ end
 function [Zw, Za, aid, did] = get_C_dayZ(R)
 Zw=[]; Za=[]; aid=[]; did=[];
 for i = 1:numel(R)
-    has_with = isfield(R(i),'C') && isfield(R(i).C,'bin') && isfield(R(i).C.bin,'byDay') ...
-               && isfield(R(i).C.bin.byDay,'z_mean');
-    has_without = isfield(R(i),'C') && isfield(R(i).C,'byDay') ...
-                  && isfield(R(i).C.byDay,'withoutTask') && isfield(R(i).C.byDay.withoutTask,'r');
-    if ~has_with || ~has_without, continue; end
+    if ~isfield(R(i),'C') || isempty(R(i).C), continue; end
 
-    z_with = R(i).C.bin.byDay.z_mean(:);
-    ur     = R(i).C.byDay.withoutTask.r;
-
-    z_without = nan(numel(ur),1);
-    for d = 1:numel(ur)
-        if ~isempty(ur{d})
-            r_d = ur{d}(:);
-            r_d = r_d(isfinite(r_d));
-            if ~isempty(r_d)
-                z_without(d) = mean(atanh(max(min(r_d,0.999999),-0.999999)), 'omitnan');
-            end
-        end
+    % Prefer explicit day-level z fields (best)
+    if isfield(R(i).C,'bin') && isfield(R(i).C.bin,'byDay') && ...
+       isfield(R(i).C.bin.byDay,'z_with_day') && isfield(R(i).C.bin.byDay,'z_without_day')
+        z_with    = R(i).C.bin.byDay.z_with_day(:);
+        z_without = R(i).C.bin.byDay.z_without_day(:);
+    elseif isfield(R(i).C,'bin') && isfield(R(i).C.bin,'byDay') && isfield(R(i).C.bin.byDay,'z_mean')
+        % fallback for legacy
+        z_with = R(i).C.bin.byDay.z_mean(:);
+        z_without = nan(size(z_with));
+    else
+        continue
     end
+
+    nD = min(numel(z_with), numel(z_without));
+    z_with    = z_with(1:nD);
+    z_without = z_without(1:nD);
 
     m = isfinite(z_with) & isfinite(z_without);
     Zw  = [Zw;  z_with(m)];
     Za  = [Za;  z_without(m)];
     aid = [aid; i*ones(nnz(m),1)];
-    did_local = (1:numel(z_with)).';
-    did = [did; did_local(m)];
+    dd  = (1:nD).';
+    did = [did; dd(m)];
 end
 end
 
@@ -1541,10 +1741,13 @@ p = inputParser;
 addParameter(p,'NBins',30, @(x) isnumeric(x)&&isscalar(x)&&x>=5);
 addParameter(p,'ShowTwoSided',true, @(x) islogical(x)&&isscalar(x));
 addParameter(p,'PermType','derange', @(s) any(strcmpi(s,{'derange','flip'})));
+addParameter(p,'PreferPooled',true, @(x) islogical(x)&&isscalar(x));  % NEW
 parse(p,varargin{:});
+
 NBins = p.Results.NBins;
 ShowTwoSided = p.Results.ShowTwoSided;
 PermType = lower(char(p.Results.PermType));
+PreferPooled = p.Results.PreferPooled;
 
 nRats = numel(R);
 figure('Color','w','Position',[200 200 1100 700]);
@@ -1555,17 +1758,42 @@ for ii = 1:nRats
     else
         ratName = sprintf('rat%02d', ii);
     end
-    if ~isfield(R(ii),'C') || isempty(R(ii).C), continue; end
+    if ~isfield(R(ii),'C') || isempty(R(ii).C)
+        continue
+    end
 
-    dlt = get_delta_struct(R(ii).C, PermType);
-    if isempty(dlt) || ~isfield(dlt,'obs_z') || ~isfield(dlt,'perm_z'), continue; end
+    C = R(ii).C;
+
+    % ---- Pick delta struct (prefer pooled if requested) ----
+    dlt = [];
+    if PreferPooled
+        if isfield(C,'resample') && isfield(C.resample,'delta_pooled') && ~isempty(C.resample.delta_pooled)
+            dlt = C.resample.delta_pooled;
+        elseif isfield(C,'delta') && ~isempty(C.delta) && isfield(C.delta,'note') && ~isempty(C.delta.note) ...
+                && contains(lower(C.delta.note),'pooled null')
+            dlt = C.delta;
+        end
+    end
+
+    if isempty(dlt)
+        % fallback to helper (which itself prefers pooled if you replaced it)
+        dlt = get_delta_struct(C, PermType);
+    end
+
+    if isempty(dlt) || ~isfield(dlt,'obs_z') || ~isfield(dlt,'perm_z')
+        continue
+    end
 
     obs  = dlt.obs_z;
     perm = dlt.perm_z;
 
-    if ~isfinite(obs) || isempty(perm), continue; end
+    if ~isfinite(obs) || isempty(perm)
+        continue
+    end
     perm = perm(isfinite(perm));
-    if isempty(perm), continue; end
+    if isempty(perm)
+        continue
+    end
 
     subplot(3,2,ii); hold on;
     histogram(perm, NBins, 'Normalization','pdf', 'EdgeColor','none');
@@ -1601,22 +1829,58 @@ for ii = 1:nRats
 
     text(obs, yl(2), ['  ', txt], 'VerticalAlignment','top', 'HorizontalAlignment','left');
     ylim(yl);
+
+    % Optional annotation to confirm pooled/canonical
+    if PreferPooled && isfield(dlt,'note') && ~isempty(dlt.note)
+        text(mean(xlim), yl(2)*0.95, dlt.note, 'HorizontalAlignment','center', 'FontSize',8);
+    end
 end
 end
 
 function dlt = get_delta_struct(C, permType)
+% get_delta_struct
+% Prefer pooled (TemplateResample-pooled) null if present, else fallback to
+% legacy per-rep delta structs.
+%
+% permType: 'flip' | 'derange'
+
 dlt = [];
-switch lower(permType)
-  case 'flip'
-      if isfield(C,'delta_flip') && ~isempty(C.delta_flip)
-          dlt = C.delta_flip;
-      end
-  case 'derange'
-      if isfield(C,'delta_derange') && ~isempty(C.delta_derange)
-          dlt = C.delta_derange;
-      elseif isfield(C,'delta') && ~isempty(C.delta)
-          dlt = C.delta;
-      end
+
+% --- 1) Prefer pooled null if present ---
+if isfield(C,'resample') && isfield(C.resample,'delta_pooled') && ~isempty(C.resample.delta_pooled)
+    dlt = C.resample.delta_pooled;
+    return
+end
+
+% If pooled was stored in C.delta with a note, prefer it
+if isfield(C,'delta') && ~isempty(C.delta) && isfield(C.delta,'note') && ~isempty(C.delta.note)
+    if contains(lower(C.delta.note), 'pooled null')
+        dlt = C.delta;
+        return
+    end
+end
+
+% --- 2) Fallback: legacy behavior ---
+switch lower(char(permType))
+    case 'flip'
+        if isfield(C,'delta_flip') && ~isempty(C.delta_flip)
+            dlt = C.delta_flip;
+            return
+        end
+        if isfield(C,'delta') && ~isempty(C.delta)
+            dlt = C.delta; % last-resort
+            return
+        end
+
+    case 'derange'
+        if isfield(C,'delta_derange') && ~isempty(C.delta_derange)
+            dlt = C.delta_derange;
+            return
+        end
+        if isfield(C,'delta') && ~isempty(C.delta)
+            dlt = C.delta; % last-resort
+            return
+        end
 end
 end
 
@@ -1844,5 +2108,13 @@ for ii = 1:nRats
     end
     text(obs, yl(2), ['  ', txt], 'VerticalAlignment','top', 'HorizontalAlignment','left');
     ylim(yl);
+end
+end
+
+function v = getfield_default(S, f, def)
+if isstruct(S) && isfield(S,f) && ~isempty(S.(f)) && isfinite(S.(f))
+    v = S.(f);
+else
+    v = def;
 end
 end

@@ -16,7 +16,7 @@ if nargin<3
   type = 2; %compres to prev 2 sec
 end
 
-type = 1;
+
 nRats      = numel(ratNames);
 velInCell  = cell(nRats,1);
 velOutCell = cell(nRats,1);
