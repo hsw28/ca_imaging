@@ -5,7 +5,7 @@ function change = plotProportionModulated(varargin)
 % Panels: one per rat + pooled.
 %
 % Options:
-%   'Metric' : 'logfold' (default) | 'fold' | 'symdiff'
+%   'Metric' : 'logfold' | 'fold'  (default)  | 'symdiff'
 %              'logfold'  -> mean(FRt)/FRr (log x-axis)
 %              'fold'     -> mean(FRt)/FRr (linear x-axis)
 %              'symdiff'  -> (mean(FRt)-FRr)/(mean(FRt)+FRr)
@@ -30,6 +30,9 @@ addParameter(p,'Alpha',0.05,@(x) isnumeric(x)&&isscalar(x)&&x>0&&x<1);
 addParameter(p,'NPerm',500,@(x) isnumeric(x)&&isscalar(x)&&x>=1);
 addParameter(p,'Mode','allNonTrial',@(s) any(strcmpi(s,{'allNonTrial','preTrial'})));
 addParameter(p,'SaveMod',true,@(x) (islogical(x) || isnumeric(x)));
+%addParameter(p,'Tail','two-sided',@(s) any(strcmpi(s,{'two-sided','right','left'})));
+addParameter(p,'Tail','right',@(s) any(strcmpi(s,{'two-sided','right','left'})));
+
 
 parse(p,varargin{:});
 Metric  = lower(p.Results.Metric);
@@ -38,6 +41,7 @@ alpha   = p.Results.Alpha;
 nPerm   = p.Results.NPerm;
 Mode    = lower(p.Results.Mode);
 SaveMod = logical(p.Results.SaveMod);
+Tail = lower(p.Results.Tail);
 
 % ---------- config ----------
 ratNames   = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
@@ -319,37 +323,51 @@ for panelIdx = 1:(nRats+1)
         nullCat = [nullCat; nullM(:)];
 
         % significance (kept for printed summaries only)
-        switch Metric
-            case 'symdiff'
-                nullUse = nullM(isfinite(nullM));
-                if isempty(nullUse)
-                    p_right = NaN; p_left = NaN; p_two = NaN;
-                else
-                    p_right = mean(nullUse >= obsM(i));   % increase
-                    p_left  = mean(nullUse <= obsM(i));   % decrease
-                    p_two   = mean(abs(nullUse) >= abs(obsM(i)));
-                end
-                hCell(i)  = (p_two < alpha);
-                incCell(i)= (p_right < alpha);
-                decCell(i)= (p_left  < alpha);
+        nullUse = nullM(isfinite(nullM));
+obsVal  = obsM(i);
 
-                % store p-value for saving: use two-sided
-                pVals(i) = p_two;
+if isempty(nullUse) || ~isfinite(obsVal)
+    pVal = NaN;
+    p_right = NaN;
+    p_left  = NaN;
+else
 
-            otherwise
-                nullUse = nullM(isfinite(nullM));
-                if isempty(nullUse)
-                    p_right = NaN;
-                else
-                    p_right = mean(nullUse >= obsM(i));
-                end
-                hCell(i)  = (p_right < alpha);
-                incCell(i)= hCell(i);
-                decCell(i)= false;
+    switch Metric
+        case 'symdiff'
+            % centered at 0
+            p_right = mean(nullUse >= obsVal);
+            p_left  = mean(nullUse <= obsVal);
+            p_two   = mean(abs(nullUse) >= abs(obsVal));
 
-                % store p-value for saving: right-sided
-                pVals(i) = p_right;
-        end
+        otherwise
+            % fold metrics (centered at 1, use log symmetry)
+            if obsVal <= 0
+                p_two = NaN; p_right = NaN; p_left = NaN;
+            else
+                obsL  = log(obsVal);
+                nullL = log(nullUse);
+
+                p_right = mean(nullUse >= obsVal);
+                p_left  = mean(nullUse <= obsVal);
+                p_two   = mean(abs(nullL) >= abs(obsL));
+            end
+    end
+
+    % choose which tail to use
+    switch Tail
+        case 'two-sided'
+            pVal = p_two;
+        case 'right'
+            pVal = p_right;
+        case 'left'
+            pVal = p_left;
+    end
+end
+
+hCell(i)   = (pVal < alpha);
+incCell(i) = (p_right < alpha);
+decCell(i) = (p_left  < alpha);
+pVals(i)   = pVal;
     end
 
     % ---- per-rat roll-up for summaries ----

@@ -16,6 +16,7 @@ if nargin<3
   type = 2; %compres to prev 2 sec
 end
 
+figure('Color','w');
 
 nRats      = numel(ratNames);
 velInCell  = cell(nRats,1);

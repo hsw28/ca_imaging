@@ -1,4 +1,4 @@
-function R = run_task_to_space_interference(ratNames, varargin)
+function R = CellNorm(ratNames, varargin)
 % RUN_TASK_TO_SPACE_INTERFERENCE  Space stability with vs without task
 %
 % Changes (memory + printing):
