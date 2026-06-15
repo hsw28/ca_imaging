@@ -1,14 +1,25 @@
-function mutualinfo_struct = MI_control_matchSpikesSpeed(spike_structure, pos_structure, velthreshold, dim, CA_timestamps, CSUS_id_struct, ca_MI, nIter, velEdges)
-% MI_control_matchSpikes_velMatched
+function mutualinfo_struct = MI_control_matchSpikesSpeed( ...
+    spike_structure, pos_structure, velthreshold, dim, ...
+    CA_timestamps, CSUS_id_struct, ca_MI, nIter, velEdges)
+% MI_control_matchSpikesSpeed
 % Control MI by removing spikes OUTSIDE CSUS, with removal chosen to match
 % the velocity distribution of CSUS-period spikes (per cell, per iteration).
 %
-% Inputs same as MI_control_matchSpikes, plus optional:
-%   velEdges – velocity bin edges for matching (e.g., linspace(4,40,13)).
-%              If empty/not provided, it will auto-define edges from data.
+% Uses the same count-based joint-distribution MI formulation as
+% mutualinfo_openfield_wCSUS and mutualinfo_openfield_shuff_noCSUS.
+%
+% Output:
+%   mutualinfo_struct.(sprintf('MIspeedmatch_%s', spikes_date)) = [nCells x 3]
+%
+% Columns:
+%   1 = 95th percentile of control distribution
+%   2 = mean of control distribution
+%   3 = percentile rank of observed MI relative to control
 
 if nargin < 8 || isempty(nIter), nIter = 100; end
 if nargin < 9, velEdges = []; end
+
+maxK = 1;   % cap counts per sample: 0,1,2,3+
 
 set(0,'DefaultFigureVisible','off');
 
@@ -20,6 +31,15 @@ fields_CSUS   = fieldnames(CSUS_id_struct);
 
 if numel(fields_spikes) ~= numel(fields_pos)
     error('spike_structure and pos_structure have different # days (pad if needed).');
+end
+if numel(fields_spikes) ~= numel(fields_MI)
+    error('spike_structure and ca_MI have different # days.');
+end
+if numel(fields_spikes) ~= numel(fields_cats)
+    error('spike_structure and CA_timestamps have different # days.');
+end
+if numel(fields_spikes) ~= numel(fields_CSUS)
+    error('spike_structure and CSUS_id_struct have different # days.');
 end
 
 mutualinfo_struct = struct();
@@ -49,57 +69,149 @@ for iDay = 1:numel(fields_spikes)
     pos = pos_structure.(fieldName_pos);
 
     fieldName_cats = fields_cats{iDay};
-    curr_CA_timestamps = CA_timestamps.(fieldName_cats); %#ok<NASGU>  % kept for parity
+    curr_CA_timestamps = CA_timestamps.(fieldName_cats);
 
-    % velocity (your helper)
+    fprintf('\nProcessing %s\n', spikes_date);
+
+    if isempty(pos)
+        warning('Empty pos for %s', spikes_date);
+        mutualinfo_struct.(sprintf('MIspeedmatch_%s', spikes_date)) = NaN;
+        continue;
+    end
+
+    if size(pos,2) > 3
+        error('Position data should have columns [time x y]');
+    end
+    if size(pos,2) > size(pos,1)
+        pos = pos';
+    end
+
+    % Convert to timestamp units if needed
+    if ~isempty(pos) && numel(curr_CA_timestamps) > 1
+        dt_pos = median(diff(pos(:,1)), 'omitnan');
+        dt_ca  = median(diff(curr_CA_timestamps), 'omitnan');
+        if ~isnan(dt_pos) & ~isnan(dt_ca) & dt_pos < 0.1 * dt_ca
+            pos = convertpostoframe(pos, curr_CA_timestamps);
+        end
+    end
+
+    % Remove duplicate pos timestamps
+    [~, uniqueIdxPos] = unique(pos(:,1), 'stable');
+    pos = pos(uniqueIdxPos, :);
+
+    % Remove duplicate CSUS timestamps
+    [csus_t_unique, idxCSUS] = unique(CSUS_id(2,:), 'stable');
+    csus_val_unique = CSUS_id(1, idxCSUS);
+
+    % velocity
     vel = ca_velocity(pos);
     vel_time = vel(2,:)';
     vel_mag  = vel(1,:)';
 
     % Interpolate CSUS labels to velocity timestamps (0 = non-task)
-    interp_CSUS = interp1(CSUS_id(2,:), CSUS_id(1,:), vel_time, 'nearest', 0);
+    interp_CSUS = interp1(csus_t_unique, csus_val_unique, vel_time, 'nearest', 0);
 
-    % de-dup pos timestamps, then interpolate x/y onto vel_time
-    [~, uniqueIdx] = unique(pos(:,1), 'stable');
-    pos = pos(uniqueIdx, :);
-
+    % Interpolate x/y onto vel_time
     interp_x = interp1(pos(:,1), pos(:,2), vel_time, 'linear', NaN);
     interp_y = interp1(pos(:,1), pos(:,3), vel_time, 'linear', NaN);
 
-    % Non-task, running, valid position frames
-    validIdx = (vel_mag >= velthreshold) & (interp_CSUS == 0) & ~isnan(interp_x) & ~isnan(interp_y);
-    posDat = [vel_time(validIdx), interp_x(validIdx), interp_y(validIdx)];
+    % Non-task, running, valid position samples
+    validIdx = (vel_mag >= velthreshold) & (interp_CSUS == 0) & ...
+               ~isnan(interp_x) & ~isnan(interp_y);
 
+    sample_time = vel_time(validIdx);
+    sample_x    = interp_x(validIdx);
+    sample_y    = interp_y(validIdx);
+
+    if isempty(sample_time)
+        warning('No valid position samples for %s', spikes_date);
+        mutualinfo_struct.(sprintf('MIspeedmatch_%s', spikes_date)) = NaN;
+        continue;
+    end
+
+    xmin = min(sample_x);
+    xmax = max(sample_x);
+    ymin = min(sample_y);
+    ymax = max(sample_y);
+
+    if xmax == xmin || ymax == ymin
+        warning('Degenerate position range for %s', spikes_date);
+        mutualinfo_struct.(sprintf('MIspeedmatch_%s', spikes_date)) = NaN;
+        continue;
+    end
+
+    xEdges = xmin:dim:(xmax + dim);
+    yEdges = ymin:dim:(ymax + dim);
+
+    % Assign included samples to bins
+    xBin_true = discretize(sample_x, xEdges);
+    yBin_true = discretize(sample_y, yEdges);
+
+    validBinSamples = ~isnan(xBin_true) & ~isnan(yBin_true);
+    sample_time_valid = sample_time(validBinSamples);
+    xBin_true         = xBin_true(validBinSamples);
+    yBin_true         = yBin_true(validBinSamples);
+
+    if isempty(sample_time_valid)
+        warning('No valid binned samples for %s', spikes_date);
+        mutualinfo_struct.(sprintf('MIspeedmatch_%s', spikes_date)) = NaN;
+        continue;
+    end
+
+    nXBins = numel(xEdges) - 1;
+    nYBins = numel(yEdges) - 1;
+    linBin_true = sub2ind([nXBins, nYBins], xBin_true, yBin_true);
 
     % Auto velocity edges if not provided
     if isempty(velEdges)
         vUse = vel_mag(validIdx);
         vUse = vUse(isfinite(vUse));
         if isempty(vUse)
-            % fallback
-            velEdges = linspace(velthreshold, velthreshold+50, 10);
+            velEdges_day = linspace(velthreshold, velthreshold+50, 10);
         else
             hi = prctile(vUse, 99);
             hi = max(hi, velthreshold + 1);
-            velEdges = linspace(velthreshold, hi, 11); % 10 bins by default
+            velEdges_day = linspace(velthreshold, hi, 11);
         end
+    else
+        velEdges_day = velEdges;
     end
+
+    % Sample timing tolerance
+    if numel(sample_time_valid) > 1
+        dt_samp = median(diff(sample_time_valid), 'omitnan');
+    else
+        dt_samp = NaN;
+    end
+    if isnan(dt_samp) || dt_samp <= 0
+        dt_samp = 1/7.5;
+          warning('funky business')
+    end
+    maxAssignDist = dt_samp / 2;
 
     nCells = size(peaks_time,1);
     controlMI = nan(nCells, nIter);
 
     parfor iIter = 1:nIter
-        % stable per-iteration randomness inside parfor
         s = RandStream('Threefry','Seed', iIter + 1000*iDay);
         RandStream.setGlobalStream(s);
 
+        iterVals = nan(nCells,1);
+
         for k = 1:nCells
+
+            if numel(MI) < k || isnan(MI(k))
+                continue;
+            end
+
             spk = peaks_time(k,:);
             spk = spk(~isnan(spk) & spk > 0);
-            if isempty(spk), continue; end
+            if isempty(spk)
+                continue;
+            end
 
-            spk_vel = interp1(vel_time, vel_mag, spk, 'linear', NaN);
-            csus_spk = interp1(CSUS_id(2,:), CSUS_id(1,:), spk, 'nearest', 0);
+            spk_vel  = interp1(vel_time, vel_mag, spk, 'linear', NaN);
+            csus_spk = interp1(csus_t_unique, csus_val_unique, spk, 'nearest', 0);
 
             runMask = isfinite(spk_vel) & (spk_vel >= velthreshold);
 
@@ -117,10 +229,9 @@ for iDay = 1:numel(fields_spikes)
                 continue;
             end
 
-            % If there are task spikes, remove same # from cand_spk,
-            % matching the velocity profile of v_csus.
+            % remove same # from non-task spikes, matched to velocity profile of task spikes
             if nRemove > 0
-                keep_spk = remove_velProfileMatched(cand_spk, cand_vel, v_csus, velEdges, s);
+                keep_spk = remove_velProfileMatched(cand_spk, cand_vel, v_csus, velEdges_day, s);
             else
                 keep_spk = cand_spk;
             end
@@ -129,13 +240,20 @@ for iDay = 1:numel(fields_spikes)
                 continue;
             end
 
-            [~, ~, ~, ~, spikeprob, occprob] = CA_normalizePosData(keep_spk, posDat, dim, 1.0);
+            % Count per included non-task sample
+            countPerSample = zeros(numel(sample_time_valid),1);
 
-            if size(spikeprob,1) < size(spikeprob,2), spikeprob = spikeprob'; end
-            if size(occprob,1)   < size(occprob,2),   occprob   = occprob';   end
+            for ss = 1:numel(keep_spk)
+                [d, idxNearest] = min(abs(sample_time_valid - keep_spk(ss)));
+                if d <= maxAssignDist
+                    countPerSample(idxNearest) = countPerSample(idxNearest) + 1;
+                end
+            end
 
-            controlMI(k, iIter) = mutualinfo([spikeprob, occprob]);
+            iterVals(k) = count_mi_from_counts(countPerSample, linBin_true, nXBins, nYBins, maxK);
         end
+
+        controlMI(:, iIter) = iterVals;
     end
 
     % Summarize shuffles per cell
@@ -143,17 +261,19 @@ for iDay = 1:numel(fields_spikes)
     for k = 1:nCells
         shuffVals = controlMI(k,:);
         shuffVals = shuffVals(~isnan(shuffVals));
-        if isempty(shuffVals), continue; end
+
+        if isempty(shuffVals) || numel(MI) < k || isnan(MI(k))
+            continue;
+        end
 
         p95cut = prctile(shuffVals, 95);
         muShuff = mean(shuffVals);
-        perc = sum(MI(k) > shuffVals) / numel(shuffVals);
+        perc = mean(shuffVals <= MI(k));
 
         mutinfo(:,k) = [p95cut; muShuff; perc];
     end
 
     mutualinfo_struct.(sprintf('MIspeedmatch_%s', spikes_date)) = mutinfo';
-
 end
 end
 
@@ -162,7 +282,6 @@ function keep_spk = remove_velProfileMatched(cand_spk, cand_vel, v_csus, velEdge
 % Remove N spikes from cand_spk where N=numel(v_csus),
 % choosing removals so their velocity histogram matches v_csus across velEdges.
 
-% ---- force column vectors (prevents implicit expansion N×N) ----
 cand_spk = cand_spk(:);
 cand_vel = cand_vel(:);
 v_csus   = v_csus(:);
@@ -180,10 +299,8 @@ if nRemove >= nCand
     return;
 end
 
-% Desired removals per velocity bin (from CSUS spikes)
 csusCounts = histcounts(v_csus, velEdges);
 
-% Candidate bin membership (column)
 candBin = discretize(cand_vel, velEdges);
 candBin = candBin(:);
 
@@ -195,7 +312,7 @@ for b = 1:nBins
     want = csusCounts(b);
     if want <= 0, continue; end
 
-    idx = find((candBin == b) & (~removeMask));   % now 1×N & 1×N (columns) -> OK
+    idx = find((candBin == b) & (~removeMask));
     if isempty(idx), continue; end
 
     take = min(want, numel(idx));
@@ -206,18 +323,15 @@ for b = 1:nBins
     end
 end
 
-% If bins underfilled, remove remaining from "close" bins (nearest in velocity-bin space)
 remain = nRemove - removed;
 
 if remain > 0
-
     targetBins = find(csusCounts > 0);
 
-    % If somehow no target bins, just remove uniformly from remaining candidates
     if isempty(targetBins)
         idxLeft = find(~removeMask & ~isnan(candBin));
         if numel(idxLeft) < remain
-            idxLeft = find(~removeMask); % last resort
+            idxLeft = find(~removeMask);
         end
         take = min(remain, numel(idxLeft));
         if take > 0
@@ -225,13 +339,11 @@ if remain > 0
             removeMask(pick) = true;
         end
     else
-        % distance of each bin to nearest target bin
         binDist = inf(nBins,1);
         for bb = 1:nBins
             binDist(bb) = min(abs(bb - targetBins));
         end
 
-        % iterate outward by distance: 0,1,2,... taking uniformly within bins at that distance
         dmax = max(binDist(isfinite(binDist)));
         if isempty(dmax) || ~isfinite(dmax), dmax = nBins; end
 
@@ -245,12 +357,11 @@ if remain > 0
             if isempty(idx), continue; end
 
             take = min(remain, numel(idx));
-            pick = randsample(s, idx, take, false);  % uniform within closest bins
+            pick = randsample(s, idx, take, false);
             removeMask(pick) = true;
             remain = remain - take;
         end
 
-        % If still need removals (e.g., lots of NaN bins), remove uniformly from anything left
         if remain > 0
             idxLeft = find(~removeMask);
             take = min(remain, numel(idxLeft));
@@ -263,4 +374,50 @@ if remain > 0
 end
 
 keep_spk = cand_spk(~removeMask);
+end
+
+function mi = count_mi_from_counts(countPerSample, linBin_true, nXBins, nYBins, maxK)
+% Full joint-distribution MI:
+% I(X;K) = sum_x sum_k p(x,k) log2( p(x,k) / (p(x)p(k)) )
+
+if isempty(countPerSample) || isempty(linBin_true)
+    mi = NaN;
+    return;
+end
+
+countPerSample = countPerSample(:);
+linBin_true = linBin_true(:);
+
+if ~isempty(maxK)
+    countPerSample(countPerSample > maxK) = maxK;
+end
+
+[countVals, ~, kIdx] = unique(countPerSample); %#ok<ASGLU>
+nK = numel(countVals);
+
+jointCounts = accumarray([linBin_true, kIdx], 1, [nXBins*nYBins, nK], @sum, 0);
+
+occCounts = sum(jointCounts, 2);
+validSpace = occCounts > 0;
+jointCounts = jointCounts(validSpace, :);
+
+N = sum(jointCounts(:));
+if N <= 0
+    mi = NaN;
+    return;
+end
+
+P_xk = jointCounts / N;
+P_x  = sum(P_xk, 2);
+P_k  = sum(P_xk, 1);
+
+mi = 0;
+for ix = 1:size(P_xk,1)
+    for ik = 1:size(P_xk,2)
+        p = P_xk(ix,ik);
+        if p > 0 && P_x(ix) > 0 && P_k(ik) > 0
+            mi = mi + p * log2(p / (P_x(ix) * P_k(ik)));
+        end
+    end
+end
 end

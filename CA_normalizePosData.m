@@ -94,7 +94,7 @@ totstime = sum(occupancy(:));
 %figure
 
 
-rate = rate./dim;
+%rate = rate./dim;
 [nr,nc] = size(rate);
 colormap('parula');
 %lower and higher three percent of firing sets bounds

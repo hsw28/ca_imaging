@@ -1,158 +1,137 @@
-function f = bitsper_openfield_noCSUS(spike_structure, pos_structure, velthreshold, dim, CA_timestamps, CSUS_id_struct)
-%finds bits per spike AND bits per second for a bunch of cells NOT including the CSUS period and the 2 seconds after
+function f = bitsper_openfield_noCSUS( ...
+    spike_structure, pos_structure, velthreshold, dim, ...
+    CA_timestamps, CSUS_id_struct)
 
+fprintf('running bitsper_openfield_noCSUS\n');
 
-tic
-
-
+f = struct();
 
 fields_spikes = fieldnames(spike_structure);
-fields_pos = fieldnames(pos_structure);
-fields_cats = fieldnames(CA_timestamps);
-fields_CSUS = fieldnames(CSUS_id_struct);
-
+fields_pos    = fieldnames(pos_structure);
+fields_cats   = fieldnames(CA_timestamps);
+fields_CSUS   = fieldnames(CSUS_id_struct);
 
 if numel(fields_spikes) ~= numel(fields_pos)
-  error('your spike and pos structures do not have the same number of values. you may need to pad your US structure for exploration days')
+    error('spike and pos structures do not have the same number of fields');
+end
+if numel(fields_spikes) ~= numel(fields_cats)
+    error('spike and timestamp structures do not have the same number of fields');
+end
+if numel(fields_spikes) ~= numel(fields_CSUS)
+    error('spike and CSUS structures do not have the same number of fields');
 end
 
-if numel(fields_pos) ~= numel(fields_cats)
-  error('your pos and timestamp structures do not have the same number of values. you may need to pad your US structure for exploration days')
-end
-
+set(0,'DefaultFigureVisible','off');
 
 for i = 1:numel(fields_spikes)
-      fieldName_spikes = fields_spikes{i};
-      fieldValue_spikes = spike_structure.(fieldName_spikes);
-      peaks_time = fieldValue_spikes;
 
-      fieldName_CSUS = fields_CSUS{i};
-      CSUS_id = CSUS_id_struct.(fieldName_CSUS);
+    fieldName_spikes = fields_spikes{i};
+    peaks_time = spike_structure.(fieldName_spikes);
 
-      index = strfind(fieldName_spikes, '_');
-      spikes_date = fieldName_spikes(index(2)+1:end)
+    fieldName_pos = fields_pos{i};
+    pos = pos_structure.(fieldName_pos);
 
-      fieldName_pos = fields_pos{i};
-      fieldValue_pos = pos_structure.(fieldName_pos);
-      pos = fieldValue_pos;
+    fieldName_cats = fields_cats{i};
+    curr_CA_timestamps = CA_timestamps.(fieldName_cats);
 
-      if size(pos,2)>3
-        error('you are not using a fixed position')
-      end
+    fieldName_CSUS = fields_CSUS{i};
+    CSUS_id = CSUS_id_struct.(fieldName_CSUS);
 
-      if size(pos,2)>size(pos,1)
+    idx = strfind(fieldName_spikes, '_');
+    spikes_date = fieldName_spikes(idx(2)+1:end);
+
+    fprintf('\nProcessing %s\n', spikes_date);
+
+    if isempty(pos)
+        warning('Empty pos for %s', spikes_date);
+        f.(sprintf('MI_%s', spikes_date)) = NaN;
+        continue;
+    end
+
+    if size(pos,2) > 3
+        error('you are not using a fixed position');
+    end
+
+    if size(pos,2) > size(pos,1)
         pos = pos';
-      end
+    end
 
-      fieldName_cats = fields_cats{i};
-      curr_CA_timestamps = CA_timestamps.(fieldName_cats);
+    % same heuristic as shuffle version
+    if ~isempty(pos) && numel(curr_CA_timestamps) > 1
+        dt_pos = median(diff(pos(:,1)), 'omitnan');
+        dt_ca  = median(diff(curr_CA_timestamps), 'omitnan');
+        if ~isnan(dt_pos) & ~isnan(dt_ca) & dt_pos < 0.1 * dt_ca
+            pos = convertpostoframe(pos, curr_CA_timestamps);
+        end
+    end
 
+    % remove duplicate pos timestamps
+    [~, uniqueIdxPos] = unique(pos(:,1), 'stable');
+    pos = pos(uniqueIdxPos,:);
 
+    % remove duplicate CSUS timestamps
+    [csus_t_unique, idxCSUS] = unique(CSUS_id(2,:), 'stable');
+    csus_val_unique = CSUS_id(1, idxCSUS);
 
+    vel = ca_velocity(pos);
+    vel_time = vel(2,:)';
+    vel_mag  = vel(1,:)';
 
+    interp_CSUS = interp1(csus_t_unique, csus_val_unique, vel_time, 'nearest', 0);
+    interp_x = interp1(pos(:,1), pos(:,2), vel_time, 'linear', NaN);
+    interp_y = interp1(pos(:,1), pos(:,3), vel_time, 'linear', NaN);
 
-      index = strfind(fieldName_spikes, '_');
-      pos_date = fieldName_spikes(index(2)+1:end);
+    validIdx = (vel_mag >= velthreshold) & (interp_CSUS == 0) & ...
+               ~isnan(interp_x) & ~isnan(interp_y);
 
-      if length(peaks_time) <5
-        mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
-        continue
-      end
+    goodpos = [vel_time(validIdx), interp_x(validIdx), interp_y(validIdx)];
 
-      if (pos(1,1)-pos(end,1))./length(pos) < 1
-        pos = convertpostoframe(pos, curr_CA_timestamps);
-      end
+    mintime = vel_time(1);
+    maxtime = vel_time(end);
 
-      bitsper_info = NaN(size(peaks_time,1),2);
+    if isempty(peaks_time) || size(peaks_time,1) < 1
+        warning('No units found for %s', spikes_date);
+        f.(sprintf('MI_%s', spikes_date)) = NaN;
+        continue;
+    end
 
-      tm = pos(:, 1);
-      biggest = max(peaks_time(:));
-      [minValue,closestIndex] = min(abs(biggest-tm));
+    numunits = size(peaks_time,1);
+    bitsper_info = NaN(2, numunits);
 
-      if abs(length(CSUS_id)-length(pos))>3
-        error('your ID and pos have different lengths')
-      end
-
-
-      % Find all time points where CSUS_id > 0
-      taskIdx = find(CSUS_id(1,:) > 0);
-      CSUS_time = pos(taskIdx, 1);
-
-      % Find all time points where CSUS_id <=0
-      goodCSUS = find(CSUS_id(1,:) <= 0);
-
-      % Now find the full range of indices to keep
-      %get vel
-      vel = ca_velocity(pos);
-      vel_time = vel(2,:)';
-      vel_mag  = vel(1,:)';
-
-      % Interpolate CSUS labels to velocity timestamps
-      interp_CSUS = interp1(CSUS_id(2,:), CSUS_id(1,:), vel_time, 'nearest', 0);
-
-
-      [~, uniqueIdx] = unique(pos(:,1), 'stable');
-      pos = pos(uniqueIdx, :);
-
-      % Interpolate X and Y position to velocity timestamps too
-      interp_x = interp1(pos(:,1), pos(:,2), vel_time, 'linear', NaN);
-      interp_y = interp1(pos(:,1), pos(:,3), vel_time, 'linear', NaN);
-
-      % Build mask based on velocity, CSUS period, and valid position values
-      validIdx = (vel_mag >= velthreshold) & (interp_CSUS == 0) & ...
-                 ~isnan(interp_x) & ~isnan(interp_y);
-
-      % Now build the posDat used downstream
-        goodpos = [vel_time(validIdx), interp_x(validIdx), interp_y(validIdx)];
-
-
-
-      mintime = vel(2,1);
-      maxtime = vel(2,end);
-
-      tm = vel(2,:);
-
-      numunits = size(peaks_time,1);
-
-      timelength = curr_CA_timestamps(end)-curr_CA_timestamps(1);
-
-      if numunits<=1
-        mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
-        warning('you have no spikes')
-      else
-      for k=1:numunits
+    for k = 1:numunits
         currspikes = peaks_time(k,:);
-        [c indexmin] = (min(abs(peaks_time(k,:)-mintime))); %
-        [c indexmax] = (min(abs(peaks_time(k,:)-maxtime))); %
-        currspikes = peaks_time(k,indexmin:indexmax);
+        currspikes = currspikes(~isnan(currspikes));
+        currspikes = currspikes(currspikes >= mintime & currspikes <= maxtime);
 
-        spike_vel = interp1(vel_time, vel_mag, currspikes, 'linear');
-        csus_currspikes = interp1(CSUS_id(2,:), CSUS_id(1,:), currspikes, 'nearest', 0);
-        highspeedspikes = currspikes((spike_vel >= velthreshold) & (csus_currspikes == 0));
+        if isempty(currspikes) || isempty(goodpos)
+            continue;
+        end
 
-        set(0,'DefaultFigureVisible', 'off');
+        spike_vel = interp1(vel_time, vel_mag, currspikes, 'linear', NaN);
+        csus_currspikes = interp1(csus_t_unique, csus_val_unique, currspikes, 'nearest', 0);
 
+        keepSpikes = ~isnan(spike_vel) & (spike_vel >= velthreshold) & (csus_currspikes == 0);
+        highspeedspikes = currspikes(keepSpikes);
 
-  if length(highspeedspikes)>0
-  [rate totspikes totstime colorbar spikeprob occprob] = CA_normalizePosData(highspeedspikes, goodpos, dim, 1.000);
-          if (size(spikeprob,1)) < (size(spikeprob,2))
-            spikeprob = spikeprob';
-          end
-          if (size(occprob,1)) < (size(occprob,2))
+        if numel(highspeedspikes) <= 1
+            continue;
+        end
+
+        [rate, ~, ~, ~, ~, occprob] = CA_normalizePosData(highspeedspikes, goodpos, dim, 1.000);
+
+        if size(occprob,1) < size(occprob,2)
             occprob = occprob';
-          end
-  [bitsPerSpike, bitsPerSecond] = bits_per(rate, occprob);
-  bitsper_info(k,1) = bitsPerSpike;
-  bitsper_info(k,2) = bitsPerSecond;
-  else
-        bitsper_info(k,1) = NaN;
-    bitsper_info(k,2) = NaN;
-  end
+        end
+        if size(rate,1) < size(rate,2)
+            rate = rate';
+        end
 
-end
+        [bitsPerSpike, bitsPerSecond] = bits_per(rate, occprob);
 
-mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = bitsper_info';
-end
-end
+        bitsper_info(1,k) = bitsPerSpike;
+        bitsper_info(2,k) = bitsPerSecond;
+    end
 
-f = mutualinfo_struct;
+    f.(sprintf('MI_%s', spikes_date)) = bitsper_info;
+end
+end

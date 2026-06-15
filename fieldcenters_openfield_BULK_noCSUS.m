@@ -41,6 +41,16 @@ function field_centers  = fieldcenters_openfield_BULK_noCSUS(peaks_time_struct, 
 
         pos = smoothpos(pos);
 
+%{
+        lasti = find(CSUS_id(1,:)==10);
+        for z=1:length(lasti)
+          if length(CSUS_id)<lasti+5
+            CSUS_id(1,lasti(z)+1:lasti(z)+5) = [11:15];
+          else
+            CSUS_id(1,lasti(z):end) = 11;
+          end
+        end
+%}
         goodCSUS = find(CSUS_id(1,:)>0);
         good_CSUStime = pos(goodCSUS,1);
         good_CSUSpos = pos(goodCSUS,:);

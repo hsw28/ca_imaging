@@ -28,7 +28,9 @@ for i = 1:numel(ratNames)
         warning('%s does not have enough days before An. Skipping...', ratVar);
         continue;
     end
-    daysToUse = dateList(idx-2:idx)
+
+  %  daysToUse = dateList(idx-2:idx)
+    daysToUse = dateList(idx-2:idx+3)
 
     %or for first day
   %  daysToUse = {'2023_04_18'} %rat0222

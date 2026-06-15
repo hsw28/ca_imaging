@@ -41,8 +41,8 @@ for i = 1:numel(ratNames)
     for d = 1:numel(daysToUse)
         dateStr = daysToUse{d};
 
-        Mspike = bitsperspike.(['bitsPerSpike_' dateStr]);  % Assuming 4-column format: [x x percentile firingRate]
-        Msec = bitspersec.(['bitsPerSec_' dateStr]);  % Assuming 4-column format: [x x percentile firingRate]
+        Mspike = bitsperspike.(['bitsPerSpike_' dateStr]);
+        Msec   = bitspersec.(['bitsPerSec_' dateStr]);
 
         ratemask = ratemask_struct.(['ratemask_' dateStr]);
 

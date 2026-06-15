@@ -1,12 +1,17 @@
-function [distance centers] = fielddistancebyday(alignmentdata1, alignmentdata2, center1, center2, goodcells1, goodcells2)
+function [distance centers] = fielddistancebyday(alignmentdata1, alignmentdata2, center1, center2, MI_shuff1, MI_shuff2)
 
 %function f = fielddistancebyday(alignmentdata1, alignmentdata2, center1, center2, goodcells1, goodcells2)
 % takes alignment data and finds the different in fields by individual day
 
 
 if nargin < 5
-    goodcells1 = [1:length(center1)]; % Example: considering all cells as good
-    goodcells2 = [1:length(center2)];
+goodcells1 = [1:length(center1)];
+goodcells2 = [1:length(center2)];
+else
+  MI_shuff1 = MI_shuff1(:,3);
+  MI_shuff2 = MI_shuff2(:,3);
+  goodcells1 = find(MI_shuff1>=.95);
+  goodcells2 = find(MI_shuff1>=.95);
 end
 
 center1(~goodcells1) = NaN;

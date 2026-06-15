@@ -46,7 +46,7 @@ end
 % 3. compute information terms (vectorised)
 % -------------------------------------------------------------------------
 % 3. compute information terms (vectorised, skip zero-rate bins)
-meanRate = nanmean(rBin);                 % overall mean firing (Hz)
+meanRate = nansum(pOcc .* rBin);             % overall mean firing (Hz)
 
 posMask  = rBin > 0;                      % ignore bins with r=0
 pOccPos  = pOcc(posMask);

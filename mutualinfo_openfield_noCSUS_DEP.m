@@ -1,23 +1,30 @@
-function f = mutualinfo_openfield_wCSUS( ...
+function f = mutualinfo_openfield_noCSUS_DEP( ...
     spike_structure, pos_structure, velthreshold, dim, ...
     CA_timestamps, CSUS_id_struct)
-% mutualinfo_openfield_wCSUS
+% mutualinfo_openfield_noCSUS
 %
-% Computes spatial mutual information INCLUDING CSUS periods and
-% above a velocity threshold using the full joint-distribution count MI:
+% Computes spatial mutual information outside CSUS periods and above a
+% velocity threshold using a binary event / no-event formulation:
 %
-%   I(X;K) = sum_x sum_k p(x,k) * log2( p(x,k) / (p(x)*p(k)) )
+%   I_pos(x_i) = sum_{k=0}^1 P(k|x_i) * log2( P(k|x_i) / P(k) )
+%   SI         = sum_i P(x_i) * I_pos(x_i)
 %
 % where:
-%   X = spatial bin
-%   K = event count per included sample
+%   P(x_i)   = probability of being in spatial bin i
+%   P(k)     = probability of observing k events in a sample (k = 0 or 1)
+%   P(k|x_i) = conditional probability of observing k events in bin i
 %
 % Output per day:
-%   f.MI_YYYY_MM_DD = [1 x numUnits]
+%   f.MI_YYYY_MM_DD = [numUnits x 1]
+%
+% Notes:
+%   - Position is sampled on the included velocity timestamps.
+%   - Calcium events are binarized per included sample:
+%         1 = at least one event assigned to that sample
+%         0 = no event
+%   - Multiple spikes mapping to the same sample still count as 1.
 
-fprintf('running mutualinfo_openfield_wCSUS\n');
-
-maxK = 1;   % cap counts per sample: 0,1,2,3+
+fprintf('running mutualinfo_openfield_noCSUS\n');
 
 fields_spikes = fieldnames(spike_structure);
 fields_pos    = fieldnames(pos_structure);
@@ -28,7 +35,7 @@ if numel(fields_spikes) ~= numel(fields_pos)
     error('spike and pos structures do not have the same number of fields');
 end
 if numel(fields_spikes) ~= numel(fields_cats)
-    error('spike and timestamp structures do not have the same number of fields');
+    error('pos and timestamp structures do not have the same number of fields');
 end
 if numel(fields_spikes) ~= numel(fields_CSUS)
     error('spike and CSUS structures do not have the same number of fields');
@@ -48,7 +55,7 @@ for i = 1:numel(fields_spikes)
     curr_CA_timestamps = CA_timestamps.(fieldName_cats);
 
     fieldName_CSUS = fields_CSUS{i};
-    CSUS_id = CSUS_id_struct.(fieldName_CSUS); %#ok<NASGU>
+    CSUS_id = CSUS_id_struct.(fieldName_CSUS);
 
     idx = strfind(fieldName_spikes, '_');
     spikes_date = fieldName_spikes(idx(2)+1:end);
@@ -81,24 +88,31 @@ for i = 1:numel(fields_spikes)
     [~, uniqueIdxPos] = unique(pos(:,1), 'stable');
     pos = pos(uniqueIdxPos,:);
 
+    % Remove duplicate CSUS timestamps
+    [csus_t_unique, idxCSUS] = unique(CSUS_id(2,:), 'stable');
+    csus_val_unique = CSUS_id(1, idxCSUS);
+
     % Velocity
     vel = ca_velocity(pos);
     vel_time = vel(2,:)';
     vel_mag  = vel(1,:)';
 
-    % Interpolate XY onto velocity timestamps
+    % Interpolate CSUS labels and XY onto velocity timestamps
+    interp_CSUS = interp1(csus_t_unique, csus_val_unique, vel_time, 'nearest', 0);
     interp_x = interp1(pos(:,1), pos(:,2), vel_time, 'linear', NaN);
     interp_y = interp1(pos(:,1), pos(:,3), vel_time, 'linear', NaN);
 
-    % Keep only moving, valid XY samples
-    validIdx = (vel_mag >= velthreshold) & ...
+    % Keep only valid moving, non-CSUS samples
+    validIdx = (vel_mag >= velthreshold) & (interp_CSUS == 0) & ...
                ~isnan(interp_x) & ~isnan(interp_y);
 
     sample_time = vel_time(validIdx);
     sample_x    = interp_x(validIdx);
     sample_y    = interp_y(validIdx);
 
-    if isempty(sample_time)
+    goodpos = [sample_time, sample_x, sample_y];
+
+    if isempty(goodpos)
         warning('No valid position samples for %s', spikes_date);
         mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = NaN;
         continue;
@@ -113,7 +127,7 @@ for i = 1:numel(fields_spikes)
         continue;
     end
 
-    % Bin edges from included true positions
+    % Spatial bins
     xmin = min(sample_x);
     xmax = max(sample_x);
     ymin = min(sample_y);
@@ -128,14 +142,14 @@ for i = 1:numel(fields_spikes)
     xEdges = xmin:dim:(xmax + dim);
     yEdges = ymin:dim:(ymax + dim);
 
-    % Assign every included sample to a true spatial bin
-    xBin_true = discretize(sample_x, xEdges);
-    yBin_true = discretize(sample_y, yEdges);
+    % Assign every included sample to a spatial bin
+    xBin = discretize(sample_x, xEdges);
+    yBin = discretize(sample_y, yEdges);
 
-    validBinSamples = ~isnan(xBin_true) & ~isnan(yBin_true);
+    validBinSamples = ~isnan(xBin) & ~isnan(yBin);
+    xBin = xBin(validBinSamples);
+    yBin = yBin(validBinSamples);
     sample_time_valid = sample_time(validBinSamples);
-    xBin_true         = xBin_true(validBinSamples);
-    yBin_true         = yBin_true(validBinSamples);
 
     if isempty(sample_time_valid)
         warning('No valid binned samples for %s', spikes_date);
@@ -145,21 +159,19 @@ for i = 1:numel(fields_spikes)
 
     nXBins = numel(xEdges) - 1;
     nYBins = numel(yEdges) - 1;
-    linBin_true = sub2ind([nXBins, nYBins], xBin_true, yBin_true);
+    linBin = sub2ind([nXBins, nYBins], xBin, yBin);
 
     numunits = size(peaks_time,1);
-    mutinfo = NaN(1, numunits);
+    mutinfo = NaN(numunits,1);
 
-    % Tolerance for assigning spikes to included samples
+    % Frame tolerance for assigning spikes to included samples
     if numel(sample_time_valid) > 1
         dt_samp = median(diff(sample_time_valid), 'omitnan');
     else
         dt_samp = NaN;
     end
     if isnan(dt_samp) || dt_samp <= 0
-        error('funky business')
-        dt_samp = 1/7.5;
-                warning('funky business')
+        dt_samp = 1/15; % fallback
     end
     maxAssignDist = dt_samp / 2;
 
@@ -174,9 +186,11 @@ for i = 1:numel(fields_spikes)
             continue;
         end
 
-        % Filter spikes by movement only (INCLUDING CSUS)
+        % Filter spikes by movement and CSUS exclusion
         spike_vel = interp1(vel_time, vel_mag, currspikes, 'linear', NaN);
-        keepSpikes = ~isnan(spike_vel) & (spike_vel >= velthreshold);
+        csus_currspikes = interp1(csus_t_unique, csus_val_unique, currspikes, 'nearest', 0);
+
+        keepSpikes = ~isnan(spike_vel) & (spike_vel >= velthreshold) & (csus_currspikes == 0);
         highspeedspikes = currspikes(keepSpikes);
 
         if isempty(highspeedspikes)
@@ -184,69 +198,59 @@ for i = 1:numel(fields_spikes)
             continue;
         end
 
-        % Count per included sample
-        countPerSample = zeros(numel(sample_time_valid),1);
+        % Assign spikes to nearest included sample, then binarize event/no-event per sample
+        eventPerSample = false(numel(sample_time_valid),1);
 
         for s = 1:numel(highspeedspikes)
             [d, idxNearest] = min(abs(sample_time_valid - highspeedspikes(s)));
             if d <= maxAssignDist
-                countPerSample(idxNearest) = countPerSample(idxNearest) + 1;
+                eventPerSample(idxNearest) = true;
             end
         end
 
-        % Observed MI from true bins
-        mutinfo(k) = count_mi_from_counts(countPerSample, linBin_true, nXBins, nYBins, maxK);
+        % Occupancy counts and event counts per spatial bin
+        occCounts   = accumarray(linBin, 1, [nXBins*nYBins, 1], @sum, 0);
+        eventCounts = accumarray(linBin, double(eventPerSample), [nXBins*nYBins, 1], @sum, 0);
+
+        validOccBins = occCounts > 0;
+        if ~any(validOccBins)
+            mutinfo(k) = NaN;
+            continue;
+        end
+
+        occCounts   = occCounts(validOccBins);
+        eventCounts = eventCounts(validOccBins);
+
+        totalSamples = sum(occCounts);
+        totalEventSamples = sum(eventCounts);
+
+        if totalSamples <= 0
+            mutinfo(k) = NaN;
+            continue;
+        end
+
+        Pxi = occCounts / totalSamples;              % P(x_i)
+        P1_given_x = eventCounts ./ occCounts;       % P(event | x_i)
+        P0_given_x = 1 - P1_given_x;                 % P(no event | x_i)
+
+        P1 = totalEventSamples / totalSamples;       % P(event)
+        P0 = 1 - P1;                                 % P(no event)
+
+        % Compute binary mutual information
+        Ipos = zeros(size(Pxi));
+
+        use1 = (P1_given_x > 0) & (P1 > 0);
+        use0 = (P0_given_x > 0) & (P0 > 0);
+
+        Ipos(use1) = Ipos(use1) + P1_given_x(use1) .* log2(P1_given_x(use1) ./ P1);
+        Ipos(use0) = Ipos(use0) + P0_given_x(use0) .* log2(P0_given_x(use0) ./ P0);
+
+        mutinfo(k) = sum(Pxi .* Ipos);
+
     end
 
-    mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo;
+    mutualinfo_struct.(sprintf('MI_%s', spikes_date)) = mutinfo';
 end
 
 f = mutualinfo_struct;
-end
-
-
-function mi = count_mi_from_counts(countPerSample, linBin_true, nXBins, nYBins, maxK)
-% Full joint-distribution MI:
-% I(X;K) = sum_x sum_k p(x,k) log2( p(x,k) / (p(x)p(k)) )
-
-if isempty(countPerSample) || isempty(linBin_true)
-    mi = NaN;
-    return;
-end
-
-countPerSample = countPerSample(:);
-linBin_true = linBin_true(:);
-
-if ~isempty(maxK)
-    countPerSample(countPerSample > maxK) = maxK;
-end
-
-[countVals, ~, kIdx] = unique(countPerSample); %#ok<ASGLU>
-nK = numel(countVals);
-
-jointCounts = accumarray([linBin_true, kIdx], 1, [nXBins*nYBins, nK], @sum, 0);
-
-occCounts = sum(jointCounts, 2);
-validSpace = occCounts > 0;
-jointCounts = jointCounts(validSpace, :);
-
-N = sum(jointCounts(:));
-if N <= 0
-    mi = NaN;
-    return;
-end
-
-P_xk = jointCounts / N;
-P_x  = sum(P_xk, 2);
-P_k  = sum(P_xk, 1);
-
-mi = 0;
-for ix = 1:size(P_xk,1)
-    for ik = 1:size(P_xk,2)
-        p = P_xk(ix,ik);
-        if p > 0 && P_x(ix) > 0 && P_k(ik) > 0
-            mi = mi + p * log2(p / (P_x(ix) * P_k(ik)));
-        end
-    end
-end
 end

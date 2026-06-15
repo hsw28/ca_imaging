@@ -90,9 +90,9 @@ col_no    = [0.22 0.45 0.70];  % NO vs WITH (blue)
 col_rand  = [0.85 0.33 0.10];  % RAND vs WITH (orange)
 col_speed = [0.20 0.70 0.35];  % SPEED vs WITH (green)
 
-H1 = cellfun(@(v) histcounts(v,Edges,'Normalization','probability'), Pct_no_vs_with,    'uni',0);
-H2 = cellfun(@(v) histcounts(v,Edges,'Normalization','probability'), Pct_rand_vs_with,  'uni',0);
-H3 = cellfun(@(v) histcounts(v,Edges,'Normalization','probability'), Pct_speed_vs_with, 'uni',0);
+H1 = cellfun(@(v) 100*histcounts(v,Edges,'Normalization','probability'), Pct_no_vs_with,    'uni',0);
+H2 = cellfun(@(v) 100*histcounts(v,Edges,'Normalization','probability'), Pct_rand_vs_with,  'uni',0);
+H3 = cellfun(@(v) 100*histcounts(v,Edges,'Normalization','probability'), Pct_speed_vs_with, 'uni',0);
 H1 = vertcat(H1{:});  H2 = vertcat(H2{:});  H3 = vertcat(H3{:});
 
 mu1 = mean(H1,1,'omitnan');   % equal weight across rats
@@ -135,9 +135,9 @@ xline(0,'k-','LineWidth',1);
 ymax = max([mu1,mu2,mu3,ci1(:)',ci2(:)',ci3(:)']);
 if ~isfinite(ymax) || ymax<=0, ymax=0.05; end
 ylim([0, ymax*1.05]);
-ytickformat('%.2f%%');
+ytickformat('%.1f%%');
 xlabel('% change in MI relative to WITH TASK (all cells)');
-ylabel('Proportion of cells (equal-weight across rats)');
+ylabel('Percentage of cells (equal-weight across rats)');
 legend({'No-task 95% CI','Random-removed 95% CI','Speed-removed 95% CI', ...
         'No-task mean density','Random-removed mean density','Speed-removed mean density', ...
         'No-task mean %Δ','Random-removed mean %Δ','Speed-removed mean %Δ'}, 'Location','northwest');
@@ -162,10 +162,10 @@ for r = 1:nR
     xline(median(ps), '-','LineWidth',1.2,'Color',col_speed);
     xline(0,'k-','LineWidth',1);
     xlim([Edges(1) Edges(end)]);
-    ytickformat('%.2f%%');
+    ytickformat('%.1f%%');
     title(RatNames{r}, 'Interpreter','none');
     if r > (nRows-1)*nCols, xlabel('% Δ relative to WITH TASK'); end
-    if mod(r-1,nCols)==0,   ylabel('Proportion of cells'); end
+    if mod(r-1,nCols)==0,   ylabel('Percent of cells'); end
     set(gca,'Box','off','LineWidth',1);
     hold off;
 end

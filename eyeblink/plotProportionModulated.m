@@ -27,7 +27,7 @@ p = inputParser;
 addParameter(p,'Metric','fold',@(s) any(strcmpi(s,{'logfold','fold','symdiff'})));
 addParameter(p,'Eps',0,@(x) isnumeric(x)&&isscalar(x)&&x>=0);
 addParameter(p,'Alpha',0.05,@(x) isnumeric(x)&&isscalar(x)&&x>0&&x<1);
-addParameter(p,'NPerm',500,@(x) isnumeric(x)&&isscalar(x)&&x>=1);
+addParameter(p,'NPerm',100,@(x) isnumeric(x)&&isscalar(x)&&x>=1);
 addParameter(p,'Mode','allNonTrial',@(s) any(strcmpi(s,{'allNonTrial','preTrial'})));
 addParameter(p,'SaveMod',true,@(x) (islogical(x) || isnumeric(x)));
 %addParameter(p,'Tail','two-sided',@(s) any(strcmpi(s,{'two-sided','right','left'})));
