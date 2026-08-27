@@ -1,5 +1,8 @@
 function R = run_speedBinMatched(ratNames, varargin)
 % R is a struct array per rat with per-day stats and pooled per-rat summary.
+% Use 'TraceOnly',true to compare non-task activity with the trace period
+% (default 'TraceWin',[0.25 0.75]) while excluding the full 'win' from
+% the non-task pool.
 if nargin<1 || isempty(ratNames)
     ratNames = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
 end
@@ -17,6 +20,8 @@ p.addParameter('MinBins',1);
 p.addParameter('alpha',0.05);
 p.addParameter('test','ttest');        % 'ttest' | 'signrank'
 p.addParameter('win',[0 2]);           % trial window for analysis
+p.addParameter('TraceOnly',false,@(x) islogical(x) && isscalar(x)); % compare non-task to trace only
+p.addParameter('TraceWin',[0.25 0.75],@(x) isnumeric(x) && numel(x)==2); % trace window from CS
 p.addParameter('ExcludeWin',[],@(x) isempty(x) || (isnumeric(x) && numel(x)==2)); % window to exclude from non-trial
 p.addParameter('binSize',.1);          % frame/bin width (s)
 p.addParameter('SpeedBinCount',[]);    %
@@ -56,7 +61,8 @@ for r = 1:nRats
         mask     = rat.ratemask.(['ratemask_' day]);
 
         S = speedBinMatched(spk, ts, xy, cs, mask, ...
-            'win',P.win, 'ExcludeWin',P.ExcludeWin, ...   % NEW
+            'win',P.win, 'TraceOnly',P.TraceOnly, 'TraceWin',P.TraceWin, ...
+            'ExcludeWin',P.ExcludeWin, ...
             'binSize',P.binSize, ...
             'SpeedEdges',P.SpeedEdges, 'SpeedBinWidth',P.SpeedBinWidth, ...
             'SpeedBinCount',P.SpeedBinCount, 'SpeedRange',P.SpeedRange, ...
@@ -175,6 +181,8 @@ function stats = speedBinMatched(spikeCell, ts, pos, csTimes, ratemask, varargin
 
 ip = inputParser();
 ip.addParameter('win',            [0 2]);   % trial analysis window
+ip.addParameter('TraceOnly',      false, @(x) islogical(x) && isscalar(x));
+ip.addParameter('TraceWin', [0.25 0.75], @(x) isnumeric(x) && numel(x)==2);
 ip.addParameter('ExcludeWin', [], @(x) isempty(x) || (isnumeric(x) && numel(x)==2)); % window to exclude from non-trial
 ip.addParameter('binSize',   .1);
 ip.addParameter('SpeedEdges',      []);
@@ -187,10 +195,19 @@ ip.addParameter('alpha',           0.05);
 ip.addParameter('test',           'ttest', @(s) any(validatestring(s,{'ttest','signrank'})));
 ip.parse(varargin{:});
 
-win            = ip.Results.win;
+taskWin        = ip.Results.win;
+traceOnly      = ip.Results.TraceOnly;
+traceWin       = ip.Results.TraceWin;
+if traceOnly
+    win = traceWin;
+else
+    win = taskWin;
+end
 excludeWin     = ip.Results.ExcludeWin;
 if isempty(excludeWin)
-    excludeWin = win;    % default: old behavior
+    % Keep all task samples out of the non-task pool, even when only the
+    % trace portion is used on the task side of the comparison.
+    excludeWin = taskWin;
 end
 binSize        = ip.Results.binSize;
 SpeedEdges     = ip.Results.SpeedEdges;
@@ -300,6 +317,9 @@ end
 % ---------- bins that qualify on BOTH sides ----------
 keepTemplate         = (durTrial >= MinDurPerBin) & (durNon >= MinDurPerBin);
 drop.pairedBinsAvail = sum(keepTemplate);
+
+% ---------- matching-quality diagnostics ----------
+matching = build_matching_diagnostics(binCenters, durTrial, durNon, keepTemplate, 'speed');
 
 % ---------- outputs per cell ----------
 pVal              = nan(nCells,1);
@@ -465,7 +485,10 @@ stats.binRatesNon       = binRatesNon;
 stats.speedBinCenters   = speedBinsUsed;
 stats.SpeedEdges        = SpeedEdges;
 stats.params            = struct('win',win, ...
-                                 'ExcludeWin',excludeWin, ...  % NEW
+                                 'TaskWin',taskWin, ...
+                                 'TraceOnly',traceOnly, ...
+                                 'TraceWin',traceWin, ...
+                                 'ExcludeWin',excludeWin, ...
                                  'binSize',binSize,'SpeedEdges',SpeedEdges, ...
                                  'SpeedBinWidth',SpeedBinWidth, ...
                                  'MinDurPerBin',MinDurPerBin,'MinBins',MinBins, ...
@@ -473,7 +496,63 @@ stats.params            = struct('win',win, ...
 stats.drop              = drop;
 stats.dayLevel          = dayLevel;
 stats.pop               = pop;   % population stats
+stats.matching          = matching;
 
+end
+
+function matching = build_matching_diagnostics(binCenters, durTrial, durNon, keepTemplate, binLabel)
+trialRet = durTrial(keepTemplate);
+nonRet   = durNon(keepTemplate);
+centRet  = binCenters(keepTemplate);
+
+ratio = nonRet ./ max(trialRet, eps);
+log2Ratio = log2(ratio);
+
+trialProb = trialRet ./ max(sum(trialRet, 'omitnan'), eps);
+nonProb   = nonRet   ./ max(sum(nonRet,   'omitnan'), eps);
+overlap = sum(min(trialProb, nonProb), 'omitnan');
+l1Distance = 0.5 * sum(abs(trialProb - nonProb), 'omitnan');
+
+matching = struct();
+matching.binLabel = binLabel;
+matching.binCenters = centRet(:);
+matching.trialDurSec = trialRet(:);
+matching.nonTrialDurSec = nonRet(:);
+matching.nonTrialToTrialDurRatio = ratio(:);
+matching.log2NonTrialToTrialDurRatio = log2Ratio(:);
+matching.trialProb = trialProb(:);
+matching.nonTrialProb = nonProb(:);
+matching.overlap = overlap;
+matching.l1Distance = l1Distance;
+matching.nTotalBins = numel(binCenters);
+matching.nTrialOccupiedBins = sum(durTrial > 0);
+matching.nNonTrialOccupiedBins = sum(durNon > 0);
+matching.nEitherOccupiedBins = sum((durTrial > 0) | (durNon > 0));
+matching.nBothOccupiedBins = sum((durTrial > 0) & (durNon > 0));
+matching.nRetainedBins = sum(keepTemplate);
+matching.totalTrialDurSec = sum(trialRet, 'omitnan');
+matching.totalNonTrialDurSec = sum(nonRet, 'omitnan');
+finiteRatio = ratio(isfinite(ratio));
+finiteAbsLog2Ratio = abs(log2Ratio(isfinite(log2Ratio)));
+matching.medianDurRatio = safe_median(finiteRatio);
+matching.iqrDurRatio = safe_prctile(finiteRatio, [25 75]);
+matching.medianAbsLog2DurRatio = safe_median(finiteAbsLog2Ratio);
+end
+
+function y = safe_median(x)
+if isempty(x)
+    y = NaN;
+else
+    y = median(x, 'omitnan');
+end
+end
+
+function y = safe_prctile(x, p)
+if isempty(x)
+    y = nan(size(p));
+else
+    y = prctile(x, p);
+end
 end
 
 

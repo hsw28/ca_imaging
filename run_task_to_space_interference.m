@@ -5,10 +5,17 @@ function R = CellNorm(ratNames, varargin)
 %   - Prints only a per-rat summary (no per-rep spam).
 %   - Does NOT store all resample structs by default (big memory cut).
 %   - Optional: StoreResampleDetails=true to keep full rep structs.
+%   - ExtinctionDays=N uses the last N extinction sessions and skips animals
+%     that do not have N extinction sessions. It overrides DaysMode.
+%
+% Example: use the final two extinction days
+%   R = run_task_to_space_interference(ratNames, 'ExtinctionDays', 2);
 
 % ------------------------------- Options ---------------------------------
 p = inputParser;
 addParameter(p,'DaysMode','last3toAn');
+addParameter(p,'ExtinctionDays',[], @(x) isempty(x) || ...
+    (isnumeric(x) && isscalar(x) && isfinite(x) && x >= 1 && x == fix(x)));
 addParameter(p,'TraceWin',[0 2]);
 addParameter(p,'BufferPost',0);
 addParameter(p,'GridRC',[2 2]);
@@ -60,28 +67,37 @@ for ii = 1:numel(ratNames)
     rat = evalin('base', ratVar);
 
     % ----- Select days -----
-    dateList = autoDateList_fallback(rat);
-    switch lower(opt.DaysMode)
-        case {'all','last3byca'}
-            daysByCa = dateList;
-            if strcmpi(opt.DaysMode,'last3byca') && numel(daysByCa) >= 3
-                daysToUse = daysByCa(end-2:end);
-            else
-                daysToUse = daysByCa;
-            end
-        case 'last3toan'
-            if isfield(rat,'An')
-                idx = find(strcmp(dateList, rat.An), 1);
-                if ~isempty(idx) && idx >= 3
-                    daysToUse = dateList(idx-2:idx);
+    if ~isempty(opt.ExtinctionDays)
+        daysToUse = extinctionDateList_fallback(rat, opt.ExtinctionDays);
+        if numel(daysToUse) < opt.ExtinctionDays
+            warning('%s has fewer than %d extinction sessions. Skipping.', ...
+                ratVar, opt.ExtinctionDays);
+            continue;
+        end
+    else
+        dateList = autoDateList_fallback(rat);
+        switch lower(opt.DaysMode)
+            case {'all','last3byca'}
+                daysByCa = dateList;
+                if strcmpi(opt.DaysMode,'last3byca') && numel(daysByCa) >= 3
+                    daysToUse = daysByCa(end-2:end);
+                else
+                    daysToUse = daysByCa;
+                end
+            case 'last3toan'
+                if isfield(rat,'An')
+                    idx = find(strcmp(dateList, rat.An), 1);
+                    if ~isempty(idx) && idx >= 3
+                        daysToUse = dateList(idx-2:idx);
+                    else
+                        daysToUse = dateList(max(1,numel(dateList)-2):end);
+                    end
                 else
                     daysToUse = dateList(max(1,numel(dateList)-2):end);
                 end
-            else
-                daysToUse = dateList(max(1,numel(dateList)-2):end);
-            end
-        otherwise
-            daysToUse = dateList;
+            otherwise
+                daysToUse = dateList;
+        end
     end
 
     if opt.Verbose
@@ -89,10 +105,25 @@ for ii = 1:numel(ratNames)
     end
 
     % ----- Pull & standardize per-day containers -----
-    spikes_raw = filterFieldsByDay_fallback(rat.Ca_peaks, daysToUse);
-    ts_raw     = filterFieldsByDay_fallback(rat.Ca_ts,    daysToUse);
-    pos_raw    = filterFieldsByDay_fallback(rat.pos,      daysToUse);
-    cs_raw     = filterFieldsByDay_fallback(rat.CS_times, daysToUse);
+    sourceFields = struct();
+    if ~isempty(opt.ExtinctionDays)
+        try
+            [spikes_raw, ts_raw, pos_raw, cs_raw, sourceFields] = ...
+                select_extinction_day_fields(rat, daysToUse);
+        catch ME
+            warning('[%s] Extinction field validation failed: %s Skipping.', ...
+                ratVar, ME.message);
+            continue
+        end
+        if opt.Verbose
+            print_extinction_field_map(ratVar, daysToUse, sourceFields);
+        end
+    else
+        spikes_raw = filterFieldsByDay_fallback(rat.Ca_peaks, daysToUse);
+        ts_raw     = filterFieldsByDay_fallback(rat.Ca_ts,    daysToUse);
+        pos_raw    = filterFieldsByDay_fallback(rat.pos,      daysToUse);
+        cs_raw     = filterFieldsByDay_fallback(rat.CS_times, daysToUse);
+    end
     [spikes, ts, pos, cs] = standardize_day_format(spikes_raw, ts_raw, pos_raw, cs_raw, daysToUse);
 
     % ----- Apply ratemask per day (keepCells where ratemask==1) -----
@@ -101,8 +132,14 @@ for ii = 1:numel(ratNames)
           keepCells = [];
 
           if isfield(rat,'ratemask')
-              f = sprintf('ratemask_%s', dlabel);
-              if isfield(rat.ratemask, f)
+              f = '';
+              if ~isempty(opt.ExtinctionDays) && isfield(sourceFields,'ratemask') && ...
+                      numel(sourceFields.ratemask) >= d
+                  f = sourceFields.ratemask{d};
+              elseif isfield(rat.ratemask, sprintf('ratemask_%s', dlabel))
+                  f = sprintf('ratemask_%s', dlabel);
+              end
+              if ~isempty(f) && isfield(rat.ratemask, f)
                   rm = rat.ratemask.(f);
                   keepCells = (rm == 1);
               end
@@ -370,13 +407,15 @@ for ii = 1:numel(ratNames)
         end
     end
 
-    % Save
-    R(ii).C = Cagg;
-    R(ii).animal = ratVar;
-    R(ii).meta.options = opt;
-    R(ii).meta.days = daysToUse;
-    R(ii).meta.ctrl_reliability = ctrl0.reliability;
-    R(ii).meta.grid = ctrl0.grid;
+    % Save contiguously so skipped animals do not leave empty entries in R.
+    outIdx = numel(R) + 1;
+    R(outIdx).C = Cagg;
+    R(outIdx).animal = ratVar;
+    R(outIdx).meta.options = opt;
+    R(outIdx).meta.days = daysToUse;
+    R(outIdx).meta.sourceFields = sourceFields;
+    R(outIdx).meta.ctrl_reliability = ctrl0.reliability;
+    R(outIdx).meta.grid = ctrl0.grid;
 end
 
 % ================================ PLOTS ==================================
@@ -596,7 +635,8 @@ for d = 1:D
     B = o.TimeBins;
 
     % ===== BIN-LEVEL TASK similarity =====
-    r_bin_accum = nan(K, B);
+    r_bin_sum = zeros(K, B);
+    r_bin_count = zeros(K, B);
 
     for tr = 1:numel(csd)
         t0 = csd(tr) + o.TraceWin(1);
@@ -630,11 +670,18 @@ for d = 1:D
                 if nnz(hit) >= o.MinTraceFrames && all(isfinite(PV_templ(:,k)))
                     pv_task = mean(S(:, seg(hit)), 2, 'omitnan');
                     r = safe_corr(double(PV_templ(:,k)), double(pv_task));
-                    r_bin_accum(k, bti) = nanmean([r_bin_accum(k, bti), r]);
+                    if isfinite(r)
+                        r_bin_sum(k,bti) = r_bin_sum(k,bti) + r;
+                        r_bin_count(k,bti) = r_bin_count(k,bti) + 1;
+                    end
                 end
             end
         end
     end
+
+    r_bin_accum = nan(K,B);
+    hasTrials = r_bin_count > 0;
+    r_bin_accum(hasTrials) = r_bin_sum(hasTrials) ./ r_bin_count(hasTrials);
 
     r_valid = r_bin_accum(isfinite(r_bin_accum));
     if isempty(r_valid)
@@ -905,6 +952,7 @@ for d = 1:D
     B = o.TimeBins;
 
     TASK_kb = cell(K,B);
+    TASK_count = zeros(K,B);
 
     for tr = 1:numel(csd)
         t0 = csd(tr) + o.TraceWin(1);
@@ -937,9 +985,18 @@ for d = 1:D
                     if isempty(TASK_kb{k,bti})
                         TASK_kb{k,bti} = vec;
                     else
-                        TASK_kb{k,bti} = nanmean([TASK_kb{k,bti}, vec], 2);
+                        TASK_kb{k,bti} = TASK_kb{k,bti} + vec;
                     end
+                    TASK_count(k,bti) = TASK_count(k,bti) + 1;
                 end
+            end
+        end
+    end
+
+    for k = 1:K
+        for bti = 1:B
+            if TASK_count(k,bti) > 0
+                TASK_kb{k,bti} = TASK_kb{k,bti} ./ TASK_count(k,bti);
             end
         end
     end
@@ -1583,6 +1640,174 @@ end
 dateList = dateList(:);
 end
 
+function days = extinctionDateList_fallback(rat, nDays)
+% Extinction CS fields occur with both the corrected spelling and the
+% historical "exinction" typo. Dates may use underscores or hyphens.
+days = {};
+if ~isfield(rat, 'CS_times') || ~isstruct(rat.CS_times) || isempty(rat.CS_times)
+    return
+end
+
+fields = fieldnames(rat.CS_times);
+isExtinction = ~cellfun('isempty', ...
+    regexpi(fields, '^CS_(exinction|extinction)_'));
+dateTokens = cellfun(@extractDateToken_fallback, fields(isExtinction), ...
+    'UniformOutput', false);
+dateTokens = dateTokens(~cellfun('isempty', dateTokens));
+if isempty(dateTokens)
+    return
+end
+
+days = unique(dateTokens, 'stable');
+dayNums = datenum(strrep(days, '_', '-'), 'yyyy-mm-dd');
+[~, order] = sort(dayNums);
+days = days(order);
+days = days(max(1, numel(days)-nDays+1):end);
+end
+
+function token = extractDateToken_fallback(fieldName)
+token = regexp(fieldName, '\d{4}[_-]\d{2}[_-]\d{2}', 'match', 'once');
+if ~isempty(token)
+    token = strrep(token, '-', '_');
+end
+end
+
+function [spikes, ts, pos, cs, selected] = select_extinction_day_fields(rat, days)
+% Resolve every extinction input explicitly. In particular, never allow a
+% same-date regular CS_DATE field to stand in for CS_extinction_DATE.
+requiredContainers = {'Ca_peaks','Ca_ts','pos','CS_times'};
+for i = 1:numel(requiredContainers)
+    name = requiredContainers{i};
+    if ~isfield(rat, name) || ~isstruct(rat.(name))
+        error('rat.%s is missing or is not a struct.', name);
+    end
+end
+
+spikes = cell(1,numel(days));
+ts = cell(1,numel(days));
+pos = cell(1,numel(days));
+cs = cell(1,numel(days));
+selected = struct('Ca_peaks',{{}}, 'Ca_ts',{{}}, 'pos',{{}}, ...
+    'CS_times',{{}}, 'ratemask',{{}});
+for d = 1:numel(days)
+    day = days{d};
+    spikeField = resolve_preferred_date_field(rat.Ca_peaks, day, ...
+        {'CA_peaks_exinction_','CA_peaks_extinction_', ...
+         'Ca_peaks_exinction_','Ca_peaks_extinction_'}, ...
+        {'CA_peaks_','Ca_peaks_'});
+    tsField = resolve_preferred_date_field(rat.Ca_ts, day, ...
+        {'CA_time_exinction_','CA_time_extinction_', ...
+         'Ca_time_exinction_','Ca_time_extinction_', ...
+         'CA_ts_exinction_','CA_ts_extinction_', ...
+         'Ca_ts_exinction_','Ca_ts_extinction_'}, ...
+        {'CA_time_','Ca_time_','CA_ts_','Ca_ts_'});
+    posField = resolve_preferred_date_field(rat.pos, day, ...
+        {'pos_exinction_','pos_extinction_','Pos_exinction_','Pos_extinction_'}, ...
+        {'pos_','Pos_'});
+    csField = resolve_date_field(rat.CS_times, day, ...
+        {'CS_exinction_','CS_extinction_'});
+
+    % Ordered cells avoid illegal bare-date struct keys such as 2023_06_02.
+    spikes{d} = rat.Ca_peaks.(spikeField);
+    ts{d} = rat.Ca_ts.(tsField);
+    pos{d} = rat.pos.(posField);
+    cs{d} = rat.CS_times.(csField);
+
+    selected.Ca_peaks{d} = spikeField;
+    selected.Ca_ts{d} = tsField;
+    selected.pos{d} = posField;
+    selected.CS_times{d} = csField;
+    selected.ratemask{d} = '';
+    if isfield(rat,'ratemask') && isstruct(rat.ratemask)
+        selected.ratemask{d} = resolve_optional_preferred_date_field( ...
+            rat.ratemask, day, ...
+            {'ratemask_exinction_','ratemask_extinction_'}, {'ratemask_'});
+    end
+end
+end
+
+function fieldName = resolve_date_field(S, day, allowedPrefixes)
+fields = fieldnames(S);
+fieldDates = cellfun(@extractDateToken_fallback, fields, 'UniformOutput', false);
+sameDate = strcmp(fieldDates, day);
+allowed = false(size(fields));
+for pfx = 1:numel(allowedPrefixes)
+    allowed = allowed | startsWith(fields, allowedPrefixes{pfx}, 'IgnoreCase', false);
+end
+matches = fields(sameDate & allowed);
+if isempty(matches)
+    error('No %s field found for %s. Available same-date fields: %s.', ...
+        strjoin(allowedPrefixes, '/'), day, join_or_none(fields(sameDate)));
+elseif numel(matches) > 1
+    error('Ambiguous fields for %s: %s.', day, strjoin(matches, ', '));
+end
+fieldName = matches{1};
+end
+
+function fieldName = resolve_preferred_date_field(S, day, preferredPrefixes, fallbackPrefixes)
+% Use an extinction-specific field whenever present. Only fall back to the
+% ordinary same-date field for animals whose extinction data use that layout.
+fields = fieldnames(S);
+fieldDates = cellfun(@extractDateToken_fallback, fields, 'UniformOutput', false);
+sameDate = strcmp(fieldDates, day);
+
+preferred = fields(sameDate & starts_with_any(fields, preferredPrefixes));
+if numel(preferred) == 1
+    fieldName = preferred{1};
+    return
+elseif numel(preferred) > 1
+    error('Ambiguous extinction-specific fields for %s: %s.', ...
+        day, strjoin(preferred, ', '));
+end
+
+fallback = fields(sameDate & starts_with_any(fields, fallbackPrefixes));
+if isempty(fallback)
+    error('No extinction-specific or fallback field found for %s.', day);
+elseif numel(fallback) > 1
+    error('Ambiguous fallback fields for %s: %s.', day, strjoin(fallback, ', '));
+end
+fieldName = fallback{1};
+end
+
+function fieldName = resolve_optional_preferred_date_field(S, day, preferredPrefixes, fallbackPrefixes)
+fieldName = '';
+fields = fieldnames(S);
+fieldDates = cellfun(@extractDateToken_fallback, fields, 'UniformOutput', false);
+sameDate = strcmp(fieldDates, day);
+if ~any(sameDate)
+    return
+end
+fieldName = resolve_preferred_date_field(S, day, preferredPrefixes, fallbackPrefixes);
+end
+
+function mask = starts_with_any(fields, prefixes)
+mask = false(size(fields));
+for pfx = 1:numel(prefixes)
+    mask = mask | startsWith(fields, prefixes{pfx}, 'IgnoreCase', false);
+end
+end
+
+function s = join_or_none(values)
+if isempty(values)
+    s = '<none>';
+else
+    s = strjoin(values, ', ');
+end
+end
+
+function print_extinction_field_map(ratVar, days, selected)
+for d = 1:numel(days)
+    maskField = '<none>';
+    if isfield(selected,'ratemask') && numel(selected.ratemask) >= d && ...
+            ~isempty(selected.ratemask{d})
+        maskField = selected.ratemask{d};
+    end
+    fprintf('[%s][%s] fields: peaks=%s | ts=%s | pos=%s | CS=%s | ratemask=%s\n', ...
+        ratVar, days{d}, selected.Ca_peaks{d}, selected.Ca_ts{d}, ...
+        selected.pos{d}, selected.CS_times{d}, maskField);
+end
+end
+
 function S = filterFieldsByDay_fallback(Sin, daysToUse)
 % Prefer your existing helper if present.
 if exist('filterFieldsByDay','file') == 2
@@ -1682,6 +1907,8 @@ text(1.5, y + 0.02*range(yl), txt1, 'HorizontalAlignment','center');
 ylim([yl(1) y + 0.10*range(yl)]);
 
 fprintf('\n== %s ==\n', titleStr);
+fprintf('Grand means (bars; Fisher-z averaged): WITH r=%.3f | WITHOUT r=%.3f\n', ...
+    tanh(mean(Zw_rats,'omitnan')), tanh(mean(Za_rats,'omitnan')));
 fprintf('Primary (per-rat):  paired t in z: t(%d)=%.2f, p=%.3g, dz=%.2f, nRats=%d\n', dfA, tA, pA, dzA, numel(Zw_rats));
 fprintf('Secondary (per-day): paired t in z: t(%d)=%.2f, p=%.3g, dz=%.2f, nDays=%d\n', dfD, tD, pD, dzD, numel(Zw_days));
 end
@@ -1709,6 +1936,13 @@ for i = 1:numel(R)
     z_without = z_without(1:nD);
 
     m = isfinite(z_with) & isfinite(z_without);
+    % ExtinctionDays=N requires all N selected days to contribute. Otherwise
+    % an earlier valid day could rescue a rat whose final day was invalid.
+    if isfield(R(i),'meta') && isfield(R(i).meta,'options') && ...
+            ~isempty(R(i).meta.options.ExtinctionDays) && ...
+            nnz(m) < R(i).meta.options.ExtinctionDays
+        continue
+    end
     Zw  = [Zw;  z_with(m)];
     Za  = [Za;  z_without(m)];
     aid = [aid; i*ones(nnz(m),1)];
@@ -1975,6 +2209,8 @@ text(1.5, y - 0.02*range(yl), txtP, 'HorizontalAlignment','center');
 ylim([yl(1) y + 0.12*range(yl)]);
 
 fprintf('\n== %s ==\n', titleStr);
+fprintf('Grand means (bars; Fisher-z averaged): WITH r=%.3f | WITHOUT r=%.3f\n', ...
+    tanh(mean(Zw_rats,'omitnan')), tanh(mean(Za_rats,'omitnan')));
 fprintf('Primary (per-rat): paired t in z: t(%d)=%.2f, p=%.3g, dz=%.2f, nRats=%d\n', dfA, tA, pA, dzA, numel(Zw_rats));
 fprintf('Secondary (per-day): paired t in z: t(%d)=%.2f, p=%.3g, dz=%.2f, nDays=%d\n', dfD, tD, pD, dzD, numel(Zw_days));
 fprintf('Perm (day-flip within rat): obs Δz=%.3f (r≈%.3f), p_two=%.3g (NPerm=%d)\n', perm.obs_z, tanh(perm.obs_z), perm.p_two, numel(perm.perm_z));
@@ -1996,6 +2232,11 @@ for i = 1:numel(R)
     z_without = z_without(1:nD);
 
     m = isfinite(z_with) & isfinite(z_without);
+    if isfield(R(i),'meta') && isfield(R(i).meta,'options') && ...
+            ~isempty(R(i).meta.options.ExtinctionDays) && ...
+            nnz(m) < R(i).meta.options.ExtinctionDays
+        continue
+    end
     Zw  = [Zw; z_with(m)]; %#ok<AGROW>
     Za  = [Za; z_without(m)]; %#ok<AGROW>
     aid = [aid; i*ones(nnz(m),1)]; %#ok<AGROW>

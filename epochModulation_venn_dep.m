@@ -1,4 +1,4 @@
-function R = epochModulation_venn_(ratNames, varargin)
+function R = epochModulation_venn_dep(ratNames, varargin)
 % epochModulation_venn
 % Detect per-cell firing-rate modulation in CS / Trace / US / Post epochs
 % vs FULL non-trial time, visualize overlaps (UpSet or Venn), and save
@@ -15,6 +15,7 @@ function R = epochModulation_venn_(ratNames, varargin)
 % ---------------- parameters ----------------
 p = inputParser;
 p.addParameter('Alpha',0.05);
+p.addParameter('BonferroniCorrection',true,@islogical);
 p.addParameter('RestrictSpeed',false);
 p.addParameter('SpeedMin',0.0);
 p.addParameter('SpeedMax',4);
@@ -136,44 +137,22 @@ for r = 1:nR
                     dirsgn(c,e) = int8(sign(double(obsK) - lambda));
                 end
             end
-
-            % After filling pvals (nCells x nEp)
-            alpha = opt.Alpha;
-            sigs = false(size(pvals));  % corrected significance calls
-
-            for c = 1:nCells
-                pv = pvals(c,:);
-                ok = isfinite(pv);
-                if nnz(ok) < 1, continue; end
-
-                % Holm-Bonferroni across the epochs for this cell
-                [pSort, ord] = sort(pv(ok), 'ascend');
-                m = numel(pSort);
-
-                pass = false(1,m);
-                for k = 1:m
-                    if pSort(k) <= alpha / (m - k + 1)
-                        pass(k) = true;
-                    else
-                        break; % Holm: once you fail, all larger p fail
-                    end
-                end
-
-                % Map back to epoch indices
-                idxOk = find(ok);
-                sigIdxLocal = ord(pass);
-                sigEpochs = idxOk(sigIdxLocal);
-                sigs(c, sigEpochs) = true;
-            end
         end
 
-        %sigs = pvals <= opt.Alpha;
+        if opt.BonferroniCorrection
+            sigs = holmBonferroniSigs(pvals, opt.Alpha);
+        else
+            sigs = pvals <= opt.Alpha & isfinite(pvals);
+        end
+        dirsgn(~sigs) = int8(0);
+
         % Fraction of kept cells significant in ANY epoch
         anyEpoch = any(sigs(keep,:), 2);
         fracAny  = mean(anyEpoch);
 
         if opt.Verbose
-            fprintf('  Any-epoch modulated (this session): %.2f%%\n', 100*fracAny);
+            fprintf('  Any-epoch modulated (this session, %s): %.2f%%\n', ...
+                correctionLabel(opt.BonferroniCorrection), 100*fracAny);
         end
 
         ALL_sets   = [ALL_sets;   sigs(keep,:)];          %#ok<AGROW>
@@ -197,8 +176,7 @@ for r = 1:nR
         epochVec = nan(nCells,1);
         for c = 1:nCells
             if ~keep(c), continue; end
-            pv = pvals(c,:);
-            sigMask = pv <= opt.Alpha & isfinite(pv);
+            sigMask = sigs(c,:);
 
             if ~any(sigMask)
                 epochVec(c) = 0;
@@ -215,6 +193,14 @@ for r = 1:nR
         end
         fld = sprintf('epoch_%s', dayStr);
         rat.epoch.(fld) = epochVec;
+
+        if ~isfield(rat,'traceneurons') || ~isstruct(rat.traceneurons)
+            rat.traceneurons = struct();
+        end
+        tnVec = nan(nCells,1);
+        tnVec(keep) = double(sigs(keep,2));
+        tnFld = sprintf('tn_%s', dayStr);
+        rat.traceneurons.(tnFld) = tnVec;
 
         assignin('base', ratNames{r}, rat);
     end
@@ -471,6 +457,38 @@ end
 % =====================================================================
 function y = ternary(cond,a,b)
 if cond, y = a; else, y = b; end
+end
+
+function txt = correctionLabel(useBonferroni)
+if useBonferroni
+    txt = 'Holm-Bonferroni corrected';
+else
+    txt = 'uncorrected';
+end
+end
+
+function sigs = holmBonferroniSigs(pvals, alpha)
+sigs = false(size(pvals));
+for c = 1:size(pvals,1)
+    pv = pvals(c,:);
+    ok = isfinite(pv);
+    if ~any(ok), continue; end
+
+    [pSort, ord] = sort(pv(ok), 'ascend');
+    m = numel(pSort);
+    pass = false(1,m);
+
+    for k = 1:m
+        if pSort(k) <= alpha / (m - k + 1)
+            pass(k) = true;
+        else
+            break; % Holm: once one sorted p-value fails, larger p-values fail too.
+        end
+    end
+
+    idxOk = find(ok);
+    sigs(c, idxOk(ord(pass))) = true;
+end
 end
 
 function [mask, labs] = selectEpochSubset(allLabels, wanted)

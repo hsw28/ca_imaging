@@ -124,7 +124,7 @@ for i = 1:numel(fields_spikes)
         dt_samp = NaN;
     end
     if isnan(dt_samp) || dt_samp <= 0
-        dt_samp = 1/15;
+        dt_samp = 1/7.5;
     end
     maxAssignDist = dt_samp / 2;
 

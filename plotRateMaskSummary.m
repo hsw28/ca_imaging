@@ -1,4 +1,4 @@
-function plotRateMaskSummary(N, normalized, MICutoff)
+function plotRateMaskSummary(N, normalized, MICutoff, comparisonMode, traceWin)
 % Summary plot using rate masks defined as N std above mean
 % For An-2, An-1, and An across all rats
 % If you want data normalized by mean rate, pass normalized==1
@@ -6,10 +6,42 @@ function plotRateMaskSummary(N, normalized, MICutoff)
 % Optional:
 %   MICutoff – [] (off) or scalar in [0,1]. When provided, ONLY INCLUDE cells
 %               whose MI_noCSUS15_shuff.MI_<date>(:,3) >= MICutoff.
+%   comparisonMode – 'task' (default) compares the full [CS, CS+2] task
+%               period with non-task. 'trace-only' compares only the trace
+%               period, and 'cs-only' compares CS+[0 0.25] s with non-task.
+%               All modes exclude [CS, CS+2] from non-task. Logical
+%               false/true remain supported as aliases for task/trace-only.
+%   traceWin  – trace-period offsets from CS (default [0.25 0.75] s).
+%
+% Examples:
+%   plotRateMaskSummary(1)
+%   plotRateMaskSummary(1, 0, [], 'trace-only')
+%   plotRateMaskSummary(1, 0, [], 'cs-only')
+%   plotRateMaskSummary(1, 0, [], 'trace-only', [0.25 0.75])
 
 if nargin < 1 || isempty(N), N = 1; end
 if nargin < 2 || isempty(normalized), normalized = 0; end
 if nargin < 3, MICutoff = []; end
+if nargin < 4 || isempty(comparisonMode), comparisonMode = 'task'; end
+if nargin < 5 || isempty(traceWin), traceWin = [0.25 0.75]; end
+
+if ischar(comparisonMode) || (isstring(comparisonMode) && isscalar(comparisonMode))
+    comparisonMode = validatestring(comparisonMode, {'task','trace-only','cs-only'}, ...
+        mfilename, 'comparisonMode');
+else
+    validateattributes(comparisonMode, {'logical','numeric'}, {'scalar'}, ...
+        mfilename, 'comparisonMode');
+    if logical(comparisonMode)
+        comparisonMode = 'trace-only';
+    else
+        comparisonMode = 'task';
+    end
+end
+validateattributes(traceWin, {'numeric'}, {'vector','numel',2,'finite'}, mfilename, 'traceWin');
+if traceWin(2) <= traceWin(1)
+    error('plotRateMaskSummary:InvalidTraceWin', ...
+        'traceWin must be [start end] with end greater than start.');
+end
 
 ratNames = {'rat0222', 'rat0307', 'rat0313', 'rat0314', 'rat0816'};
 nRats = numel(ratNames);
@@ -89,7 +121,8 @@ for r = 1:nRats
             spikes = spikes(~isnan(spikes));
             if isempty(spikes), continue; end
 
-            [rt1, rt2, rp1, rp2] = RateMaskVsTask_summary(rat, ni, dateStr, N);
+            [rt1, rt2, rp1, rp2] = RateMaskVsTask_summary( ...
+                rat, ni, dateStr, N, comparisonMode, traceWin);
             if any(isnan([rt1, rt2, rp1, rp2])), continue; end
 
             rt1_all(end+1) = rt1 ./ meanrate(ni); %#ok<*AGROW>
@@ -122,6 +155,17 @@ for r = 1:nRats
 end
 
 figure
+switch comparisonMode
+    case 'trace-only'
+        comparisonLabel = 'Trace';
+        comparisonLabelLower = 'trace';
+    case 'cs-only'
+        comparisonLabel = 'CS';
+        comparisonLabelLower = 'CS';
+    otherwise
+        comparisonLabel = 'Task';
+        comparisonLabelLower = 'task';
+end
 % --- Plot Task-based mask ---
 subplot(1,2,1); cla; hold on;
 barData = [rate_task_mask, rate_nontask_mask];
@@ -132,8 +176,9 @@ errorbar(x1, barData(:,1), sem_task_mask,        'k', 'LineStyle','none');
 errorbar(x2, barData(:,2), sem_nontask_mask,     'k', 'LineStyle','none');
 xticks(1:nRats); xticklabels(ratNames);
 ylabel('Firing Rate (Hz)');
-title('Task vs Non-task in task-defined mask');
-legend({'In Mask','Out of Mask'}, 'Location', 'northwest');
+title(sprintf('%s vs Non-task in %s-defined mask', ...
+    comparisonLabel, comparisonLabelLower));
+legend({comparisonLabel,'Non-task'}, 'Location', 'northwest');
 set(gca,'Box','off');
 bh(1).FaceColor = [0.2 0.4 0.8];
 bh(2).FaceColor = [0.7 0.7 0.7];
@@ -154,8 +199,8 @@ errorbar(x1, barData2(:,1), sem_task_mask_non,       'k', 'LineStyle','none');
 errorbar(x2, barData2(:,2), sem_nontask_mask_non,    'k', 'LineStyle','none');
 xticks(1:nRats); xticklabels(ratNames);
 ylabel('Firing Rate (Hz)');
-title('Task vs Non-task in non-task-defined mask');
-legend({'Task','Non-task'}, 'Location', 'northwest');
+title(sprintf('%s vs Non-task in non-task-defined mask', comparisonLabel));
+legend({comparisonLabel,'Non-task'}, 'Location', 'northwest');
 set(gca,'Box','off');
 bh2(1).FaceColor = [0.2 0.4 0.8];
 bh2(2).FaceColor = [0.7 0.7 0.7];
@@ -174,8 +219,9 @@ figure
 
 % --- Task mask scatter ---
 subplot(1,2,1); hold on; axis square
-title('Per-cell: Task mask');
-xlabel('In-trial rate (task mask)'); ylabel('Out-of-trial rate (task mask)');
+title(sprintf('Per-cell: %s mask', comparisonLabel));
+xlabel(sprintf('%s-period rate (%s mask)', comparisonLabel, comparisonLabelLower));
+ylabel(sprintf('Non-task rate (%s mask)', comparisonLabelLower));
 
 x = rt1_all(:); y = rt2_all(:);
 good = isfinite(x) & isfinite(y);
@@ -203,7 +249,8 @@ end
 % --- Spatial mask scatter ---
 subplot(1,2,2); hold on; axis square
 title('Per-cell: Spatial mask');
-xlabel('In-trial rate (spatial mask)'); ylabel('Out-of-trial rate (spatial mask)');
+xlabel(sprintf('%s-period rate (spatial mask)', comparisonLabel));
+ylabel('Non-task rate (spatial mask)');
 
 x = rp1_all(:); y = rp2_all(:);
 good = isfinite(x) & isfinite(y);
@@ -252,7 +299,8 @@ end
 
 
 
-function [rate1, rate2, rate3, rate4] = RateMaskVsTask_summary(animal, neuronIdx, dateStr, N)
+function [rate1, rate2, rate3, rate4] = RateMaskVsTask_summary( ...
+    animal, neuronIdx, dateStr, N, comparisonMode, traceWin)
 % RateMaskVsTask_summary
 %   Returns four proportions for one neuron on one day:
 %     rate1: fraction of TASK spikes that land in TASK-defined mask
@@ -261,7 +309,7 @@ function [rate1, rate2, rate3, rate4] = RateMaskVsTask_summary(animal, neuronIdx
 %     rate4: fraction of NON-TASK (running>=4) spikes that land in NON-TASK-defined mask
 %
 % Notes
-%   - Task window is [CS, CS+2] s (no speed filter).
+%   - comparisonMode selects [CS, CS+2], traceWin, or CS+[0 0.25] s.
 %   - Non-task map/Spikes use only running samples/spikes (speed >= 4 cm/s)
 %     and exclude all CS→CS+2 s windows.
 
@@ -279,11 +327,22 @@ if isempty(spikes), return, end
 ts     = pos(:,1);
 pos_xy = pos(:,2:3);
 
+taskWin = [0 2];
+switch comparisonMode
+    case 'trace-only'
+        comparisonWin = traceWin;
+    case 'cs-only'
+        comparisonWin = [0 0.25];
+    otherwise
+        comparisonWin = taskWin;
+end
+
 % --- Build trial mask on the position timebase
 taskMask = false(size(ts));
 for k = 1:numel(csTimes)
     t0 = csTimes(k);
-    taskMask = taskMask | (ts >= t0 & ts < t0 + 2);
+    taskMask = taskMask | ...
+        (ts >= t0 + comparisonWin(1) & ts < t0 + comparisonWin(2));
 end
 taskTimes = ts(taskMask);
 taskPos   = pos(taskMask, :);     % used to build the task map
@@ -293,10 +352,20 @@ taskPos   = pos(taskMask, :);     % used to build the task map
 isInTask_spk = false(size(spikes));
 for k = 1:numel(csTimes)
     t0 = csTimes(k);
-    isInTask_spk = isInTask_spk | (spikes >= t0 & spikes < t0 + 2);
+    isInTask_spk = isInTask_spk | ...
+        (spikes >= t0 + comparisonWin(1) & spikes < t0 + comparisonWin(2));
 end
 taskSpikes    = spikes(isInTask_spk);
-nonTaskSpikes = spikes(~isInTask_spk);
+
+% Non-task excludes the entire task window, including the portions outside
+% comparison window when a partial-trial mode is enabled.
+isInFullTask_spk = false(size(spikes));
+for k = 1:numel(csTimes)
+    t0 = csTimes(k);
+    isInFullTask_spk = isInFullTask_spk | ...
+        (spikes >= t0 + taskWin(1) & spikes < t0 + taskWin(2));
+end
+nonTaskSpikes = spikes(~isInFullTask_spk);
 
 % If either group is empty we can't compute any of the four rates
 if isempty(taskSpikes) || isempty(nonTaskSpikes), return, end
@@ -314,7 +383,8 @@ interp_y = interp1(ts, pos_xy(:,2), vel_time, 'linear', NaN);
 inTrial_vel = false(size(vel_time));
 for k = 1:numel(csTimes)
     t0 = csTimes(k);
-    inTrial_vel = inTrial_vel | (vel_time >= t0 & vel_time < t0 + 2);
+    inTrial_vel = inTrial_vel | ...
+        (vel_time >= t0 + taskWin(1) & vel_time < t0 + taskWin(2));
 end
 
 % keep only running & non-trial velocity samples with valid position
@@ -327,7 +397,6 @@ spike_vel = interp1(vel_time, vel_mag, nonTaskSpikes, 'linear', 'extrap');
 nonTaskSpikes = nonTaskSpikes(spike_vel >= 4);
 if isempty(nonTaskSpikes), return, end
 
-N=1;
 % ---------- Build rate maps and masks ----------
 % Task map (no speed filter; uses only taskPos)
 rate_task = CA_normalizePosData(taskSpikes(:), taskPos, 2.5, 1);

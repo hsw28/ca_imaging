@@ -10,9 +10,11 @@ end
 function ATTS = run_space_to_task_interference_PV_splitHalf_fast(ratNames, varargin)
 
 p = inputParser;
+addParameter(p,'ExtinctionDays',[], @(x) isempty(x) || ...
+    (isnumeric(x) && isscalar(x) && isfinite(x) && x >= 1 && x == fix(x)));
 addParameter(p,'TraceWin',[0 2]);
 addParameter(p,'TimeBins',15);
-addParameter(p,'GridN',[2 2]);
+addParameter(p,'GridN',[6 6]);
 addParameter(p,'UseSpeedMask',false);
 addParameter(p,'VelThresh',4);
 addParameter(p,'CellNorm','demean');
@@ -43,14 +45,11 @@ for ri = 1:nR
     RAT   = evalin('base', rname);
     ATTS.rats(ri).name = rname;
 
-    dates = autoDateList(RAT);
-    idx = find(strcmp(dates, RAT.An), 1);
-    if isempty(idx), dayIdx = max(1,numel(dates)-2):numel(dates);
-    else, dayIdx = max(1,idx-2):idx;
-    end
-    days = dates(dayIdx);
+    days = select_space_task_days(RAT, o.ExtinctionDays, rname);
+    if isempty(days), continue; end
 
     ATTS.rats(ri).days = repmat(struct('label','', ...
+        'sourceFields',struct(), ...
         'obs',struct('metricZ',nan(3,1)), ...
         'perm',struct('deltaZ',[])), numel(days),1);
 
@@ -58,15 +57,13 @@ for ri = 1:nR
         dlabel = days{di}
         ATTS.rats(ri).days(di).label = dlabel;
 
-        spk  = RAT.Ca_peaks.(sprintf('CA_peaks_%s',dlabel));
-        posM = (RAT.pos.(sprintf('pos_%s',dlabel)));
-
-        cs   = coerce_cs(RAT.CS_times.(sprintf('CS_%s',dlabel)));
-
-        if isfield(RAT,'ratemask')
-            rm = RAT.ratemask.(sprintf('ratemask_%s',dlabel));
-            spk = spk(rm==1,:);
+        [spk,posM,cs,rm,sourceFields] = get_space_task_day_data( ...
+            RAT, dlabel, ~isempty(o.ExtinctionDays));
+        ATTS.rats(ri).days(di).sourceFields = sourceFields;
+        if ~isempty(o.ExtinctionDays)
+            print_space_task_field_map(rname,dlabel,sourceFields);
         end
+        if ~isempty(rm), spk = spk(rm==1,:); end
 
         [ts,x,y] = coerce_pos(posM);
         if isempty(cs) || size(spk,1)<2, continue; end
@@ -129,6 +126,8 @@ end
 function ATTSsc = run_space_to_task_interference_SC_splitHalf_fast(ratNames, varargin)
 
 p = inputParser;
+addParameter(p,'ExtinctionDays',[], @(x) isempty(x) || ...
+    (isnumeric(x) && isscalar(x) && isfinite(x) && x >= 1 && x == fix(x)));
 addParameter(p,'TraceWin',[0 2]);
 addParameter(p,'TimeBins',15);
 addParameter(p,'GridN',[2 2]);
@@ -158,14 +157,11 @@ for ri=1:numel(ratNames)
     RAT=evalin('base',rname);
     ATTSsc.rats(ri).name=rname;
 
-    dates=autoDateList(RAT);
-    idx=find(strcmp(dates,RAT.An),1);
-    if isempty(idx), dayIdx=max(1,numel(dates)-2):numel(dates);
-    else, dayIdx=max(1,idx-2):idx;
-    end
-    days=dates(dayIdx);
+    days=select_space_task_days(RAT,o.ExtinctionDays,rname);
+    if isempty(days), continue; end
 
     ATTSsc.rats(ri).days=repmat(struct('label','', ...
+        'sourceFields',struct(), ...
         'obs',struct('metricZ',nan(3,1)), ...
         'perm',struct('deltaZ',[])), numel(days),1);
 
@@ -173,16 +169,13 @@ for ri=1:numel(ratNames)
         dlabel=days{di}
         ATTSsc.rats(ri).days(di).label=dlabel;
 
-        spk=RAT.Ca_peaks.(sprintf('CA_peaks_%s',dlabel));
-        %posM=smoothpos(RAT.pos.(sprintf('pos_%s',dlabel)));
-        posM=(RAT.pos.(sprintf('pos_%s',dlabel)));
-
-        cs=coerce_cs(RAT.CS_times.(sprintf('CS_%s',dlabel)));
-
-        if isfield(RAT,'ratemask')
-            rm=RAT.ratemask.(sprintf('ratemask_%s',dlabel));
-            spk=spk(rm==1,:);
+        [spk,posM,cs,rm,sourceFields]=get_space_task_day_data( ...
+            RAT,dlabel,~isempty(o.ExtinctionDays));
+        ATTSsc.rats(ri).days(di).sourceFields=sourceFields;
+        if ~isempty(o.ExtinctionDays)
+            print_space_task_field_map(rname,dlabel,sourceFields);
         end
+        if ~isempty(rm), spk=spk(rm==1,:); end
 
         [ts,x,y]=coerce_pos(posM);
         if isempty(cs)||size(spk,1)<2, continue; end
@@ -232,6 +225,93 @@ plot_spaceTask_splitHalf_permHist_perRat(ATTSsc,'SC');
 
 end
 
+function days = select_space_task_days(RAT,nExtinctionDays,rname)
+if isempty(nExtinctionDays)
+    dates=autoDateList(RAT); idx=find(strcmp(dates,RAT.An),1);
+    if isempty(idx), dayIdx=max(1,numel(dates)-2):numel(dates); else, dayIdx=max(1,idx-2):idx; end
+    days=dates(dayIdx); return
+end
+days={};
+if ~isfield(RAT,'CS_times') || ~isstruct(RAT.CS_times), return; end
+fields=fieldnames(RAT.CS_times);
+isExt=~cellfun('isempty',regexpi(fields,'^CS_(exinction|extinction)_'));
+tokens=cellfun(@space_task_date_token,fields(isExt),'UniformOutput',false);
+tokens=tokens(~cellfun('isempty',tokens));
+if ~isempty(tokens)
+    days=unique(tokens,'stable'); nums=datenum(strrep(days,'_','-'),'yyyy-mm-dd');
+    [~,ord]=sort(nums); days=days(ord);
+end
+if numel(days)<nExtinctionDays
+    warning('%s has fewer than %d extinction sessions. Skipping.',rname,nExtinctionDays); days={};
+else
+    days=days(end-nExtinctionDays+1:end);
+end
+end
+
+function [spk,posM,cs,rm,src] = get_space_task_day_data(RAT,day,isExtinction)
+if isExtinction
+    spkField=space_task_preferred_field(RAT.Ca_peaks,day, ...
+        {'CA_peaks_exinction_','CA_peaks_extinction_','Ca_peaks_exinction_','Ca_peaks_extinction_'}, ...
+        {'CA_peaks_','Ca_peaks_'});
+    posField=space_task_preferred_field(RAT.pos,day, ...
+        {'pos_exinction_','pos_extinction_','Pos_exinction_','Pos_extinction_'},{'pos_','Pos_'});
+    csField=space_task_required_field(RAT.CS_times,day,{'CS_exinction_','CS_extinction_'});
+else
+    spkField=space_task_required_field(RAT.Ca_peaks,day,{'CA_peaks_','Ca_peaks_'});
+    posField=space_task_required_field(RAT.pos,day,{'pos_','Pos_'});
+    csField=space_task_required_field(RAT.CS_times,day,{'CS_'});
+end
+spk=RAT.Ca_peaks.(spkField); posM=RAT.pos.(posField); cs=coerce_cs(RAT.CS_times.(csField));
+rm=[]; maskField='';
+if isfield(RAT,'ratemask') && isstruct(RAT.ratemask)
+    if isExtinction
+        maskField=space_task_optional_preferred_field(RAT.ratemask,day, ...
+            {'ratemask_exinction_','ratemask_extinction_'},{'ratemask_'});
+    else
+        candidate=sprintf('ratemask_%s',day); if isfield(RAT.ratemask,candidate), maskField=candidate; end
+    end
+    if ~isempty(maskField), rm=RAT.ratemask.(maskField); end
+end
+src=struct('Ca_peaks',spkField,'pos',posField,'CS_times',csField,'ratemask',maskField);
+end
+
+function fieldName = space_task_preferred_field(S,day,preferredPrefixes,fallbackPrefixes)
+fields=fieldnames(S); dates=cellfun(@space_task_date_token,fields,'UniformOutput',false); same=strcmp(dates,day);
+matches=fields(same & space_task_starts_with_any(fields,preferredPrefixes));
+if numel(matches)==1, fieldName=matches{1}; return; end
+if numel(matches)>1, error('Ambiguous extinction fields for %s: %s',day,strjoin(matches,', ')); end
+fieldName=space_task_required_field(S,day,fallbackPrefixes);
+end
+
+function fieldName = space_task_required_field(S,day,prefixes)
+fields=fieldnames(S); dates=cellfun(@space_task_date_token,fields,'UniformOutput',false);
+matches=fields(strcmp(dates,day) & space_task_starts_with_any(fields,prefixes));
+if isempty(matches), error('No matching %s field for %s.',strjoin(prefixes,'/'),day); end
+if numel(matches)>1, error('Ambiguous fields for %s: %s',day,strjoin(matches,', ')); end
+fieldName=matches{1};
+end
+
+function fieldName = space_task_optional_preferred_field(S,day,preferredPrefixes,fallbackPrefixes)
+fields=fieldnames(S); dates=cellfun(@space_task_date_token,fields,'UniformOutput',false);
+if ~any(strcmp(dates,day)), fieldName=''; return; end
+fieldName=space_task_preferred_field(S,day,preferredPrefixes,fallbackPrefixes);
+end
+
+function mask = space_task_starts_with_any(fields,prefixes)
+mask=false(size(fields));
+for i=1:numel(prefixes), mask=mask|startsWith(fields,prefixes{i},'IgnoreCase',false); end
+end
+
+function token = space_task_date_token(fieldName)
+token=regexp(fieldName,'\d{4}[_-]\d{2}[_-]\d{2}','match','once');
+if ~isempty(token), token=strrep(token,'-','_'); end
+end
+
+function print_space_task_field_map(rname,day,src)
+mask=src.ratemask; if isempty(mask), mask='<none>'; end
+fprintf('[%s][%s] fields: peaks=%s | pos=%s | CS=%s | ratemask=%s\n', ...
+    rname,day,src.Ca_peaks,src.pos,src.CS_times,mask);
+end
 
 function [ts,x,y] = coerce_pos(pos)
 if istable(pos)

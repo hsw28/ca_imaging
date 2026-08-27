@@ -19,8 +19,11 @@ function change = plotProportionModulated(varargin)
 %                               shuffle: post vs pre around pseudo-CS
 %   'SaveMod': true/false (default false)
 %              If true, save per-rat/day p-values as:
-%                ratXXXX.mod.mod_YYYY_MM_DD (vector, len = nCells)
-%              Value = p-value per cell; NaN = not analyzed.
+%                ratXXXX.mod.mod_YYYY_MM_DD.p_two
+%                ratXXXX.mod.mod_YYYY_MM_DD.p_right
+%                ratXXXX.mod.mod_YYYY_MM_DD.p_left
+%                ratXXXX.mod.mod_YYYY_MM_DD.p_selected
+%              Each is a vector of length nCells; NaN = not analyzed.
 
 % ---------- options ----------
 p = inputParser;
@@ -30,7 +33,6 @@ addParameter(p,'Alpha',0.05,@(x) isnumeric(x)&&isscalar(x)&&x>0&&x<1);
 addParameter(p,'NPerm',100,@(x) isnumeric(x)&&isscalar(x)&&x>=1);
 addParameter(p,'Mode','allNonTrial',@(s) any(strcmpi(s,{'allNonTrial','preTrial'})));
 addParameter(p,'SaveMod',true,@(x) (islogical(x) || isnumeric(x)));
-%addParameter(p,'Tail','two-sided',@(s) any(strcmpi(s,{'two-sided','right','left'})));
 addParameter(p,'Tail','right',@(s) any(strcmpi(s,{'two-sided','right','left'})));
 
 
@@ -165,6 +167,9 @@ for panelIdx = 1:(nRats+1)
 
     % NEW: store p-values per cell in this panel (for SaveMod)
     pVals = nan(nCells,1);
+    pTwoVals = nan(nCells,1);
+    pRightVals = nan(nCells,1);
+    pLeftVals = nan(nCells,1);
 
     for i = 1:nCells
         st = cells(i).st;
@@ -368,6 +373,9 @@ hCell(i)   = (pVal < alpha);
 incCell(i) = (p_right < alpha);
 decCell(i) = (p_left  < alpha);
 pVals(i)   = pVal;
+pTwoVals(i) = p_two;
+pRightVals(i) = p_right;
+pLeftVals(i) = p_left;
     end
 
     % ---- per-rat roll-up for summaries ----
@@ -399,22 +407,29 @@ pVals(i)   = pVal;
           spkDay    = rat.Ca_peaks.(sprintf('CA_peaks_%s', dayStr));
           nCellsDay = size(spkDay,1);
 
-          % default NaN for all cells (not examined)
-          vec = nan(nCellsDay,1);
+          % Preserve every tail so downstream analyses can define all
+          % task-modulated cells while retaining direction.
+          modOut = struct();
+          modOut.p_two = nan(nCellsDay,1);
+          modOut.p_right = nan(nCellsDay,1);
+          modOut.p_left = nan(nCellsDay,1);
+          modOut.p_selected = nan(nCellsDay,1);
+          modOut.selected_tail = Tail;
+          modOut.alpha = alpha;
 
           % fill in p-values for examined cells
           inds = find(maskDay);
           for kIdx = 1:numel(inds)
               ii   = inds(kIdx);          % index into cells/pVals/meta
               cIdx = meta(ii).cellIdx;    % cell index in that day
-              pVal = pVals(ii);
-              if isfinite(pVal)
-                  vec(cIdx) = pVal;       % p-value per cell
-              end
+              modOut.p_two(cIdx) = pTwoVals(ii);
+              modOut.p_right(cIdx) = pRightVals(ii);
+              modOut.p_left(cIdx) = pLeftVals(ii);
+              modOut.p_selected(cIdx) = pVals(ii);
           end
 
           fld = sprintf('mod_%s', dayStr);
-          rat.mod.(fld) = vec;
+          rat.mod.(fld) = modOut;
       end
 
       assignin('base', ratNames{panelIdx}, rat);

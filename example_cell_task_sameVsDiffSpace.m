@@ -20,6 +20,9 @@ function OUT = example_cells_task_sameVsDiffSpace(ratVar, dayLabel, varargin)
 %   'MinTaskSpikes'  20        % MIN spikes for the cell across ALL task frames (filter)
 %   'CellNorm'       'none'    % 'none'|'demean'|'zscore' for frame vectors S
 %   'Colormap'       'parula'
+%   'ShowPSTH'       true      % add same-place/different-place PSTH lines
+%   'PSTHWindow'     [0 2]     % seconds relative to CS
+%   'PSTHBin'        0.05      % PSTH bin width (s)
 %   'Verbose'        true
 %
 % Auto-pick logic:
@@ -40,6 +43,10 @@ addParameter(p,'MinBinsCorr',10);
 addParameter(p,'MinTaskSpikes',35);
 addParameter(p,'CellNorm','none');
 addParameter(p,'Colormap','parula');
+addParameter(p,'ShowPSTH',true);
+addParameter(p,'PSTHWindow',[0 2]);
+addParameter(p,'PSTHBin',0.05);
+addParameter(p,'PSTHSmoothBins',1);
 addParameter(p,'Verbose',true);
 parse(p,varargin{:});
 o = p.Results; B = o.TimeBins;
@@ -161,10 +168,12 @@ if o.Verbose
 end
 
 % ============================ plot =============================
-R = numel(cells); C = 3;                     % SAME heat | DIFF heat | bars
-figure('Color','w','Position',[100 80 1100 max(300, 140*R)]);
+R = numel(cells); C = 3 + (o.ShowPSTH ~= 0); % SAME heat | DIFF heat | bars | PSTH
+figure('Color','w','Position',[100 80 1300 max(300, 140*R)]);
 tiledlayout(R, C, 'TileSpacing','compact','Padding','compact');
 cm = o.Colormap; if ischar(cm), cm = feval(cm, 256); end
+frameDt = median(diff(t),'omitnan');
+if ~isfinite(frameDt) || frameDt<=0, frameDt = max(eps, mean(diff(t),'omitnan')); end
 
 % compute a per-figure color range so rows are comparable
 % (based on all values used in SAME/DIFF averages below)
@@ -172,7 +181,7 @@ allVals = [];
 for iRow = 1:R
     cIdx = cells(iRow);
     [meanSame, meanDiff] = averaged_same_diff_profiles(cIdx, S, bSpace, framesBy, B, K);
-    allVals = [allVals; meanSame(:); meanDiff(:)]; %#ok<AGROW>
+    allVals = [allVals; meanSame(:)./frameDt; meanDiff(:)./frameDt]; %#ok<AGROW>
 end
 clim = [min(allVals(isfinite(allVals)),[],'omitnan'), max(allVals(isfinite(allVals)),[],'omitnan')];
 if ~all(isfinite(clim)) || clim(2)<=clim(1), clim = [0 1]; end
@@ -182,14 +191,16 @@ for iRow = 1:R
 
     % (1) SAME trial-averaged temporal profile heat (1×B)
     [meanSame, meanDiff] = averaged_same_diff_profiles(cIdx, S, bSpace, framesBy, B, K);
-    nexttile; imagesc(1:B, 1, meanSame); set(gca,'YTick',[]); axis tight
-    colormap(cm); colorbar; caxis(clim);
+    meanSameRate = meanSame ./ frameDt;
+    meanDiffRate = meanDiff ./ frameDt;
+    nexttile; imagesc(1:B, 1, meanSameRate); set(gca,'YTick',[]); axis tight
+    colormap(cm); cb = colorbar; ylabel(cb,'Events/s'); caxis(clim);
     title(sprintf('Cell %d  SAME space (avg trials)', cIdx));
     xlabel('Temporal bin');
 
     % (2) DIFF trial-averaged temporal profile heat (1×B)
-    nexttile; imagesc(1:B, 1, meanDiff); set(gca,'YTick',[]); axis tight
-    colormap(cm); colorbar; caxis(clim);
+    nexttile; imagesc(1:B, 1, meanDiffRate); set(gca,'YTick',[]); axis tight
+    colormap(cm); cb = colorbar; ylabel(cb,'Events/s'); caxis(clim);
     title('DIFF space (avg other bins)');
     xlabel('Temporal bin');
 
@@ -210,6 +221,27 @@ for iRow = 1:R
     xlim([0.5 2.5]); xticks([1 2]); xticklabels({'SAME','DIFF'});
     ylabel('Trial–trial temporal corr (r)');
     title(sprintf('Cell %d  mean r: %.2f vs %.2f  |  |Δ|=%.2f', cIdx, same_mu, diff_mu, abs(same_mu-diff_mu)));
+
+    if o.ShowPSTH
+        kRef = reference_space_bin(bSpace, framesBy, B, K);
+        [tp, samePSTH, diffPSTH, nSameFrames, nDiffFrames] = same_diff_place_psth( ...
+            cellSpk{cIdx}, cs, t, bSpace, kRef, o.PSTHWindow, o.PSTHBin, o.PSTHSmoothBins);
+        nexttile; hold on
+        plot(tp, samePSTH, 'Color',[0.30 0.60 1.00], 'LineWidth',1.8);
+        plot(tp, diffPSTH, 'Color',[0.85 0.40 0.20], 'LineWidth',1.8);
+        xline(0,'k--','LineWidth',1.0);
+        xline(o.TraceWin(2),'--','Color',[0.65 0.15 0.10],'LineWidth',1.0);
+        yline(0,':','Color',[0.65 0.65 0.65]);
+        yl = [0 max([samePSTH(:); diffPSTH(:)],[],'omitnan')*1.15];
+        if ~all(isfinite(yl)) || yl(2)<=yl(1), yl = [0 1]; end
+        ylim(yl); xlim(o.PSTHWindow);
+        xlabel('Time from CS (s)'); ylabel('Events/s');
+        title(sprintf('PSTH same vs diff place (bin %d)', kRef));
+        legend({sprintf('same place (n=%d frames)',nSameFrames), ...
+                sprintf('different place (n=%d frames)',nDiffFrames)}, ...
+               'Location','northoutside','Orientation','horizontal');
+        set(gca,'Box','off');
+    end
 end
 
 sgtitle(sprintf('%s | %s | Trace %.1f–%.1fs | Grid %dx%d | speed\\geq%.1f=%d | MinTaskSpikes=%d', ...
@@ -288,19 +320,8 @@ end
 function [meanSame, meanDiff] = averaged_same_diff_profiles(cIdx, S, bSpace, framesBy, B, K)
 % Build trial-averaged temporal profiles (length B) for SAME and DIFF for this cell.
 % We pick kRef as the spatial bin with the most task frames.
+kRef = reference_space_bin(bSpace, framesBy, B, K);
 nT = size(framesBy,1);
-% count frames per bin
-countK = zeros(K,1);
-for k = 1:K
-    for b = 1:B
-        for tr = 1:nT
-            idx = framesBy(tr,b).idx;
-            if isempty(idx), continue; end
-            countK(k) = countK(k) + nnz(bSpace(idx) == k);
-        end
-    end
-end
-[~, kRef] = max(countK); if ~isfinite(kRef) || countK(kRef)==0, kRef = 1; end
 
 meanSame = nan(1,B);
 meanDiff = nan(1,B);
@@ -317,6 +338,94 @@ for b = 1:B
     if ~isempty(fSame), meanSame(b) = mean(S(cIdx, fSame), 2, 'omitnan'); end
     if ~isempty(fDiff), meanDiff(b) = mean(S(cIdx, fDiff), 2, 'omitnan'); end
 end
+end
+
+function kRef = reference_space_bin(bSpace, framesBy, B, K)
+% Pick the spatial bin with the most task frames; this is the SAME place.
+nT = size(framesBy,1);
+countK = zeros(K,1);
+for k = 1:K
+    for b = 1:B
+        for tr = 1:nT
+            idx = framesBy(tr,b).idx;
+            if isempty(idx), continue; end
+            countK(k) = countK(k) + nnz(bSpace(idx) == k);
+        end
+    end
+end
+[~, kRef] = max(countK);
+if ~isfinite(kRef) || countK(kRef)==0, kRef = 1; end
+end
+
+function [tp, sameRate, diffRate, nSameFrames, nDiffFrames] = same_diff_place_psth( ...
+    events, cs, t, bSpace, kRef, psthWin, bin, smoothBins)
+% Occupancy-normalized event-rate PSTHs split by SAME place versus DIFF place.
+edges = psthWin(1):bin:psthWin(2);
+tp = edges(1:end-1) + bin/2;
+dt = median(diff(t),'omitnan');
+if ~isfinite(dt) || dt<=0, dt = max(eps, mean(diff(t),'omitnan')); end
+
+sameEvt = zeros(1,numel(tp));
+diffEvt = zeros(1,numel(tp));
+sameOcc = zeros(1,numel(tp));
+diffOcc = zeros(1,numel(tp));
+nSameFrames = 0;
+nDiffFrames = 0;
+
+events = double(events(:));
+events = events(isfinite(events) & events>0);
+for tr = 1:numel(cs)
+    frameIdx = find(t >= cs(tr)+edges(1) & t < cs(tr)+edges(end));
+    if ~isempty(frameIdx)
+        relFrame = t(frameIdx) - cs(tr);
+        [~,~,frameBin] = histcounts(relFrame, edges);
+        sameFrame = bSpace(frameIdx) == kRef;
+        diffFrame = isfinite(bSpace(frameIdx)) & bSpace(frameIdx) ~= kRef;
+        for b = 1:numel(tp)
+            sameOcc(b) = sameOcc(b) + nnz(frameBin == b & sameFrame) * dt;
+            diffOcc(b) = diffOcc(b) + nnz(frameBin == b & diffFrame) * dt;
+        end
+        nSameFrames = nSameFrames + nnz(sameFrame);
+        nDiffFrames = nDiffFrames + nnz(diffFrame);
+    end
+
+    relEvt = events(events >= cs(tr)+edges(1) & events < cs(tr)+edges(end)) - cs(tr);
+    if isempty(relEvt), continue; end
+    evtFrame = nearest_frame_index(t, relEvt + cs(tr));
+    [~,~,evtBin] = histcounts(relEvt, edges);
+    sameEvent = bSpace(evtFrame) == kRef;
+    diffEvent = isfinite(bSpace(evtFrame)) & bSpace(evtFrame) ~= kRef;
+    for b = 1:numel(tp)
+        sameEvt(b) = sameEvt(b) + nnz(evtBin == b & sameEvent);
+        diffEvt(b) = diffEvt(b) + nnz(evtBin == b & diffEvent);
+    end
+end
+
+sameRate = sameEvt ./ max(sameOcc, eps);
+diffRate = diffEvt ./ max(diffOcc, eps);
+sameRate(sameOcc <= 0) = NaN;
+diffRate(diffOcc <= 0) = NaN;
+
+if smoothBins > 0
+    w = ones(1, 2*round(smoothBins)+1);
+    w = w ./ sum(w);
+    sameRate = smooth_with_nan(sameRate, w);
+    diffRate = smooth_with_nan(diffRate, w);
+end
+end
+
+function y = smooth_with_nan(x, w)
+good = isfinite(x);
+x0 = x;
+x0(~good) = 0;
+den = conv(double(good), w, 'same');
+y = conv(x0, w, 'same') ./ max(den, eps);
+y(den <= 0) = NaN;
+end
+
+function idx = nearest_frame_index(tFrames, tEvents)
+idx = round(interp1(tFrames, 1:numel(tFrames), tEvents, 'linear', 'extrap'));
+idx = max(1, min(numel(tFrames), idx));
 end
 
 function [t,x,y] = coerce_pos(pos)

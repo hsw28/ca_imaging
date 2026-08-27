@@ -17,16 +17,19 @@ end
 
 % ---- CONTROL MATCHING OPTIONS ----
 ControlMatch = 'speed';   % 'none' | 'speed' | 'space' | 'speedspace'
-%%%NSpeedBins   = 200;       % used when ControlMatch includes 'speed'
-%%%NSpeedBins   = 100;       % used when ControlMatch includes 'speed'
-NSpeedBins   = 100;
+% Choose ONE speed-binning method and leave the other empty:
+NSpeedBins   = [];       % quantile bins (approximately equal event counts)
+SpeedBinSize = 2;        % fixed bin width in cm/s; e.g., 2
+% Example for fixed 2 cm/s bins:
+% NSpeedBins   = [];
+% SpeedBinSize = 2;
 SpaceBinSize = [];        % [] => use MI 'dim'; else numeric bin size (same units as pos)
 
 % ---- config ----
 ratNames  = {'rat0222','rat0307','rat0313','rat0314','rat0816'};
 velthresh = 4;    % cm/s
 dim       = 2.5;
-nIter     = 100;
+nIter     = 50;
 alpha     = 0.05;
 
 fprintf('\n===== Running MI_control_rollingPost (CS-aligned; control outside span; match=%s) =====\n', ControlMatch);
@@ -65,7 +68,8 @@ for ii = 1:numel(ratNames)
 
     % run rolling CS-aligned analysis with control-matching options
     out = MI_control_rollingPost(spikes, pos, velthresh, dim, ts, cs_times, ...
-                                 nIter, WEdges, ControlMatch, NSpeedBins, SpaceBinSize, RM_structure);
+                                 nIter, WEdges, ControlMatch, NSpeedBins, SpaceBinSize, ...
+                                 RM_structure, SpeedBinSize);
 
     % spike-count parity (optional)
     %print_spike_count_parity(out, ratVar);

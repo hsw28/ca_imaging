@@ -132,12 +132,12 @@ plot_paired_means_slopegraph_POP(R,  'Accel-bin analysis (population POP)'); % N
 plot_rate_change_bars(R, 'Accel-bin analysis', 'metric','percent', 'errType','sem');
 plot_rate_change_bars(R, 'Accel-bin analysis', 'metric','fold',    'errType','sem');
 
-% POPULATION (speed-matched) bars + text
+% POPULATION (accel-matched) bars + text
 plot_rate_change_bars_POP(R, 'Accel-bin analysis', 'metric','percent', 'errType','sem');
 plot_rate_change_bars_POP(R, 'Accel-bin analysis', 'metric','fold',   'errType','sem');
 
-speedBin_dayLevel_heatmap(R, 'titleTag','Speed-bin analysis');
-speedBin_dayLevel_bars(R,    'titleTag','Speed-bin analysis');
+speedBin_dayLevel_heatmap(R, 'titleTag','Accel-bin analysis');
+speedBin_dayLevel_bars(R,    'titleTag','Accel-bin analysis');
 
 % Combo panel: Δ violin, per-rat paired violins, permutation null
 speedBin_population_combo_plots(R, ...
@@ -149,7 +149,7 @@ speedBin_population_combo_plots(R, ...
 speedBin_sigbar_acrossAnimals(R, 'titleTag','Accel-bin analysis');
 
 plot_cell_scatter_trial_vs_non(R, ...
-    'titleTag','Speed-bin analysis (ALL CELLS)', ...
+    'titleTag','Accel-bin analysis (ALL CELLS)', ...
     'perRatPanels', false, ...   % <- single pooled panel
     'logAxes', false, ...
     'alpha', 0.12, ...
@@ -295,6 +295,9 @@ end
 keepTemplate         = (durTrial >= MinDurPerBin) & (durNon >= MinDurPerBin);
 drop.pairedBinsAvail = sum(keepTemplate);
 
+% ---------- matching-quality diagnostics ----------
+matching = build_matching_diagnostics(binCenters, durTrial, durNon, keepTemplate, 'acceleration');
+
 % POPULATION accumulators (across cells, per accel bin)
 popTrialSpikes = zeros(nBins,1);   % total spikes in trial intervals per bin
 popNonSpikes   = zeros(nBins,1);   % total spikes in non-trial intervals per bin
@@ -427,6 +430,63 @@ stats.params             = struct('win',win,'binSize',binSize,'AccelEdges',Accel
                                   'AccelBinWidth',AccelBinWidth,'AccelMode',AccelMode, ...
                                   'MinDurPerBin',MinDurPerBin,'MinBins',MinBins, ...
                                   'alpha',alpha,'test',testType);
+stats.drop               = drop;
+stats.matching           = matching;
+end
+
+function matching = build_matching_diagnostics(binCenters, durTrial, durNon, keepTemplate, binLabel)
+trialRet = durTrial(keepTemplate);
+nonRet   = durNon(keepTemplate);
+centRet  = binCenters(keepTemplate);
+
+ratio = nonRet ./ max(trialRet, eps);
+log2Ratio = log2(ratio);
+
+trialProb = trialRet ./ max(sum(trialRet, 'omitnan'), eps);
+nonProb   = nonRet   ./ max(sum(nonRet,   'omitnan'), eps);
+overlap = sum(min(trialProb, nonProb), 'omitnan');
+l1Distance = 0.5 * sum(abs(trialProb - nonProb), 'omitnan');
+
+matching = struct();
+matching.binLabel = binLabel;
+matching.binCenters = centRet(:);
+matching.trialDurSec = trialRet(:);
+matching.nonTrialDurSec = nonRet(:);
+matching.nonTrialToTrialDurRatio = ratio(:);
+matching.log2NonTrialToTrialDurRatio = log2Ratio(:);
+matching.trialProb = trialProb(:);
+matching.nonTrialProb = nonProb(:);
+matching.overlap = overlap;
+matching.l1Distance = l1Distance;
+matching.nTotalBins = numel(binCenters);
+matching.nTrialOccupiedBins = sum(durTrial > 0);
+matching.nNonTrialOccupiedBins = sum(durNon > 0);
+matching.nEitherOccupiedBins = sum((durTrial > 0) | (durNon > 0));
+matching.nBothOccupiedBins = sum((durTrial > 0) & (durNon > 0));
+matching.nRetainedBins = sum(keepTemplate);
+matching.totalTrialDurSec = sum(trialRet, 'omitnan');
+matching.totalNonTrialDurSec = sum(nonRet, 'omitnan');
+finiteRatio = ratio(isfinite(ratio));
+finiteAbsLog2Ratio = abs(log2Ratio(isfinite(log2Ratio)));
+matching.medianDurRatio = safe_median(finiteRatio);
+matching.iqrDurRatio = safe_prctile(finiteRatio, [25 75]);
+matching.medianAbsLog2DurRatio = safe_median(finiteAbsLog2Ratio);
+end
+
+function y = safe_median(x)
+if isempty(x)
+    y = NaN;
+else
+    y = median(x, 'omitnan');
+end
+end
+
+function y = safe_prctile(x, p)
+if isempty(x)
+    y = nan(size(p));
+else
+    y = prctile(x, p);
+end
 end
 
 % ======================================================================
@@ -1742,11 +1802,11 @@ plot([x0 x0],[mu-se mu+se],'k-','LineWidth',1.2);
 end
 
 function Pop = accel_population_summary_split_POP(R, varargin)
-% Population-level (across cells) speed-matched summary.
+% Population-level (across cells) acceleration-matched summary.
 % Uses per-day S.pop.* fields (bin-wise population rates).
 %
 % Prints:
-%   === Mean POPULATION firing rates (per rat; speed-matched bins) ===
+%   === Mean POPULATION firing rates (per rat; accel-matched bins) ===
 % in the same spirit as your per-cell summary, but with nBins instead of nCells.
 
 p = inputParser;
@@ -1847,7 +1907,7 @@ end
 p_perm_all = mean(abs(T_perm_all) >= abs(T_obs_all));
 
 % ---- console print: POPULATION mean firing rates per rat ----
-fprintf('\n=== Mean POPULATION firing rates (per rat; speed-matched bins) ===\n');
+fprintf('\n=== Mean POPULATION firing rates (per rat; accel-matched bins) ===\n');
 for rr=1:nR
     fprintf('%s: trial=%.4f Hz nontrial=%.4f Hz Δ=%.4f Hz nBins=%d p_perm=%.4g\n', ...
         ratNames{rr}, ...

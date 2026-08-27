@@ -1,7 +1,7 @@
 function rolling_struct = MI_control_rollingPost( ...
     spike_structure, pos_structure, velthreshold, dim, ...
     CA_timestamps, CS_times_struct, nIter, winEdges, ...
-    ControlMatch, NSpeedBins, SpaceBinSize, RM_structure)
+    ControlMatch, NSpeedBins, SpaceBinSize, RM_structure, SpeedBinSize)
 % MI_control_rollingPost
 %
 % CS-aligned rolling removal/control using count-based joint MI:
@@ -23,11 +23,24 @@ function rolling_struct = MI_control_rollingPost( ...
 %     .winEdges, .MI_win (W×Nc), .MI_rand (W×Nc), .MI_base (1×Nc), .dMI
 %     .counts: struct of spike-count diagnostics
 
-if nargin < 7 || isempty(nIter),        nIter = 20; end
+if nargin < 7 || isempty(nIter),        nIter = 5; end
 if nargin < 8 || isempty(winEdges),     winEdges = [0 2; 1 3; 2 4; 3 5; 4 6; 5 7; 8 10; 9 11; 10 12; 11 13]; end
 if nargin < 9 || isempty(ControlMatch), ControlMatch = 'none'; end
-if nargin < 10 || isempty(NSpeedBins),  NSpeedBins = 5; end
+if nargin < 10,                         NSpeedBins = 5; end
 if nargin < 11 || isempty(SpaceBinSize),SpaceBinSize = dim; end
+if nargin < 13,                         SpeedBinSize = []; end
+
+if isempty(NSpeedBins) && isempty(SpeedBinSize)
+    NSpeedBins = 5;
+elseif ~isempty(NSpeedBins) && ~isempty(SpeedBinSize)
+    error('Choose either NSpeedBins or SpeedBinSize; leave the other empty.');
+end
+if ~isempty(NSpeedBins) && (~isscalar(NSpeedBins) || NSpeedBins < 1 || NSpeedBins ~= floor(NSpeedBins))
+    error('NSpeedBins must be a positive integer.');
+end
+if ~isempty(SpeedBinSize) && (~isscalar(SpeedBinSize) || ~isfinite(SpeedBinSize) || SpeedBinSize <= 0)
+    error('SpeedBinSize must be a positive scalar in cm/s.');
+end
 
 TrialWinSecs = [0 2];
 GuardSecs    = 0.5;
@@ -270,6 +283,12 @@ for iDay = 1:numel(fields_spikes)
             continue;
         end
 
+        % Assign each movement spike to a position sample once.  All rolling
+        % windows and control iterations below reuse this assignment instead
+        % of repeating a full nearest-sample search for every MI calculation.
+        [base_count_per_sample, assigned_sample_idx] = assign_spikes_to_samples( ...
+            move_spikes, sample_time_valid, maxAssignDist);
+
         nearest_cs_for_move = interp1(cs_times, cs_times, move_spikes, 'nearest', NaN);
         rel_t_move          = move_spikes - nearest_cs_for_move;
 
@@ -309,14 +328,14 @@ for iDay = 1:numel(fields_spikes)
                 continue;
             end
 
-            keep_mask_win = true(size(move_spikes));
-            keep_mask_win(w_idx) = false;
-            keep_win = move_spikes(keep_mask_win);
+            nKeepWin = numel(move_spikes) - nRemove;
+            N_keep_win_k(w) = nKeepWin;
 
-            N_keep_win_k(w) = numel(keep_win);
-
-            if numel(keep_win) >= 2
-                MI_win_k(w) = count_mi_from_spikes(keep_win, sample_time_valid, linBin_true, maxAssignDist, nXBins, nYBins, maxK);
+            if nKeepWin >= 2
+                win_counts = remove_assigned_spikes( ...
+                    base_count_per_sample, assigned_sample_idx, w_idx);
+                MI_win_k(w) = count_mi_from_counts( ...
+                    win_counts, linBin_true, nXBins, nYBins, maxK);
             end
 
             in_trial = (rel_t_move >= TrialWinSecs(1)) & (rel_t_move <= TrialWinSecs(2));
@@ -344,7 +363,8 @@ for iDay = 1:numel(fields_spikes)
 
                     case 'speed'
                         ctrl_speed = move_speed(ctrl_idx);
-                        edges = make_quant_edges([w_speed(:); ctrl_speed(:)], NSpeedBins);
+                        edges = make_speed_edges( ...
+                            [w_speed(:); ctrl_speed(:)], NSpeedBins, SpeedBinSize);
                         wbins    = discretize(w_speed,    edges);
                         ctrlbins = discretize(ctrl_speed, edges);
                         sample_idx = stratified_sample(ctrl_idx, ctrlbins, wbins, nRemove);
@@ -366,7 +386,8 @@ for iDay = 1:numel(fields_spikes)
 
                     case 'speedspace'
                         ctrl_speed = move_speed(ctrl_idx);
-                        edges = make_quant_edges([w_speed(:); ctrl_speed(:)], NSpeedBins);
+                        edges = make_speed_edges( ...
+                            [w_speed(:); ctrl_speed(:)], NSpeedBins, SpeedBinSize);
                         wbins    = discretize(w_speed,    edges);
                         ctrlbins = discretize(ctrl_speed, edges);
                         if isempty(edgesX) || isempty(edgesY)
@@ -391,14 +412,14 @@ for iDay = 1:numel(fields_spikes)
                     continue;
                 end
 
-                keep_rd = move_spikes;
-                keep_rd(sample_idx) = [];
-
-                if numel(keep_rd) < 2
+                if (numel(move_spikes) - numel(sample_idx)) < 2
                     continue;
                 end
 
-                thisMI = count_mi_from_spikes(keep_rd, sample_time_valid, linBin_true, maxAssignDist, nXBins, nYBins, maxK);
+                ctrl_counts = remove_assigned_spikes( ...
+                    base_count_per_sample, assigned_sample_idx, sample_idx);
+                thisMI = count_mi_from_counts( ...
+                    ctrl_counts, linBin_true, nXBins, nYBins, maxK);
                 if isnan(thisMI)
                     continue;
                 end
@@ -454,16 +475,40 @@ if isempty(spike_times) || isempty(sample_time_valid) || isempty(linBin_true)
     return;
 end
 
+[countPerSample, ~] = assign_spikes_to_samples( ...
+    spike_times, sample_time_valid, maxAssignDist);
+
+mi = count_mi_from_counts(countPerSample, linBin_true, nXBins, nYBins, maxK);
+end
+
+
+function [countPerSample, assignedSampleIdx] = assign_spikes_to_samples(spike_times, sample_time_valid, maxAssignDist)
+
 countPerSample = zeros(numel(sample_time_valid),1);
+assignedSampleIdx = nan(numel(spike_times),1);
 
 for s = 1:numel(spike_times)
     [d, idxNearest] = min(abs(sample_time_valid - spike_times(s)));
     if d <= maxAssignDist
+        assignedSampleIdx(s) = idxNearest;
         countPerSample(idxNearest) = countPerSample(idxNearest) + 1;
     end
 end
+end
 
-mi = count_mi_from_counts(countPerSample, linBin_true, nXBins, nYBins, maxK);
+
+function countPerSample = remove_assigned_spikes(baseCountPerSample, assignedSampleIdx, spikeIdx)
+
+countPerSample = baseCountPerSample;
+sampleIdx = assignedSampleIdx(spikeIdx);
+sampleIdx = sampleIdx(isfinite(sampleIdx));
+
+if isempty(sampleIdx)
+    return;
+end
+
+removedPerSample = accumarray(sampleIdx, 1, size(countPerSample), @sum, 0);
+countPerSample = countPerSample - removedPerSample;
 end
 
 
@@ -542,6 +587,19 @@ elseif numel(edges) <= NB
     edges = linspace(mn, mx, NB+1);
 end
 end
+
+
+function edges = make_speed_edges(x, NSpeedBins, SpeedBinSize)
+x = x(isfinite(x));
+if isempty(x)
+    edges = [];
+elseif ~isempty(SpeedBinSize)
+    edges = make_lin_edges(min(x), max(x), SpeedBinSize);
+else
+    edges = make_quant_edges(x, NSpeedBins);
+end
+end
+
 
 function sample_idx = stratified_sample(ctrl_idx, ctrl_bins, w_bins, nRemove)
 ctrl_idx  = ctrl_idx(:);

@@ -1,4 +1,4 @@
-function SpikesPerBin(ratNames, varargin)
+function SpikesPerBin_extinction(ratNames, varargin)
 % SpikesPerBin(ratNames, ...)
 % Build a (nBins × nCells) event-rate matrix per day and store in rat.spikesperbin.
 % Optionally demean each cell by its pre-CS baseline mean (Hz).
@@ -15,8 +15,11 @@ function SpikesPerBin(ratNames, varargin)
 %   'DoPlot'          true
 %   'Axes'            []      (see notes below)
 %   'GrandPlot'       true
-%   'EndTime'         4
+%   'StartTime'       -1
+%   'EndTime'         3
 %   'BinWidth'        (1/10)
+%   'DropFirstTrials' 0       (use all trials by default)
+%   'ExtinctionDays'  3       (1 = final day, 2 = final two days, etc.)
 %
 % Axes usage:
 %   PerDay=false:
@@ -25,8 +28,8 @@ function SpikesPerBin(ratNames, varargin)
 %       - Axes = vector length nRats+1 -> last axis is grand
 %   PerDay=true:
 %       - Axes = [] -> creates per-rat figure(s) + optional grand figure
-%       - Axes can be 2x3 (top row rat day1-3, bottom row grand day1-3)
-%         or vector length 6 in order [ratD1 ratD2 ratD3 grandD1 grandD2 grandD3]
+%       - Axes can be 2 x ExtinctionDays (top row rat days, bottom row grand days)
+%         or vector length 2*ExtinctionDays in order [rat days, grand days]
 
 % ---------- options ----------
 p = inputParser;
@@ -37,9 +40,11 @@ p.addParameter('PerDay', false, @(x)islogical(x) && isscalar(x));
 p.addParameter('DoPlot', true, @(x)islogical(x) && isscalar(x));
 p.addParameter('Axes', [], @(x) isempty(x) || all(ishghandle(x)));
 p.addParameter('GrandPlot', true, @(x)islogical(x) && isscalar(x));
-p.addParameter('EndTime', 4, @(x)isnumeric(x) && isscalar(x) && x>0);
-p.addParameter('StartTime', -.5, @(x)isnumeric(x) && x<0);
+p.addParameter('StartTime', -1, @(x)isnumeric(x) && isscalar(x));
+p.addParameter('EndTime', 3, @(x)isnumeric(x) && isscalar(x) && x>0);
 p.addParameter('BinWidth', (1/15), @(x)isnumeric(x) && isscalar(x) && x>0);
+p.addParameter('DropFirstTrials', 0, @(x)isnumeric(x) && isscalar(x) && x>=0 && mod(x,1)==0);
+p.addParameter('ExtinctionDays', 2, @(x)isnumeric(x) && isscalar(x) && x>=1 && mod(x,1)==0);
 p.parse(varargin{:});
 
 Demean          = p.Results.Demean;
@@ -49,9 +54,15 @@ PerDay          = p.Results.PerDay;
 DoPlot          = p.Results.DoPlot;
 AxesIn          = p.Results.Axes;
 GrandPlot       = p.Results.GrandPlot;
+starttime       = p.Results.StartTime;
 endtime         = p.Results.EndTime;
-starttime         = p.Results.StartTime;
 binWidth        = p.Results.BinWidth;
+dropFirstN      = p.Results.DropFirstTrials;
+nExtDays        = p.Results.ExtinctionDays;
+
+if endtime <= starttime
+    error('EndTime must be greater than StartTime.');
+end
 
 % --- bar border style (NEW) ---
 barEdgeColor = [0 0 0];
@@ -69,23 +80,23 @@ baseMask = (tAxis >= BaselineWindow(1)) & (tAxis < BaselineWindow(2));
 % ---------- main loop: compute + store per day ----------
 for r = 1:numel(ratNames)
     rat   = evalin('base', ratNames{r});
-    dates = autoDateList(rat);
-    idx   = find(strcmp(dates, rat.An),1);
-    if isempty(idx) || idx < 3
-        warning('%s has fewer than 3 learned sessions (An=%s). Skipping.', ratNames{r}, rat.An);
+    days  = extinctionDateList(rat, nExtDays);
+    if numel(days) < nExtDays
+        warning('%s has fewer than %d extinction sessions. Skipping.', ratNames{r}, nExtDays);
         continue;
     end
-    days  = dates(idx-2:idx);
 
-    for d = 1:3
+    for d = 1:nExtDays
         dayStr   = days{d};
-        spk      = rat.Ca_peaks.(sprintf('CA_peaks_%s',dayStr));
-        csTimes  = rat.CS_times.(sprintf('CS_%s',dayStr));
-        ratemask = (rat.ratemask.(sprintf('ratemask_%s',dayStr)) == 1);
+        spkField = findFieldForDate(rat.Ca_peaks, dayStr, {'CA_peaks_', 'Ca_peaks_'});
+        csField  = findFieldForDate(rat.CS_times, dayStr, ...
+            {'CS_exinction_', 'CS_extinction_', 'CS_'});
+        spk      = rat.Ca_peaks.(spkField);
+        csTimes  = rat.CS_times.(csField);
+        csTimes  = dropFirstTrials(csTimes, dropFirstN);
 
         nTotal   = size(spk,1);
-        inclMask = ratemask(:) == 1;
-        inclIdx  = find(inclMask);
+        inclIdx  = [1:size(spk,1)];
 
         counts = zeros(nBins, nTotal);
         nTrialsUse = numel(csTimes);
@@ -105,7 +116,6 @@ for r = 1:numel(ratNames)
         end
 
         ratesHz = counts / (binWidth * max(1, nTrialsUse));
-        ratesHz(:, ~inclMask) = NaN;
 
         if Demean
             if ~any(baseMask)
@@ -135,7 +145,7 @@ for r = 1:numel(ratNames)
     end
 
     assignin('base', ratNames{r}, rat);
-    fprintf('Stored spikesperbin for %s (days: %s, %s, %s)\n', ratNames{r}, days{:});
+    fprintf('Stored spikesperbin for %s (days: %s)\n', ratNames{r}, strjoin(days, ', '));
 end
 
 % ---------- plotting ----------
@@ -147,20 +157,18 @@ nRats = numel(ratNames);
 nBinsLocal = nBins; %#ok<NASGU>
 
 % Precompute per-rat day means (for grand panels)
-ratMu = cell(nRats,3);
-ratDayLabels = cell(nRats,3);
+ratMu = cell(nRats,nExtDays);
+ratDayLabels = cell(nRats,nExtDays);
 
 for rr = 1:nRats
     rat   = evalin('base', ratNames{rr});
-    dates = autoDateList(rat);
-    idx   = find(strcmp(dates, rat.An),1);
-    if isempty(idx) || idx < 3
-        for d=1:3, ratMu{rr,d} = nan(1,nBins); ratDayLabels{rr,d} = ''; end
+    days  = extinctionDateList(rat, nExtDays);
+    if numel(days) < nExtDays
+        for d=1:nExtDays, ratMu{rr,d} = nan(1,nBins); ratDayLabels{rr,d} = ''; end
         continue;
     end
-    days  = dates(idx-2:idx);
 
-    for d = 1:3
+    for d = 1:nExtDays
         ratDayLabels{rr,d} = days{d};
         if Demean && isfield(rat.spikesperbin, sprintf('cpbDM_%s',days{d}))
             X = rat.spikesperbin.(sprintf('cpbDM_%s',days{d}));
@@ -205,18 +213,16 @@ if ~PerDay
         axes(ax); cla(ax); hold(ax,'on');
 
         rat   = evalin('base', ratNames{rr});
-        dates = autoDateList(rat);
-        idx   = find(strcmp(dates, rat.An),1);
-        if isempty(idx) || idx < 3
+        days  = extinctionDateList(rat, nExtDays);
+        if numel(days) < nExtDays
             title(ax, sprintf('%s (insufficient days)', ratNames{rr}), 'Interpreter','none');
             box(ax,'off');
             continue;
         end
-        days  = dates(idx-2:idx);
 
-        % concatenate cells across 3 days for this rat
+        % concatenate cells across selected extinction days for this rat
         M = [];
-        for d = 1:3
+        for d = 1:nExtDays
             if Demean && isfield(rat.spikesperbin, sprintf('cpbDM_%s',days{d}))
                 X = rat.spikesperbin.(sprintf('cpbDM_%s',days{d}));
             else
@@ -282,40 +288,38 @@ end
 % =========================
 for rr = 1:nRats
     rat   = evalin('base', ratNames{rr});
-    dates = autoDateList(rat);
-    idx   = find(strcmp(dates, rat.An),1);
-    if isempty(idx) || idx < 3
+    days  = extinctionDateList(rat, nExtDays);
+    if numel(days) < nExtDays
         warning('%s: insufficient days for PerDay plot. Skipping plot.', ratNames{rr});
         continue;
     end
-    days  = dates(idx-2:idx);
 
     if isempty(AxesIn)
         figure('Color','w');
-        axRat = gobjects(1,3);
-        for d = 1:3, axRat(d) = subplot(1,3,d); end
+        axRat = gobjects(1,nExtDays);
+        for d = 1:nExtDays, axRat(d) = subplot(1,nExtDays,d); end
         axGrand = [];
         if GrandPlot
             figure('Color','w');
-            axGrand = gobjects(1,3);
-            for d = 1:3, axGrand(d) = subplot(1,3,d); end
+            axGrand = gobjects(1,nExtDays);
+            for d = 1:nExtDays, axGrand(d) = subplot(1,nExtDays,d); end
         end
     else
-        % AxesIn can be 3 (rat only) or 6 / 2x3 (rat + grand)
-        if ismatrix(AxesIn) && size(AxesIn,1)==2 && size(AxesIn,2)==3
+        % AxesIn can be nExtDays (rat only) or 2*nExtDays (rat + grand)
+        if ismatrix(AxesIn) && size(AxesIn,1)==2 && size(AxesIn,2)==nExtDays
             axRat   = AxesIn(1,:);
             axGrand = AxesIn(2,:);
         else
             a = AxesIn(:).';
-            if numel(a) < 3
-                error('Axes must have at least 3 axes for PerDay=true.');
+            if numel(a) < nExtDays
+                error('Axes must have at least ExtinctionDays axes for PerDay=true.');
             end
-            axRat = a(1:3);
+            axRat = a(1:nExtDays);
             if GrandPlot
-                if numel(a) < 6
-                    error('Axes must have 6 axes (rat 3 + grand 3) when GrandPlot=true.');
+                if numel(a) < 2*nExtDays
+                    error('Axes must have 2*ExtinctionDays axes (rat + grand) when GrandPlot=true.');
                 end
-                axGrand = a(4:6);
+                axGrand = a(nExtDays+1:2*nExtDays);
             else
                 axGrand = [];
             end
@@ -323,7 +327,7 @@ for rr = 1:nRats
     end
 
     % --- rat day-by-day ---
-    for d = 1:3
+    for d = 1:nExtDays
         ax = axRat(d);
         axes(ax); cla(ax); hold(ax,'on');
 
@@ -357,7 +361,7 @@ for rr = 1:nRats
 
     % --- grand day-by-day across rats ---
     if GrandPlot && ~isempty(axGrand)
-        for d = 1:3
+        for d = 1:nExtDays
             ax = axGrand(d);
             axes(ax); cla(ax); hold(ax,'on');
 
@@ -389,4 +393,78 @@ for rr = 1:nRats
         end
     end
 end
+end
+
+function days = extinctionDateList(rat, nDays)
+% Use the actual extinction CS fields; autoDateList only looks at Ca_traces.
+days = {};
+if ~isfield(rat, 'CS_times') || isempty(rat.CS_times)
+    return;
+end
+
+fields = fieldnames(rat.CS_times);
+isExtinction = ~cellfun('isempty', regexpi(fields, '^CS_(exinction|extinction)_'));
+dateTokens = cellfun(@extractDateToken, fields(isExtinction), 'UniformOutput', false);
+dateTokens = dateTokens(~cellfun('isempty', dateTokens));
+
+if isempty(dateTokens)
+    dateTokens = cellfun(@extractDateToken, fields, 'UniformOutput', false);
+    dateTokens = dateTokens(~cellfun('isempty', dateTokens));
+end
+
+days = unique(dateTokens, 'stable');
+if isempty(days)
+    return;
+end
+
+dayNums = datenum(strrep(days, '_', '-'), 'yyyy-mm-dd');
+[~, order] = sort(dayNums);
+days = days(order);
+days = days(max(1, numel(days)-nDays+1):end);
+end
+
+function token = extractDateToken(fieldName)
+token = regexp(fieldName, '\d{4}[_-]\d{2}[_-]\d{2}', 'match', 'once');
+if ~isempty(token)
+    token = strrep(token, '-', '_');
+end
+end
+
+function trials = dropFirstTrials(trials, nDrop)
+if numel(trials) <= nDrop
+    trials = trials([]);
+else
+    trials = trials(nDrop+1:end);
+end
+end
+
+function fieldName = findFieldForDate(S, dayStr, prefixes)
+fields = fieldnames(S);
+for i = 1:numel(prefixes)
+    candidate = [prefixes{i} dayStr];
+    if isfield(S, candidate)
+        fieldName = candidate;
+        return;
+    end
+end
+
+datePattern = strrep(dayStr, '_', '[_-]');
+matches = fields(~cellfun('isempty', regexp(fields, datePattern, 'once')));
+if isempty(matches)
+    error('Could not find a field for date %s.', dayStr);
+elseif numel(matches) > 1
+    prefixMatches = false(size(matches));
+    for i = 1:numel(prefixes)
+        prefixMatches = prefixMatches | startsWith(matches, prefixes{i});
+    end
+    matches = matches(prefixMatches);
+end
+
+if isempty(matches)
+    error('Could not find a field for date %s.', dayStr);
+elseif numel(matches) > 1
+    error('Found multiple fields for date %s: %s', dayStr, strjoin(matches, ', '));
+end
+
+fieldName = matches{1};
 end

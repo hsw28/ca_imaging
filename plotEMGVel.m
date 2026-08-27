@@ -1,6 +1,9 @@
 function f = plotEMGVel()
 
+
 ratNames = {'rat0222','rat0307','rat0313','rat0314','rat0816'};  %
+
+
 spreadType = 'std';  % 'std' or 'sem' to pass to align + plot
 
 velMat = {};
